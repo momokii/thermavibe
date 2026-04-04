@@ -1,0 +1,19 @@
+{
+  "tools": {
+    "Bash": {
+      "allow": [
+        "python -m pytest*",
+        "ruff check*",
+        "npm test*",
+        "npm run lint*",
+        "npx tsc*",
+        "alembic*",
+        "docker compose*",
+        "make *",
+        "git status*",
+        "git diff*",
+        "git log*"
+      ]
+    }
+  }
+}

@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibeprint-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-thermavibe}
+      POSTGRES_USER: ${POSTGRES_USER:-thermavibe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thermavibe}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - vibeprint-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-thermavibe}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vibeprint-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-thermavibe}:${POSTGRES_PASSWORD:-thermavibe}@postgres:5432/${POSTGRES_DB:-thermavibe}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-change-me-in-production}
+      ADMIN_PIN: ${ADMIN_PIN:-1234}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      PAYMENT_ENABLED: ${PAYMENT_ENABLED:-false}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      PRINTER_VENDOR_ID: ${PRINTER_VENDOR_ID:-0x04b8}
+      PRINTER_PRODUCT_ID: ${PRINTER_PRODUCT_ID:-0x0202}
+      CAMERA_DEVICE_INDEX: ${CAMERA_DEVICE_INDEX:-0}
+    volumes:
+      - app-logs:/app/logs
+    networks:
+      - vibeprint-net
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/video0:/dev/video0
+
+volumes:
+  postgres-data:
+    name: vibeprint-postgres-data
+  app-logs:
+    name: vibeprint-app-logs
+
+networks:
+  vibeprint-net:
+    driver: bridge
+    name: vibeprint-net

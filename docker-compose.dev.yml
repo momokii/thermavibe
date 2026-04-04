@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      target: backend-runtime
+    container_name: vibeprint-app-dev
+    volumes:
+      - ./backend/app:/app/app
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://thermavibe:thermavibe@postgres:5432/thermavibe
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    networks:
+      - vibeprint-net
+
+  postgres:
+    container_name: vibeprint-postgres-dev
+    ports:
+      - "5432:5432"
+    networks:
+      - vibeprint-net
+
+networks:
+  vibeprint-net:
+    driver: bridge
+    name: vibeprint-net
