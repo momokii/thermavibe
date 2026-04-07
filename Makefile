@@ -74,6 +74,28 @@ shell-backend: ## Open a shell in the backend container
 shell-db: ## Open psql shell in the database container
 	docker compose exec postgres psql -U thermavibe -d thermavibe
 
+# ---- Local Development (non-Docker) ----
+
+.PHONY: local-backend
+local-backend: ## Run backend with hot reload (no Docker)
+	cd backend && .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+.PHONY: local-migrate
+local-migrate: ## Run database migrations locally
+	cd backend && .venv/bin/alembic upgrade head
+
+.PHONY: local-migrate-create
+local-migrate-create: ## Create a new migration locally (usage: make local-migrate-create msg="description")
+	cd backend && .venv/bin/alembic revision --autogenerate -m "$(msg)"
+
+.PHONY: local-test
+local-test: ## Run backend tests locally (no Docker)
+	cd backend && .venv/bin/python -m pytest tests/ -v
+
+.PHONY: local-lint
+local-lint: ## Lint backend Python code locally (no Docker)
+	cd backend && .venv/bin/ruff check app/ tests/
+
 # ---- Utilities ----
 
 .PHONY: logs

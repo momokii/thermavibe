@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Admin
     admin_pin: str = "1234"
 
+    # CORS
+    cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

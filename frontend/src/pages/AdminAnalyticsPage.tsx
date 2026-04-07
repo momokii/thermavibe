@@ -1,7 +1,5 @@
-/**
- * Admin analytics page -- session and revenue charts.
- * Route: /admin/analytics
- */
+import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
+
 export default function AdminAnalyticsPage() {
-  return <div className="admin-analytics-page" />;
+  return <AnalyticsDashboard mode="full" />;
 }

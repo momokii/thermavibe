@@ -1,7 +1,12 @@
-/**
- * Public kiosk page — the main route for end-user interaction.
- * Renders the KioskShell component in fullscreen mode.
- */
+import KioskShell from '@/components/kiosk/KioskShell';
+import ErrorBoundary from '@/components/ErrorBoundary';
+
 export default function KioskPage() {
-  return <div className="kiosk-page" />
+  return (
+    <div className="kiosk-fullscreen">
+      <ErrorBoundary>
+        <KioskShell />
+      </ErrorBoundary>
+    </div>
+  );
 }

@@ -1,7 +1,10 @@
-/**
- * Admin hardware page -- camera and printer status and testing.
- * Route: /admin/hardware
- */
+import HardwareSetup from '@/components/admin/HardwareSetup';
+
 export default function AdminHardwarePage() {
-  return <div className="admin-hardware-page" />;
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">Hardware</h2>
+      <HardwareSetup />
+    </div>
+  );
 }

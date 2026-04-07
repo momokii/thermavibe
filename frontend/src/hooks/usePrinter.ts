@@ -1,5 +1,9 @@
-/**
- * Print job trigger and status polling hook.
- */
+import { useMutation } from '@tanstack/react-query';
+import { kioskApi } from '@/api/kioskApi';
 
-// TODO: Implement printer hook
+export function usePrintReceipt() {
+  return useMutation({
+    mutationFn: ({ sessionId, includePhoto }: { sessionId: string; includePhoto?: boolean }) =>
+      kioskApi.print(sessionId, includePhoto),
+  });
+}

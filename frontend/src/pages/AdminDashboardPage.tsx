@@ -1,7 +1,5 @@
-/**
- * Admin dashboard page -- overview with key metrics.
- * Route: /admin
- */
+import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard';
+
 export default function AdminDashboardPage() {
-  return <div className="admin-dashboard-page" />;
+  return <AnalyticsDashboard mode="summary" />;
 }

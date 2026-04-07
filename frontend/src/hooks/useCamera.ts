@@ -1,5 +1,8 @@
-/**
- * Custom hook for accessing the camera live preview stream.
- * Connects to the backend MJPEG stream endpoint and provides
- * a ref to attach to a <video> or <img> element.
- */
+import { useMemo } from 'react';
+import { CAMERA_STREAM_URL } from '@/lib/constants';
+
+export function useCamera() {
+  const streamUrl = useMemo(() => CAMERA_STREAM_URL, []);
+  const isActive = true;
+  return { streamUrl, isActive };
+}

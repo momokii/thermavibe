@@ -1,7 +1,17 @@
-/**
- * Operator admin dashboard page — PIN-protected configuration and analytics interface.
- * Renders the AdminLayout with tabbed navigation for different admin panels.
- */
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAdminStore } from '@/stores/adminStore';
+import AdminLayout from '@/components/admin/AdminLayout';
+
 export default function AdminPage() {
-  return <div className="admin-page" />
+  const isAuthenticated = useAdminStore((s) => s.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return (
+    <AdminLayout>
+      <Outlet />
+    </AdminLayout>
+  );
 }
