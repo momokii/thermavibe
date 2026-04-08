@@ -19,6 +19,7 @@ from app.schemas.camera import (
     ActiveCameraInfo,
     CameraDevice,
     CameraListResponse,
+    CameraSelectResponse,
     ResolutionInfo,
 )
 

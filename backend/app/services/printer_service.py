@@ -232,7 +232,7 @@ def _dither_image(image_bytes: bytes, width: int = 384) -> Image.Image:
     img = img.resize((width, new_height), Image.Resampling.LANCZOS)
 
     # Apply Floyd-Steinberg dithering
-    img = img.convert('1', method=Image.FloydSteinberg)
+    img = img.convert('1', method=Image.Dither.FLOYDSTEINBERG)
 
     return img
 
