@@ -8,13 +8,22 @@ Tasks are organized in dependency waves, ordered by sequence.
 
 ## Remaining Work
 
-These are the items still needing implementation:
+These are the items still needing implementation, ordered by priority:
 
-1. **Implement PaymentScreen** — The kiosk payment screen is a stub (empty `<div>`). Must be completed before enabling `PAYMENT_ENABLED=true`.
-2. **Add kiosk error display UI** — `kioskStore.error` is set but never rendered. Users see nothing on errors.
-3. **Expand frontend test coverage** — Admin components, most hooks, and pages lack tests.
-4. **Fix useKioskState side effect** — Render-time side effect should be in `useEffect`.
-5. **Remove unused `next-themes` dependency** — Dead package in `package.json`.
+### Security Remediation (from Phase 1 audit)
+
+1. **SEC-001: Add non-root user to Dockerfile** — App container runs as root. Add `USER` directive with non-root user. Priority: High.
+2. **SEC-002: Add API rate limiting** — No rate limiting beyond admin login. Add general API rate limiting middleware. Priority: Medium.
+3. **SEC-003: Add request/response size limits** — No file upload or payload size limits configured. Priority: Medium.
+4. **SEC-004: Restrict CORS in production** — Default CORS allows all methods/headers. Should be narrowed for production. Priority: Medium.
+
+### Feature Work
+
+5. **Implement PaymentScreen** — The kiosk payment screen is a stub (empty `<div>`). Must be completed before enabling `PAYMENT_ENABLED=true`.
+6. **Add kiosk error display UI** — `kioskStore.error` is set but never rendered. Users see nothing on errors.
+7. **Expand frontend test coverage** — Admin components, most hooks, and pages lack tests.
+8. **Fix useKioskState side effect** — Render-time side effect should be in `useEffect`.
+9. **Remove unused `next-themes` dependency** — Dead package in `package.json`.
 
 ---
 

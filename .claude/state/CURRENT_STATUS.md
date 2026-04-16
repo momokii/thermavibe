@@ -1,8 +1,8 @@
 # Current Status — VibePrint OS
 
-**Last Updated:** 2026-04-13
-**Updated By:** Repository status audit
-**Session Summary:** Full repo analysis. Updated from Phase 0 (5%) to reflect actual implementation state (~75%).
+**Last Updated:** 2026-04-16
+**Updated By:** `.claude/` infrastructure takeover audit
+**Session Summary:** Complete security and infrastructure audit. Added SECURITY_STANDARDS.md, ENVIRONMENT_GUIDE.md, templates/new_feature.md. Enhanced existing .claude/ files with security rules, environment awareness, and session-end protocols.
 
 ---
 
@@ -142,6 +142,37 @@ The project has a complete backend with all services, API endpoints, and 249 tes
 5. **useCamera is oversimplified** — Always returns static stream URL, no device selection.
 6. **No CI/CD pipeline** — No automated testing or deployment.
 7. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
+
+---
+
+## Security Findings
+
+**Overall Posture: YELLOW** (good foundations, production hardening needed)
+
+### Confirmed Safe
+- No hardcoded secrets, API keys, or tokens in source code
+- `.env` is properly gitignored (not tracked in version control)
+- All database queries use parameterized statements (no SQL injection)
+- JWT auth with constant-time PIN comparison and rate limiting
+- Input validation via Pydantic v2 on all request bodies
+- Photos deleted after session completion (privacy-first)
+
+### Issues Requiring Remediation (see TASK_QUEUE.md for SEC-001 through SEC-004)
+- SEC-001: Docker container runs as root (no `USER` directive)
+- SEC-002: No API rate limiting beyond auth endpoint
+- SEC-003: No request/response size limits
+- SEC-004: CORS allows all methods/headers in production defaults
+
+Full details in `.claude/SECURITY_STANDARDS.md`
+
+---
+
+## Open Questions
+
+1. Should payment store be persisted to database instead of in-memory? (Current: in-memory, acceptable for single-kiosk)
+2. Should rate limiter use Redis for distributed deployments? (Current: in-memory, acceptable for single-kiosk)
+3. What is the production CORS policy? (Current: configurable via env var, defaults to localhost)
+4. Is there a Content Security Policy requirement for the kiosk browser?
 
 ---
 

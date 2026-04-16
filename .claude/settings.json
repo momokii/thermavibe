@@ -12,7 +12,9 @@
         "make *",
         "git status*",
         "git diff*",
-        "git log*"
+        "git log*",
+      "curl*",
+      "node*"
       ]
     }
   }

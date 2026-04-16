@@ -31,7 +31,9 @@ Read these files in order:
 3. **Task queue** (`.claude/state/TASK_QUEUE.md`) — pick the next task
 4. **Decisions log** (`.claude/state/DECISIONS_LOG.md`) — what was decided and why
 5. **Coding standards** (`.claude/CODING_STANDARDS.md`) — how to write code here
-6. **Root CLAUDE.md** — project-wide rules and constraints
+6. **Security standards** (`.claude/SECURITY_STANDARDS.md`) — security requirements and audit findings
+7. **Environment guide** (`.claude/ENVIRONMENT_GUIDE.md`) — environment definitions and verified commands
+8. **Root CLAUDE.md** — project-wide rules and constraints
 
 Then, for your task at hand, read the relevant sections from:
 
@@ -73,10 +75,27 @@ make dev
 
 This starts PostgreSQL + backend + frontend in Docker containers with hot-reload.
 
+Verify the backend is healthy:
+```bash
+curl http://localhost:8000/health
+# Expected: {"status":"healthy","version":"0.1.0","uptime_seconds":...}
+```
+
 Other key commands:
-- `make test` — Run all tests
+- `make test` — Run all tests (249 backend + 32 frontend)
 - `make lint` — Run all linters
 - `make help` — See all available commands
+- See `.claude/ENVIRONMENT_GUIDE.md` for the complete command reference
+
+## Security
+
+Consult `.claude/SECURITY_STANDARDS.md` for the full security posture and requirements.
+
+Key points:
+- No secrets in source code — all via `.env` (properly gitignored)
+- JWT auth with rate limiting on admin endpoints
+- Docker container runs as root (known issue SEC-001 — needs remediation)
+- Default credentials in `.env.example` are for development only
 
 ## Key Files in the Repo
 

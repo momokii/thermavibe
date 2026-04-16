@@ -30,7 +30,34 @@ Identify the next task:
 
 ---
 
-## Step 4: Read the Relevant PRD Section
+## Step 4: Read `.claude/AGENT_RULES.md`
+
+Re-internalize all behavioral rules. There are 36 non-negotiable rules covering workflow, safety, security, environment awareness, and session management.
+
+---
+
+## Step 5: Read `.claude/CODING_STANDARDS.md`
+
+Re-internalize all conventions before writing any code. Pay special attention to naming, error handling, and forbidden patterns.
+
+---
+
+## Step 6: Read `.claude/SECURITY_STANDARDS.md`
+
+Re-internalize all security requirements. Check the audit findings and remediation status.
+
+---
+
+## Step 7: Identify the Active Environment
+
+Check `APP_ENV` in `.env` or ask the user. Consult `.claude/ENVIRONMENT_GUIDE.md` for environment-specific behavior.
+
+- `development` — proceed with standard workflow
+- `staging` or `production` — present a written plan before executing any change
+
+---
+
+## Step 8: Read Task-Relevant Docs
 
 For your task, read the corresponding section(s) in `docs/prd/`:
 - `02-functional-requirements.md` — functional requirements for your module
@@ -38,11 +65,7 @@ For your task, read the corresponding section(s) in `docs/prd/`:
 - `05-data-models.md` — data models if your task involves database changes
 - `06-integration-map.md` — integration specs if your task involves external services
 
----
-
-## Step 5: Read the Relevant Technical Docs
-
-For your task, read the corresponding section(s) in `docs/technical/`:
+And the relevant technical docs in `docs/technical/`:
 - `api-contract.md` — if implementing or modifying API endpoints
 - `coding-standards.md` — for code style and pattern requirements
 - `testing-strategy.md` — for testing requirements
@@ -50,7 +73,7 @@ For your task, read the corresponding section(s) in `docs/technical/`:
 
 ---
 
-## Step 6: Verify the Environment
+## Step 9: Verify the Environment
 
 Start the development environment:
 
@@ -59,6 +82,11 @@ make dev
 ```
 
 This starts PostgreSQL + backend (with hot-reload) + frontend (with HMR) in Docker containers.
+
+Verify the backend is healthy:
+```bash
+curl http://localhost:8000/health
+```
 
 Verify all services are running:
 ```bash
@@ -72,7 +100,7 @@ You should see:
 
 ---
 
-## Step 7: Confirm Test Baseline
+## Step 10: Confirm No Regressions
 
 Before touching any code, run the existing test suite and confirm it passes:
 
@@ -90,7 +118,7 @@ If tests fail, **do not proceed** — document the failure in `.claude/state/CUR
 
 ---
 
-## Step 8: Begin Work
+## Step 11: Begin Work
 
 Now you're ready. Follow these rules while working:
 

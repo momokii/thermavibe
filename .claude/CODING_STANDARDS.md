@@ -157,9 +157,21 @@ Error responses:
 
 ### Logging
 - Use `structlog` for structured JSON logging
+- Get logger: `logger = structlog.get_logger(__name__)`
 - Log level configurable via `LOG_LEVEL` env var (default: `INFO`)
+- Output: `ConsoleRenderer` in development, JSON in production
 - Always include: timestamp, level, event type, session_id (if applicable)
+- Request context: `request_id` is bound automatically by `RequestIDMiddleware`
+- Context binding: `structlog.contextvars.bind_contextvars(key=value)`
+- Context clearing: `structlog.contextvars.clear_contextvars()` (automatic per request)
 - Never log photo data, API keys, or sensitive information
+
+```python
+# Standard logging pattern
+logger = structlog.get_logger(__name__)
+logger.info('session_created', session_id=str(session.id), state=session.state)
+logger.error('ai_provider_failed', provider='openai', error=str(exc))
+```
 
 ### Docstrings
 - All public functions and classes must have Google-style docstrings
@@ -262,3 +274,72 @@ These patterns are explicitly disallowed:
 9. **Modifying `.env.example` without updating `docs/technical/development-setup-guide.md`**
 10. **Removing API endpoints without updating `docs/technical/api-contract.md`**
 11. **Changing database column types without a new Alembic migration**
+
+---
+
+## Patterns to Follow
+
+### Service Layer Pattern
+- Routes call services. Services call models. Never skip a layer.
+- Services receive `AsyncSession` via FastAPI dependency injection (`get_db_session` from `backend/app/api/deps.py`)
+- Services return domain objects (not HTTP responses)
+- Error handling: raise `VibePrintError` subclasses — the middleware catches and formats the HTTP response
+
+### Provider/Strategy Pattern
+- Used for AI providers (`backend/app/ai/`) and payment gateways (`backend/app/services/payment_service.py`)
+- Abstract base class defines the interface
+- Concrete implementations for each provider
+- Facade service dispatches to the configured provider
+- Mock providers always available for development
+- Fallback chains: AI (OpenAI -> Anthropic -> Google -> Ollama -> Mock)
+
+### State Machine Pattern
+- Kiosk session uses explicit state transitions with validation
+- 7 states: IDLE -> PAYMENT -> CAPTURE -> REVIEW -> PROCESSING -> REVEAL -> RESET
+- Invalid transitions raise `StateTransitionError`
+- State diagram in `docs/prd/04-user-flows.md`
+
+### Error Response Envelope
+All errors follow this exact format (from `backend/app/core/middleware.py`):
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message",
+    "request_id": "uuid"
+  }
+}
+```
+Success responses wrap data in:
+```json
+{
+  "data": { ... },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "ISO-8601"
+  }
+}
+```
+
+---
+
+## Adding Dependencies
+
+### Backend
+1. Add to `backend/pyproject.toml` `[project.dependencies]` with minimum version pin (`>=x.y.z`)
+2. Install: `cd backend && pip install -e ".[dev]"`
+3. Check for vulnerabilities: `pip audit`
+4. Log in `.claude/state/DECISIONS_LOG.md`
+5. Get user confirmation
+
+### Frontend
+1. Install: `cd frontend && npm install package@exact-version`
+2. Check for vulnerabilities: `cd frontend && npm audit`
+3. Log in `.claude/state/DECISIONS_LOG.md`
+4. Get user confirmation
+
+### Rules
+- Never add a dependency without user confirmation
+- Prefer stdlib over third-party packages
+- All dependencies must be MIT-compatible
+- Check for vulnerabilities before adding
