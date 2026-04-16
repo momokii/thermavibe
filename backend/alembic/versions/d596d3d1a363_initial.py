@@ -88,11 +88,9 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_print_jobs_session_id'), 'print_jobs', ['session_id'], unique=True)
     op.create_index(op.f('ix_print_jobs_status'), 'print_jobs', ['status'], unique=False)
-    op.drop_index(op.f('idx_jobs_created_at'), table_name='jobs')
-    op.drop_index(op.f('idx_jobs_status'), table_name='jobs')
-    op.drop_index(op.f('idx_jobs_task_type'), table_name='jobs')
-    op.drop_table('jobs')
-    op.drop_table('schema_migrations')
+    # Drop legacy tables if they exist (from pre-Alembic schema)
+    op.execute('DROP TABLE IF EXISTS jobs CASCADE')
+    op.execute('DROP TABLE IF EXISTS schema_migrations CASCADE')
     # ### end Alembic commands ###
 
 

@@ -1,6 +1,10 @@
 """Application configuration via Pydantic BaseSettings."""
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -46,6 +50,7 @@ class Settings(BaseSettings):
     # Kiosk
     kiosk_idle_timeout_seconds: int = 10
     kiosk_capture_countdown_seconds: int = 3
+    kiosk_capture_time_limit_seconds: int = 60
     kiosk_processing_timeout_seconds: int = 60
     kiosk_reveal_display_seconds: int = 10
 
@@ -55,7 +60,7 @@ class Settings(BaseSettings):
     # CORS
     cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": str(BACKEND_DIR / ".env"), "env_file_encoding": "utf-8"}
 
 
 settings = Settings()

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import IdleScreen from './IdleScreen';
 import CaptureScreen from './CaptureScreen';
+import ReviewScreen from './ReviewScreen';
 import ProcessingScreen from './ProcessingScreen';
 import RevealScreen from './RevealScreen';
 
@@ -28,6 +29,11 @@ export default function KioskShell() {
         {state === 'capture' && (
           <motion.div key="capture" {...screenTransition} className="absolute inset-0">
             <CaptureScreen />
+          </motion.div>
+        )}
+        {state === 'review' && (
+          <motion.div key="review" {...screenTransition} className="absolute inset-0">
+            <ReviewScreen />
           </motion.div>
         )}
         {state === 'processing' && (

@@ -1,23 +1,119 @@
+# =============================================================================
+# docker-compose.dev.yml — Development overrides
+# =============================================================================
+#
+# This file is merged ON TOP of docker-compose.yml when you run:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# It overrides the production defaults with development-specific settings:
+#   - Hot-reload: backend source is mounted as a volume, uvicorn uses --reload
+#   - Dev container names: suffixed with "-dev" to avoid clashing with prod
+#   - Postgres exposed on host port 5433 (so local tools can connect)
+#   - ALL environment variables are passed through from your .env file
+#
+# How to use:
+#   1. Copy .env.example to .env and fill in your values (API keys, camera index, etc.)
+#   2. Run: make dev
+#   3. Everything in .env is picked up — AI providers, camera, printer, payment, etc.
+#
+# The ${VAR:-default} syntax means: use the value from .env if set, else use the
+# default after the dash. This mirrors docker-compose.yml so dev behaves like prod.
+# =============================================================================
+
 services:
   app:
     build:
       context: .
+      # Use only the backend stage (skip frontend build — you run `npm run dev` separately)
       target: backend-runtime
     container_name: vibeprint-app-dev
+
+    # Mount the backend source code so changes are picked up instantly by --reload.
+    # This lets you edit Python files on the host and see changes without rebuilding.
     volumes:
       - ./backend/app:/app/app
+
+    # Also read .env directly as a fallback. Explicit `environment` vars below
+    # take precedence over env_file, so this is just a safety net.
+    env_file:
+      - .env
+
     environment:
-      - APP_ENV=development
-      - APP_DEBUG=true
-      - DATABASE_URL=postgresql+asyncpg://thermavibe:thermavibe@postgres:5432/thermavibe
+      # ── Application ──────────────────────────────────────────────────────
+      # Dev mode: always development, always debug, same secret key from .env
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-change-me-in-production}
+
+      # ── Database ─────────────────────────────────────────────────────────
+      # Inside Docker, the hostname is 'postgres' (the service name), not localhost.
+      # If you override POSTGRES_USER/PASSWORD/DB in .env, this URL updates too.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-thermavibe}:${POSTGRES_PASSWORD:-thermavibe}@postgres:5432/${POSTGRES_DB:-thermavibe}
+
+      # ── AI Providers ─────────────────────────────────────────────────────
+      # Which AI service to use: openai | anthropic | google | ollama | mock
+      # Set AI_PROVIDER and the corresponding API key in your .env file.
+      # Example: AI_PROVIDER=anthropic, ANTHROPIC_API_KEY=sk-ant-...
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_MODEL: ${AI_MODEL:-gpt-4o}
+      AI_SYSTEM_PROMPT: ${AI_SYSTEM_PROMPT:-You are a witty vibe reader.}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      # For Ollama running on the host, use host.docker.internal so the container
+      # can reach the host's port 11434. For local (non-Docker) dev, use localhost.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+
+      # ── Payment (QRIS) ───────────────────────────────────────────────────
+      # Payment is disabled by default. Set PAYMENT_ENABLED=true to test the flow.
+      # Use PAYMENT_PROVIDER=mock for simulated payments (auto-confirms after 5s).
+      PAYMENT_ENABLED: ${PAYMENT_ENABLED:-false}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      XENDIT_API_KEY: ${XENDIT_API_KEY:-}
+      PAYMENT_AMOUNT: ${PAYMENT_AMOUNT:-5000}
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-IDR}
+      PAYMENT_TIMEOUT_SECONDS: ${PAYMENT_TIMEOUT_SECONDS:-120}
+
+      # ── Thermal Printer ──────────────────────────────────────────────────
+      # USB vendor/product IDs for your thermal printer (find with `lsusb`).
+      # These are passed to python-escpos for direct USB communication.
+      PRINTER_VENDOR_ID: ${PRINTER_VENDOR_ID:-0x04b8}
+      PRINTER_PRODUCT_ID: ${PRINTER_PRODUCT_ID:-0x0e15}
+      PRINTER_PAPER_WIDTH: ${PRINTER_PAPER_WIDTH:-384}
+
+      # ── Camera ───────────────────────────────────────────────────────────
+      # V4L2 device index: 0 = /dev/video0, 1 = /dev/video1, etc.
+      # Set CAMERA_DEVICE_INDEX in .env if your webcam is not at index 0.
+      CAMERA_DEVICE_INDEX: ${CAMERA_DEVICE_INDEX:-0}
+      CAMERA_RESOLUTION_WIDTH: ${CAMERA_RESOLUTION_WIDTH:-1280}
+      CAMERA_RESOLUTION_HEIGHT: ${CAMERA_RESOLUTION_HEIGHT:-720}
+
+      # ── Kiosk Behavior ───────────────────────────────────────────────────
+      # Timings for the kiosk state machine (in seconds).
+      # Tweak these in .env to speed up or slow down the flow during testing.
+      KIOSK_IDLE_TIMEOUT_SECONDS: ${KIOSK_IDLE_TIMEOUT_SECONDS:-10}
+      KIOSK_CAPTURE_COUNTDOWN_SECONDS: ${KIOSK_CAPTURE_COUNTDOWN_SECONDS:-3}
+      KIOSK_PROCESSING_TIMEOUT_SECONDS: ${KIOSK_PROCESSING_TIMEOUT_SECONDS:-60}
+      KIOSK_REVEAL_DISPLAY_SECONDS: ${KIOSK_REVEAL_DISPLAY_SECONDS:-10}
+
+      # ── Admin ────────────────────────────────────────────────────────────
+      # PIN code to access the admin dashboard. Default is 1234 for dev.
+      ADMIN_PIN: ${ADMIN_PIN:-1234}
+
+    # Override the default command to enable hot-reload.
+    # The base docker-compose.yml starts uvicorn without --reload for production.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     networks:
       - vibeprint-net
 
   postgres:
     container_name: vibeprint-postgres-dev
+    # Expose Postgres on host port 5433 so you can connect with psql, DBeaver,
+    # pgAdmin, etc. without conflicting with any local Postgres on port 5432.
     ports:
       - "5433:5432"
     networks:

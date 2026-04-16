@@ -1,13 +1,16 @@
 """Kiosk session state machine — core orchestrator.
 
-Manages the 6-state kiosk FSM:
-    IDLE → PAYMENT → CAPTURE → PROCESSING → REVEAL → RESET
+Manages the 7-state kiosk FSM:
+    IDLE → PAYMENT → CAPTURE → REVIEW → PROCESSING → REVEAL → RESET
 
 Valid transitions:
     IDLE       → PAYMENT (if payment_enabled)
     IDLE       → CAPTURE (if payment not enabled)
     PAYMENT    → CAPTURE (on payment confirmed)
-    CAPTURE    → PROCESSING (on capture complete)
+    CAPTURE    → REVIEW (on snap taken)
+    CAPTURE    → PROCESSING (legacy /capture endpoint)
+    REVIEW     → CAPTURE (on retake)
+    REVIEW     → PROCESSING (on photo selected for analysis)
     PROCESSING → REVEAL (on AI response received)
     REVEAL     → RESET (on finish/timeout)
     RESET      → IDLE (auto, or new session)
@@ -32,7 +35,8 @@ logger = structlog.get_logger(__name__)
 VALID_TRANSITIONS: dict[str, set[str]] = {
     KioskState.IDLE: {KioskState.PAYMENT, KioskState.CAPTURE},
     KioskState.PAYMENT: {KioskState.CAPTURE, KioskState.RESET},
-    KioskState.CAPTURE: {KioskState.PROCESSING, KioskState.RESET},
+    KioskState.CAPTURE: {KioskState.REVIEW, KioskState.PROCESSING, KioskState.RESET},
+    KioskState.REVIEW: {KioskState.CAPTURE, KioskState.PROCESSING, KioskState.RESET},
     KioskState.PROCESSING: {KioskState.REVEAL, KioskState.RESET},
     KioskState.REVEAL: {KioskState.RESET},
     KioskState.RESET: {KioskState.IDLE},
@@ -405,14 +409,193 @@ async def get_active_session(db: AsyncSession) -> KioskSession | None:
     return result.scalar_one_or_none()
 
 
+async def snap_photo(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    photo_path: str,
+) -> KioskSession:
+    """Save a snapped photo and transition CAPTURE → REVIEW.
+
+    Appends the photo to the session's photos array.
+
+    Args:
+        db: Async database session.
+        session_id: UUID of the session.
+        photo_path: Filesystem path to the captured JPEG.
+
+    Returns:
+        The updated KioskSession.
+
+    Raises:
+        StateTransitionError: If the session is not in CAPTURE state.
+    """
+    session = await get_session(db, session_id)
+
+    if session.state not in (KioskState.CAPTURE, KioskState.REVIEW):
+        raise StateTransitionError(session.state, KioskState.REVIEW)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    photos = list(session.photos or [])
+    photos.append({'photo_path': photo_path, 'captured_at': now_iso})
+    session.photos = photos
+
+    # Record capture event
+    previous_state = session.state
+    event = _make_event(
+        session_id=session.id,
+        event_type=EventType.CAPTURE_COMPLETE,
+        metadata={'photo_path': photo_path, 'photo_index': len(photos) - 1},
+    )
+    db.add(event)
+
+    session.state = KioskState.REVIEW
+    transition_event = _make_event(
+        session_id=session.id,
+        event_type=EventType.CAPTURE_COMPLETE,
+        metadata={'from_state': previous_state, 'to_state': KioskState.REVIEW},
+    )
+    db.add(transition_event)
+
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(
+        'photo_snapped',
+        session_id=str(session.id),
+        photo_path=photo_path,
+        total_photos=len(photos),
+    )
+    return session
+
+
+async def retake_photo(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+) -> KioskSession:
+    """Transition REVIEW → CAPTURE so the user can take another photo.
+
+    Args:
+        db: Async database session.
+        session_id: UUID of the session.
+
+    Returns:
+        The updated KioskSession.
+
+    Raises:
+        StateTransitionError: If the session is not in REVIEW state.
+    """
+    return await transition_state(db, session_id, KioskState.CAPTURE)
+
+
+async def select_and_process(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    photo_index: int,
+) -> KioskSession:
+    """Select a photo from the gallery and transition REVIEW → PROCESSING.
+
+    Deletes all unselected photos from disk immediately (privacy-first),
+    sets the selected photo as `photo_path`, and transitions to PROCESSING.
+
+    Args:
+        db: Async database session.
+        session_id: UUID of the session.
+        photo_index: Index of the selected photo in the photos array.
+
+    Returns:
+        The updated KioskSession with `photo_path` set to the selected photo.
+
+    Raises:
+        StateTransitionError: If the session is not in REVIEW state.
+        ValueError: If photo_index is out of range.
+    """
+    import os
+
+    session = await get_session(db, session_id)
+
+    if session.state != KioskState.REVIEW:
+        raise StateTransitionError(session.state, KioskState.PROCESSING)
+
+    photos = list(session.photos or [])
+    if photo_index < 0 or photo_index >= len(photos):
+        raise ValueError(f'photo_index {photo_index} out of range (0-{len(photos) - 1})')
+
+    # Delete unselected photos from disk
+    for i, entry in enumerate(photos):
+        if i != photo_index:
+            path = entry.get('photo_path') if isinstance(entry, dict) else None
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                    logger.debug('unselected_photo_deleted', path=path)
+                except OSError:
+                    pass
+
+    # Set the selected photo as the session photo
+    selected = photos[photo_index]
+    session.photo_path = selected.get('photo_path') if isinstance(selected, dict) else str(selected)
+
+    # Record selection event
+    event = _make_event(
+        session_id=session.id,
+        event_type=EventType.CAPTURE_COMPLETE,
+        metadata={
+            'selected_photo_index': photo_index,
+            'total_photos_taken': len(photos),
+            'from_state': KioskState.REVIEW,
+            'to_state': KioskState.PROCESSING,
+        },
+    )
+    db.add(event)
+
+    session.state = KioskState.PROCESSING
+    processing_event = _make_event(
+        session_id=session.id,
+        event_type=EventType.AI_REQUEST_SENT,
+        metadata={'from_state': KioskState.REVIEW, 'to_state': KioskState.PROCESSING},
+    )
+    db.add(processing_event)
+
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(
+        'photo_selected',
+        session_id=str(session.id),
+        selected_index=photo_index,
+        total_taken=len(photos),
+    )
+    return session
+
+
 async def _clear_session_data(db: AsyncSession, session: KioskSession) -> None:
     """Clear sensitive session data for privacy.
+
+    Deletes all photo files from disk and wipes session fields.
 
     Args:
         db: Async database session.
         session: The session to clear.
     """
+    import os
+
+    # Delete all photo files from disk
+    if session.photos:
+        for entry in session.photos:
+            path = entry.get('photo_path') if isinstance(entry, dict) else None
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+    if session.photo_path and os.path.exists(session.photo_path):
+        try:
+            os.remove(session.photo_path)
+        except OSError:
+            pass
+
     session.photo_path = None
+    session.photos = []
     session.cleared_at = datetime.now(timezone.utc)
 
 
@@ -439,6 +622,7 @@ def _state_to_event_type(state: str) -> EventType:
     mapping = {
         KioskState.PAYMENT: EventType.PAYMENT_INITIATED,
         KioskState.CAPTURE: EventType.CAPTURE_COMPLETE,
+        KioskState.REVIEW: EventType.CAPTURE_COMPLETE,
         KioskState.PROCESSING: EventType.AI_REQUEST_SENT,
         KioskState.REVEAL: EventType.AI_RESPONSE_RECEIVED,
         KioskState.RESET: EventType.SESSION_TIMEOUT,

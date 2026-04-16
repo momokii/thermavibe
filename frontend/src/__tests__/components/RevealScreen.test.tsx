@@ -44,6 +44,8 @@ describe('RevealScreen', () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       expires_at: null,
+      photos: [],
+      capture_time_limit: null,
     });
   });
 

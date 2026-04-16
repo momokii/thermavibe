@@ -1,6 +1,6 @@
 """Pydantic schemas for kiosk session API endpoints.
 
-Covers session creation, retrieval, capture, print, and finish flows.
+Covers session creation, retrieval, snap, select, capture, print, and finish flows.
 """
 
 from __future__ import annotations
@@ -20,6 +20,13 @@ class SessionCreateRequest(BaseModel):
     )
 
 
+class PhotoEntry(BaseModel):
+    """A single photo taken during the capture phase."""
+
+    photo_url: str = Field(description='URL to fetch the JPEG image')
+    captured_at: str = Field(description='ISO timestamp when photo was taken')
+
+
 class SessionResponse(BaseModel):
     """Response for session endpoints (create, get, capture, print)."""
 
@@ -36,6 +43,8 @@ class SessionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     expires_at: datetime | None = None
+    photos: list[PhotoEntry] = Field(default_factory=list, description='All photos taken this session')
+    capture_time_limit: int | None = Field(default=None, description='Capture time limit in seconds')
 
     model_config = {'from_attributes': True}
 
@@ -68,3 +77,25 @@ class CaptureResponse(BaseModel):
     expires_at: datetime | None = None
 
     model_config = {'from_attributes': True}
+
+
+class SnapResponse(BaseModel):
+    """Response after snapping a photo (no AI analysis yet)."""
+
+    id: UUID
+    state: str
+    photos: list[PhotoEntry] = Field(default_factory=list)
+    photo_url: str = Field(description='URL of the just-snapped photo')
+    photo_index: int = Field(description='Index of the snapped photo in the photos array')
+    time_remaining_seconds: float = Field(description='Seconds left in the capture window')
+
+    model_config = {'from_attributes': True}
+
+
+class SelectRequest(BaseModel):
+    """Request body for POST /api/v1/kiosk/session/{id}/select."""
+
+    photo_index: int = Field(
+        ge=0,
+        description='Index of the photo to select for AI analysis',
+    )

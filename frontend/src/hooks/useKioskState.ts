@@ -1,6 +1,15 @@
 import { useCallback } from 'react';
 import { useKioskStore } from '@/stores/kioskStore';
-import { useCreateSession, useCapture, useFinish, usePrint, useSession } from './useSession';
+import {
+  useCreateSession,
+  useSnap,
+  useSelect,
+  useRetake,
+  useCapture,
+  useFinish,
+  usePrint,
+  useSession,
+} from './useSession';
 import type { SessionResponse } from '@/api/types';
 
 export function useKioskState() {
@@ -9,12 +18,19 @@ export function useKioskState() {
   const sessionData = useKioskStore((s) => s.sessionData);
   const error = useKioskStore((s) => s.error);
   const isTransitioning = useKioskStore((s) => s.isTransitioning);
+  const photos = useKioskStore((s) => s.photos);
+  const selectedPhotoIndex = useKioskStore((s) => s.selectedPhotoIndex);
+  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
+  const captureStartedAt = useKioskStore((s) => s.captureStartedAt);
   const store = useKioskStore();
 
   const createSessionMut = useCreateSession();
+  const snapMut = useSnap();
+  const selectMut = useSelect();
+  const retakeMut = useRetake();
   const captureMut = useCapture();
-  const printMut = usePrint();
   const finishMut = useFinish();
+  const printMut = usePrint();
 
   const sessionQuery = useSession(
     state === 'processing' ? sessionId : null,
@@ -29,18 +45,85 @@ export function useKioskState() {
     store.setSession(sessionId!, sessionQuery.data);
   }
 
+  // --- Session lifecycle ---
+
   const startSession = useCallback(async () => {
     try {
       store.setTransitioning(true);
+      // Reset all timer/capture state for fresh session
+      store.setPhotos([]);
+      store.selectPhoto(0);
+      store.setCaptureStartedAt(null);
       const response = await createSessionMut.mutateAsync({ payment_enabled: false });
       store.setSession(response.data.id, response.data);
+      if (response.data.capture_time_limit) {
+        store.setTimeLimit(response.data.capture_time_limit);
+      }
       store.setState('capture');
     } catch {
+      store.reset();
       store.setError('Failed to start session. Please try again.');
     } finally {
       store.setTransitioning(false);
     }
   }, [createSessionMut, store]);
+
+  // --- Multi-photo capture ---
+
+  const snapPhoto = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      store.setTransitioning(true);
+      const response = await snapMut.mutateAsync(sessionId);
+      const data = response.data;
+      store.setPhotos(data.photos);
+      store.selectPhoto(data.photo_index);
+      if (!captureStartedAt) {
+        store.setCaptureStartedAt(Date.now());
+      }
+      store.setState('review');
+    } catch {
+      store.setState('idle');
+      store.setError('Capture failed. Please try again.');
+    } finally {
+      store.setTransitioning(false);
+    }
+  }, [snapMut, sessionId, store, captureStartedAt]);
+
+  const retake = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      store.setTransitioning(true);
+      await retakeMut.mutateAsync(sessionId);
+      store.setState('capture');
+    } catch {
+      store.setError('Failed to go back. Please try again.');
+    } finally {
+      store.setTransitioning(false);
+    }
+  }, [retakeMut, sessionId, store]);
+
+  const confirmSelection = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      store.setTransitioning(true);
+      const response = await selectMut.mutateAsync({
+        id: sessionId,
+        photoIndex: selectedPhotoIndex,
+      });
+      store.setSession(sessionId, response.data as unknown as SessionResponse);
+      if (response.data.state !== 'reveal') {
+        store.setState('processing');
+      }
+    } catch {
+      store.reset();
+      store.setError('Analysis failed. Please try again.');
+    } finally {
+      store.setTransitioning(false);
+    }
+  }, [selectMut, sessionId, selectedPhotoIndex, store]);
+
+  // --- Legacy single-shot capture (unused by new flow) ---
 
   const triggerCapture = useCallback(async () => {
     if (!sessionId) return;
@@ -48,13 +131,18 @@ export function useKioskState() {
       store.setTransitioning(true);
       const response = await captureMut.mutateAsync(sessionId);
       store.setSession(sessionId, response.data as unknown as SessionResponse);
-      store.setState('processing');
+      if (response.data.state !== 'reveal') {
+        store.setState('processing');
+      }
     } catch {
+      store.setState('idle');
       store.setError('Capture failed. Please try again.');
     } finally {
       store.setTransitioning(false);
     }
   }, [captureMut, sessionId, store]);
+
+  // --- Print + Finish ---
 
   const triggerPrint = useCallback(async () => {
     if (!sessionId) return;
@@ -75,16 +163,30 @@ export function useKioskState() {
     store.reset();
   }, [finishMut, sessionId, store]);
 
+  // --- Timer calculation ---
+
+  const timeRemainingSeconds = captureStartedAt
+    ? Math.max(0, timeLimitSeconds - (Date.now() - captureStartedAt) / 1000)
+    : timeLimitSeconds;
+
   return {
     state,
     sessionId,
     sessionData,
     error,
     isTransitioning,
+    photos,
+    selectedPhotoIndex,
+    timeLimitSeconds,
+    timeRemainingSeconds,
     startSession,
+    snapPhoto,
+    retake,
+    confirmSelection,
     triggerCapture,
     triggerPrint,
     finishSession,
+    selectPhoto: store.selectPhoto,
     reset: store.reset,
   };
 }

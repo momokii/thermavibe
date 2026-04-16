@@ -41,6 +41,8 @@ describe('CaptureScreen', () => {
       created_at: new Date().toISOString(),
       updated_at: null,
       expires_at: null,
+      photos: [],
+      capture_time_limit: null,
     });
   });
 

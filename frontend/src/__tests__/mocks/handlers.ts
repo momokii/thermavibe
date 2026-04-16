@@ -19,6 +19,8 @@ export const handlers = [
       created_at: new Date().toISOString(),
       updated_at: null,
       expires_at: null,
+      photos: [],
+      capture_time_limit: 60,
     });
   }),
 
@@ -38,6 +40,8 @@ export const handlers = [
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       expires_at: null,
+      photos: [],
+      capture_time_limit: 60,
     });
   }),
 
@@ -56,6 +60,8 @@ export const handlers = [
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       expires_at: null,
+      photos: [],
+      capture_time_limit: 60,
     });
   }),
 

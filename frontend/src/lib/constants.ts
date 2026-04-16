@@ -8,6 +8,7 @@ export const KIOSK_STATES = {
   IDLE: 'idle',
   PAYMENT: 'payment',
   CAPTURE: 'capture',
+  REVIEW: 'review',
   PROCESSING: 'processing',
   REVEAL: 'reveal',
   RESET: 'reset',
@@ -15,6 +16,9 @@ export const KIOSK_STATES = {
 
 /** Default countdown duration in seconds before capture. */
 export const COUNTDOWN_SECONDS = 3;
+
+/** Default capture window time limit in seconds. */
+export const DEFAULT_CAPTURE_TIME_LIMIT = 60;
 
 /** Reveal screen display duration in seconds before auto-reset. */
 export const REVEAL_DURATION_SECONDS = 15;

@@ -5,11 +5,29 @@
 
 // --- Enums ---
 
-export type KioskState = 'idle' | 'payment' | 'capture' | 'processing' | 'reveal' | 'reset';
+export type KioskState = 'idle' | 'payment' | 'capture' | 'review' | 'processing' | 'reveal' | 'reset';
 
 export type PaymentStatusValue = 'none' | 'pending' | 'confirmed' | 'expired' | 'denied' | 'refunded';
 
 // --- Kiosk ---
+
+export interface PhotoEntry {
+  photo_url: string;
+  captured_at: string;
+}
+
+export interface SnapResponse {
+  id: string;
+  state: KioskState;
+  photos: PhotoEntry[];
+  photo_url: string;
+  photo_index: number;
+  time_remaining_seconds: number;
+}
+
+export interface SelectRequest {
+  photo_index: number;
+}
 
 export interface SessionCreateRequest {
   payment_enabled: boolean;
@@ -29,6 +47,8 @@ export interface SessionResponse {
   created_at: string;
   updated_at: string | null;
   expires_at: string | null;
+  photos: PhotoEntry[];
+  capture_time_limit: number | null;
 }
 
 export interface CaptureResponse {

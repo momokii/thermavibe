@@ -1,10 +1,30 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { kioskApi } from '@/api/kioskApi';
+import type { SelectRequest } from '@/api/types';
 
 export function useCreateSession() {
   return useMutation({
     mutationFn: (data: { payment_enabled: boolean }) =>
       kioskApi.createSession(data),
+  });
+}
+
+export function useSnap() {
+  return useMutation({
+    mutationFn: (id: string) => kioskApi.snap(id),
+  });
+}
+
+export function useSelect() {
+  return useMutation({
+    mutationFn: ({ id, photoIndex }: { id: string; photoIndex: number }) =>
+      kioskApi.select(id, { photo_index: photoIndex } satisfies SelectRequest),
+  });
+}
+
+export function useRetake() {
+  return useMutation({
+    mutationFn: (id: string) => kioskApi.retake(id),
   });
 }
 

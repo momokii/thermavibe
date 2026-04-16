@@ -40,6 +40,8 @@ describe('kioskStore', () => {
       created_at: '2025-01-01T00:00:00Z',
       updated_at: null,
       expires_at: null,
+      photos: [],
+      capture_time_limit: null,
     };
 
     useKioskStore.getState().setSession('sess-123', mockSession);

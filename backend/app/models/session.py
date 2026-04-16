@@ -10,6 +10,7 @@ import enum
 import uuid
 
 from sqlalchemy import Index, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import INTEGER, TIMESTAMP, Uuid
@@ -23,6 +24,7 @@ class KioskState(str, enum.Enum):
     IDLE = 'idle'
     PAYMENT = 'payment'
     CAPTURE = 'capture'
+    REVIEW = 'review'
     PROCESSING = 'processing'
     REVEAL = 'reveal'
     RESET = 'reset'
@@ -87,6 +89,7 @@ class KioskSession(Base):
         index=True,
     )
     photo_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    photos: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
     ai_response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_provider_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
