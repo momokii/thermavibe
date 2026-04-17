@@ -24,18 +24,18 @@ export default function ProcessingScreen() {
       <div className="blob blob-violet w-64 h-64 top-1/4 left-1/4 animate-float opacity-10" />
       <div className="blob blob-pink w-48 h-48 bottom-1/3 right-1/4 animate-float-slow opacity-10" />
 
-      {/* Floating particles */}
+      {/* Floating particles (reduced from 6 to 4) */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(4)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1.5 h-1.5 rounded-full float-particle"
+            className="absolute w-2 h-2 rounded-full float-particle"
             style={{
-              left: `${15 + i * 15}%`,
-              top: `${20 + (i % 3) * 25}%`,
-              background: i % 3 === 0 ? '#8b5cf6' : i % 3 === 1 ? '#ec4899' : '#f97316',
-              opacity: 0.4,
-              animationDelay: `${i * 0.7}s`,
+              left: `${20 + i * 20}%`,
+              top: `${25 + (i % 2) * 30}%`,
+              background: i % 2 === 0 ? '#8b5cf6' : '#ec4899',
+              opacity: 0.35,
+              animationDelay: `${i * 1}s`,
             }}
           />
         ))}
@@ -55,8 +55,8 @@ export default function ProcessingScreen() {
         )}
       </AnimatePresence>
 
-      {/* Animated gradient orb rings */}
-      <div className="relative w-32 h-32 flex items-center justify-center mb-10">
+      {/* Animated gradient orb rings — tighter gap to message */}
+      <div className="relative w-32 h-32 flex items-center justify-center mb-6">
         {/* Outer ring */}
         <div className="absolute inset-0 rounded-full ring-pulse"
           style={{ border: '2px solid rgba(139,92,246,0.3)', animationDelay: '0s' }}
@@ -75,8 +75,8 @@ export default function ProcessingScreen() {
         />
       </div>
 
-      {/* Rotating message */}
-      <div className="h-14 flex items-center justify-center mb-4 relative z-10">
+      {/* Rotating message — tighter container */}
+      <div className="h-12 flex items-center justify-center mb-3 relative z-10">
         <AnimatePresence mode="wait">
           <motion.p
             key={messageIndex}
@@ -91,7 +91,7 @@ export default function ProcessingScreen() {
         </AnimatePresence>
       </div>
 
-      <p className="text-sm text-kiosk-text-muted/50 relative z-10">This won&apos;t take long...</p>
+      <p className="text-sm text-kiosk-text/40 relative z-10">This won&apos;t take long...</p>
     </div>
   );
 }

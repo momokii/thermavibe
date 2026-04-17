@@ -38,12 +38,12 @@ export default function IdleScreen() {
         initial={{ opacity: 0, y: -30, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.8, ease: [0.34, 1.56, 0.64, 1] }}
-        className="text-center mb-12 relative z-10"
+        className="text-center mb-10 relative z-10"
       >
-        <h1 className="text-7xl font-display font-black text-gradient-vibe mb-3 tracking-tight">
+        <h1 className="text-7xl font-display font-black text-gradient-vibe mb-5 tracking-tight">
           VibePrint
         </h1>
-        <p className="text-lg text-kiosk-text-muted/70 font-medium tracking-wide">
+        <p className="text-lg text-kiosk-text/60 font-medium tracking-wide">
           AI-Powered Photobooth
         </p>
       </motion.div>
@@ -55,7 +55,7 @@ export default function IdleScreen() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mb-4 px-6 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-xl text-sm max-w-md text-center relative z-10"
+            className="mb-6 px-6 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-xl text-sm max-w-md text-center relative z-10"
             onClick={(e) => e.stopPropagation()}
           >
             {error}
@@ -65,7 +65,7 @@ export default function IdleScreen() {
 
       {/* CTA Button */}
       <motion.button
-        className="btn-gradient px-14 py-5 text-xl font-display font-bold rounded-3xl shadow-lg shadow-purple-500/25 relative z-10"
+        className="btn-gradient px-14 py-5 text-xl font-display font-bold rounded-2xl shadow-lg shadow-purple-500/25 relative z-10"
         animate={{ scale: [1, 1.06, 1] }}
         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
         disabled={isTransitioning}
@@ -79,7 +79,7 @@ export default function IdleScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.4 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-8 text-sm text-kiosk-text/40 relative z-10"
+        className="absolute bottom-10 text-sm text-kiosk-text/40 z-10"
       >
         Tap anywhere to begin your vibe reading
       </motion.p>

@@ -137,7 +137,7 @@ export default function RevealScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.5 }}
         transition={{ delay: 2 }}
-        className="mt-8 text-sm text-kiosk-text-muted/50 relative z-10"
+        className="mt-8 text-sm text-kiosk-text/45 relative z-10"
       >
         Your receipt is printing... Touch to continue
       </motion.p>

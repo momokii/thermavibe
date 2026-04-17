@@ -54,7 +54,7 @@ export default function ReviewScreen() {
       }}
     >
       {/* Main content area */}
-      <div className="flex-1 flex items-center justify-center p-6 relative">
+      <div className="flex-1 flex items-center justify-center px-6 py-6 relative">
         {/* Large preview of selected photo with glowing border */}
         <AnimatePresence mode="wait">
           {selectedPhoto && (
@@ -97,10 +97,10 @@ export default function ReviewScreen() {
         )}
       </div>
 
-      {/* Thumbnail strip with glass background */}
+      {/* Thumbnail strip with glass background — aligned with px-6 */}
       {photos.length > 1 && (
-        <div className="px-4 pb-3">
-          <div className="flex gap-3 justify-center overflow-x-auto py-2 glass-card rounded-2xl px-4">
+        <div className="px-6 pb-4">
+          <div className="flex gap-3 justify-center overflow-x-auto py-3 glass-card rounded-2xl px-5">
             {photos.map((photo, i) => (
               <button
                 key={i}
@@ -122,8 +122,8 @@ export default function ReviewScreen() {
         </div>
       )}
 
-      {/* Bottom bar: timer + actions */}
-      <div className="px-6 pb-8 pt-3">
+      {/* Bottom bar: timer + actions — consistent px-6, safe bottom padding */}
+      <div className="px-6 pb-12 pt-2">
         {/* Timer ring */}
         <div className="flex justify-center mb-5">
           <div className="relative w-12 h-12">
@@ -155,15 +155,15 @@ export default function ReviewScreen() {
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-4">
+        {/* Action buttons — wider gap for touch safety */}
+        <div className="flex gap-6">
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={retake}
             disabled={isTransitioning}
-            className="flex-1 py-4 rounded-2xl text-kiosk-text/80 text-lg font-display font-semibold
+            className="flex-1 py-4 rounded-2xl text-kiosk-text/70 text-lg font-display font-semibold
                        disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200
-                       glass-card hover:bg-white/10 active:bg-white/15"
+                       border border-white/[0.1] hover:bg-white/[0.08] hover:border-white/[0.18] hover:text-kiosk-text/90 active:bg-white/[0.12]"
           >
             Retake
           </motion.button>
