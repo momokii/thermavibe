@@ -8,10 +8,13 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
+from app.core.exceptions import VibePrintError
 from app.schemas.ai import AIAnalyzeResponse
 from app.services import ai_service, session_service
 
 router = APIRouter()
+
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 @router.post('/analyze', response_model=AIAnalyzeResponse)
@@ -27,6 +30,12 @@ async def analyze_image(
     vibe reading. Falls back through the provider chain on failure.
     """
     image_bytes = await image.read()
+
+    if len(image_bytes) > MAX_IMAGE_SIZE:
+        raise VibePrintError(
+            code='PAYLOAD_TOO_LARGE',
+            message='Image must be under 10MB.',
+        )
 
     result = await ai_service.analyze_image(
         image_bytes=image_bytes,

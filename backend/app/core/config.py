@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # CORS
     cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"
 
+    # Rate Limiting
+    rate_limit_max_requests: int = 60
+    rate_limit_window_seconds: int = 60
+
     model_config = {"env_file": str(BACKEND_DIR / ".env"), "env_file_encoding": "utf-8"}
 
 

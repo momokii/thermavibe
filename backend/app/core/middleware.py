@@ -1,12 +1,13 @@
-"""CORS, request logging, and error handling middleware."""
+"""CORS, request logging, rate limiting, and error handling middleware."""
 
 from __future__ import annotations
 
+import time
+
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-import structlog
 
 from app.core.config import settings
 from app.core.exceptions import VibePrintError, status_code_for_error
@@ -14,6 +15,156 @@ from app.schemas.common import ErrorEnvelope, ErrorResponse
 from app.utils.logging import bind_request_context, clear_request_context, generate_request_id
 
 logger = structlog.get_logger(__name__)
+
+# --- Rate Limiting ---
+
+_rate_limit_store: dict[str, list[float]] = {}
+
+
+def _get_client_ip(scope: dict) -> str:
+    """Extract client IP from ASGI scope."""
+    client = scope.get('client')
+    if client:
+        return client[0]
+    for header_name, header_value in scope.get('headers', []):
+        if header_name == b'x-forwarded-for':
+            return header_value.decode().split(',')[0].strip()
+    return 'unknown'
+
+
+class RateLimitMiddleware:
+    """ASGI middleware that limits requests per IP per minute."""
+
+    def __init__(self, app, max_requests: int = 60, window_seconds: int = 60) -> None:
+        self.app = app
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] not in ('http',):
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get('path', '')
+
+        # Skip rate limiting for health checks and MJPEG streams
+        if path == '/health' or '/camera/stream' in path:
+            await self.app(scope, receive, send)
+            return
+
+        ip = _get_client_ip(scope)
+        now = time.monotonic()
+
+        # Clean old entries and count recent requests
+        requests = _rate_limit_store.get(ip, [])
+        requests = [t for t in requests if now - t < self.window_seconds]
+        requests.append(now)
+        _rate_limit_store[ip] = requests
+
+        if len(requests) > self.max_requests:
+            logger.warning('rate_limited', ip=ip, path=path, requests=len(requests))
+            await self._send_429(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+    async def _send_429(self, scope, receive, send) -> None:
+        """Send a 429 Too Many Requests response."""
+        import json
+
+        body = json.dumps({
+            'error': {
+                'code': 'RATE_LIMITED',
+                'message': 'Too many requests. Please try again later.',
+                'request_id': None,
+            },
+        }).encode()
+
+        await send({
+            'type': 'http.response.start',
+            'status': 429,
+            'headers': [
+                [b'content-type', b'application/json'],
+                [b'content-length', str(len(body)).encode()],
+            ],
+        })
+        await send({
+            'type': 'http.response.body',
+            'body': body,
+        })
+
+
+# --- Request Size Limit ---
+
+class RequestSizeLimitMiddleware:
+    """ASGI middleware that rejects requests exceeding size limits."""
+
+    def __init__(
+        self,
+        app,
+        default_max_bytes: int = 1 * 1024 * 1024,
+        upload_max_bytes: int = 10 * 1024 * 1024,
+    ) -> None:
+        self.app = app
+        self.default_max_bytes = default_max_bytes
+        self.upload_max_bytes = upload_max_bytes
+        self.upload_prefixes = ('/api/v1/ai/analyze',)
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] not in ('http',):
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get('path', '')
+
+        # Determine the limit for this path
+        is_upload = any(path.startswith(prefix) for prefix in self.upload_prefixes)
+        max_bytes = self.upload_max_bytes if is_upload else self.default_max_bytes
+
+        # Check Content-Length header
+        for header_name, header_value in scope.get('headers', []):
+            if header_name == b'content-length':
+                try:
+                    content_length = int(header_value.decode())
+                    if content_length > max_bytes:
+                        logger.warning(
+                            'request_too_large',
+                            path=path,
+                            content_length=content_length,
+                            max_bytes=max_bytes,
+                        )
+                        await self._send_413(scope, receive, send)
+                        return
+                except ValueError:
+                    pass
+                break
+
+        await self.app(scope, receive, send)
+
+    async def _send_413(self, scope, receive, send) -> None:
+        """Send a 413 Payload Too Large response."""
+        import json
+
+        body = json.dumps({
+            'error': {
+                'code': 'PAYLOAD_TOO_LARGE',
+                'message': 'Request payload exceeds the allowed size limit.',
+                'request_id': None,
+            },
+        }).encode()
+
+        await send({
+            'type': 'http.response.start',
+            'status': 413,
+            'headers': [
+                [b'content-type', b'application/json'],
+                [b'content-length', str(len(body)).encode()],
+            ],
+        })
+        await send({
+            'type': 'http.response.body',
+            'body': body,
+        })
 
 
 class RequestIDMiddleware:
@@ -98,6 +249,6 @@ def setup_cors(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=['*'],
-        allow_headers=['*'],
+        allow_methods=['GET', 'POST', 'PUT'],
+        allow_headers=['Content-Type', 'Authorization', 'X-Request-ID'],
     )

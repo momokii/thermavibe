@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskState } from '@/hooks/useKioskState';
+import { useKioskStore } from '@/stores/kioskStore';
 import { REVEAL_DURATION_SECONDS } from '@/lib/constants';
 
 export default function RevealScreen() {
-  const { sessionData, triggerPrint, finishSession } = useKioskState();
+  const { sessionData, triggerPrint, finishSession, error } = useKioskState();
+  const storeReset = useKioskStore((s) => s.reset);
   const [displayedText, setDisplayedText] = useState('');
   const fullText = sessionData?.analysis_text ?? '';
 
@@ -39,14 +41,33 @@ export default function RevealScreen() {
   }, [fullText, triggerPrint, finishSession]);
 
   const handleTouch = useCallback(() => {
+    if (error) {
+      storeReset();
+      return;
+    }
     finishSession();
-  }, [finishSession]);
+  }, [error, storeReset, finishSession]);
 
   return (
     <div
       className="w-full h-full flex flex-col items-center justify-center bg-kiosk-background p-8 cursor-pointer"
       onClick={handleTouch}
     >
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            key="error-banner"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+          >
+            {error}
+            <span className="block mt-1 text-xs text-red-300/60">Touch anywhere to go back</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {sessionData?.capture_image_url && (
         <motion.img
           initial={{ opacity: 0, x: -40 }}

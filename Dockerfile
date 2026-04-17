@@ -29,11 +29,19 @@ WORKDIR /app
 COPY backend/pyproject.toml ./
 RUN pip install --no-cache-dir .
 
+# Create non-root user with USB access groups (video for camera, lp for printer)
+RUN groupadd -r vibeprint && useradd -r -g vibeprint -G video,lp -d /app -s /sbin/nologin vibeprint
+
 # Copy backend application code
 COPY backend/ ./
 
 # Copy frontend build output into static files directory
 COPY --from=frontend-build /frontend/dist ./static
+
+# Create logs directory and set ownership for non-root user
+RUN mkdir -p /app/logs && chown -R vibeprint:vibeprint /app
+
+USER vibeprint
 
 # Expose the application port
 EXPOSE 8000

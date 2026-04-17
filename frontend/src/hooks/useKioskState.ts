@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useKioskStore } from '@/stores/kioskStore';
 import {
   useCreateSession,
@@ -37,13 +37,16 @@ export function useKioskState() {
     { refetchInterval: 1000 },
   );
 
-  if (
-    state === 'processing' &&
-    sessionQuery.data &&
-    sessionQuery.data.state === 'reveal'
-  ) {
-    store.setSession(sessionId!, sessionQuery.data);
-  }
+  // Transition from processing to reveal when backend signals ready
+  useEffect(() => {
+    if (
+      state === 'processing' &&
+      sessionQuery.data &&
+      sessionQuery.data.state === 'reveal'
+    ) {
+      store.setSession(sessionId!, sessionQuery.data);
+    }
+  }, [state, sessionQuery.data, sessionId, store]);
 
   // --- Session lifecycle ---
 
@@ -59,7 +62,8 @@ export function useKioskState() {
       if (response.data.capture_time_limit) {
         store.setTimeLimit(response.data.capture_time_limit);
       }
-      store.setState('capture');
+      // Route to payment screen if backend says payment is enabled, otherwise go straight to capture
+      store.setState(response.data.payment_enabled ? 'payment' : 'capture');
     } catch {
       store.reset();
       store.setError('Failed to start session. Please try again.');

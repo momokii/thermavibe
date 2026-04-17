@@ -5,6 +5,7 @@ import CaptureScreen from './CaptureScreen';
 import ReviewScreen from './ReviewScreen';
 import ProcessingScreen from './ProcessingScreen';
 import RevealScreen from './RevealScreen';
+import PaymentScreen from './PaymentScreen';
 
 const screenTransition = {
   initial: { opacity: 0, scale: 0.95 },
@@ -46,7 +47,12 @@ export default function KioskShell() {
             <RevealScreen />
           </motion.div>
         )}
-        {(state === 'reset' || state === 'payment') && (
+        {state === 'payment' && (
+          <motion.div key="payment" {...screenTransition} className="absolute inset-0">
+            <PaymentScreen />
+          </motion.div>
+        )}
+        {state === 'reset' && (
           <motion.div key="transition" {...screenTransition} className="absolute inset-0 flex items-center justify-center bg-kiosk-background">
             <div className="w-8 h-8 border-2 border-kiosk-primary border-t-transparent rounded-full animate-spin" />
           </motion.div>

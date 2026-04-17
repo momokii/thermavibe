@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { PROCESSING_MESSAGES, PROCESSING_MESSAGE_INTERVAL_MS } from '@/lib/constants';
+import { useKioskStore } from '@/stores/kioskStore';
 
 export default function ProcessingScreen() {
+  const error = useKioskStore((s) => s.error);
   const [messageIndex, setMessageIndex] = useState(0);
 
   useEffect(() => {
@@ -14,6 +16,20 @@ export default function ProcessingScreen() {
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-kiosk-background gap-8">
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            key="error-banner"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="w-16 h-16 border-4 border-kiosk-primary border-t-transparent rounded-full animate-spin" />
 
       <div className="h-12 flex items-center justify-center">
