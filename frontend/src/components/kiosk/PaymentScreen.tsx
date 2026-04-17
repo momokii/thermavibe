@@ -96,7 +96,7 @@ export default function PaymentScreen() {
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden bg-surface-0">
+    <div className="kiosk-layout items-center justify-center relative overflow-hidden bg-surface-0">
       <AnimatePresence mode="wait">
         {status === 'loading' && (
           <motion.div

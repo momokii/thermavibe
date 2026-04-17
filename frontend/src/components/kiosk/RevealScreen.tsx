@@ -50,7 +50,7 @@ export default function RevealScreen() {
 
   return (
     <div
-      className="w-full h-full flex flex-col items-center justify-center p-8 cursor-pointer relative overflow-hidden bg-surface-0"
+      className="kiosk-layout items-center justify-center cursor-pointer relative overflow-hidden bg-surface-0"
       onClick={handleTouch}
     >
       <AnimatePresence>
@@ -60,7 +60,8 @@ export default function RevealScreen() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+            className="absolute left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+            style={{ top: 'var(--kiosk-safe-y)' }}
           >
             {error}
             <span className="block mt-1 text-xs text-red-300/50">Touch anywhere to go back</span>
@@ -73,7 +74,8 @@ export default function RevealScreen() {
         initial={{ opacity: 0, y: -15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-3xl font-display font-black text-white mb-6 relative z-10"
+        className="text-3xl font-display font-black text-white relative z-10"
+        style={{ marginBottom: '3rem' }}
       >
         Your Vibe Reading
       </motion.h2>
@@ -84,13 +86,13 @@ export default function RevealScreen() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-          className="relative mb-6 rounded-xl overflow-hidden"
-          style={{ border: '2px solid rgba(255,255,255,0.12)' }}
+          className="relative rounded-xl overflow-hidden aspect-square w-72"
+          style={{ marginBottom: '3rem', border: '2px solid rgba(255,255,255,0.12)' }}
         >
           <img
             src={sessionData.capture_image_url}
             alt="Your photo"
-            className="w-52 h-52 object-cover"
+            className="w-full h-full object-cover"
           />
         </motion.div>
       )}

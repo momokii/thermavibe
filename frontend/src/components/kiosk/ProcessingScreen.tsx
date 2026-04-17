@@ -15,7 +15,7 @@ export default function ProcessingScreen() {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden bg-surface-0">
+    <div className="kiosk-layout items-center justify-center relative overflow-hidden bg-surface-0">
       <AnimatePresence>
         {error && (
           <motion.div
@@ -23,7 +23,8 @@ export default function ProcessingScreen() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+            className="absolute left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
+            style={{ top: 'var(--kiosk-safe-y)' }}
           >
             {error}
           </motion.div>
