@@ -46,23 +46,22 @@ export default function PaymentConfig() {
   };
 
   return (
-    <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-pink-500 via-rose-500 to-orange-500" />
+    <Card className="card-surface border-0">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-pink-400" />
-          <CardTitle className="font-display">Payment Settings</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <CreditCard className="h-4 w-4 text-violet-400" />
+          <CardTitle className="font-display text-white">Payment Settings</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         <div className="flex items-center justify-between py-1">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Enable Payment</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Enable Payment</Label>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Provider</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="bg-white/[0.04] border-white/[0.08]">
+            <SelectTrigger className="input-surface text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -73,35 +72,35 @@ export default function PaymentConfig() {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Amount (IDR)</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Amount (IDR)</Label>
           <Input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="bg-white/[0.04] border-white/[0.08]"
+            className="input-surface text-white placeholder:text-white/20"
           />
         </div>
         {provider !== 'mock' && (
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Server Key</Label>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Server Key</Label>
             <Input
               type="password"
               value={serverKey}
               onChange={(e) => setServerKey(e.target.value)}
-              className="bg-white/[0.04] border-white/[0.08]"
+              className="input-surface text-white placeholder:text-white/20"
             />
           </div>
         )}
         <div className="flex items-center justify-between py-1">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Sandbox Mode</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Sandbox Mode</Label>
           <Switch checked={sandbox} onCheckedChange={setSandbox} />
         </div>
         <Button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="btn-gradient border-0 shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30"
+          className="btn-primary border-0"
         >
-          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
           {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}
         </Button>
       </CardContent>

@@ -11,13 +11,6 @@ interface Props {
   mode?: 'summary' | 'full';
 }
 
-const cardAccents = [
-  'linear-gradient(90deg, #8b5cf6, transparent)',
-  'linear-gradient(90deg, #ec4899, transparent)',
-  'linear-gradient(90deg, #06b6d4, transparent)',
-  'linear-gradient(90deg, #f97316, transparent)',
-];
-
 export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['analytics-sessions'],
@@ -30,12 +23,12 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   });
 
   if (sessionsLoading || revenueLoading) {
-    return <p className="text-muted-foreground">Loading analytics...</p>;
+    return <p className="text-white/40">Loading analytics...</p>;
   }
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-display font-bold">Analytics</h2>
+      <h2 className="text-2xl font-display font-bold text-white">Analytics</h2>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -44,17 +37,13 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           { title: 'Completion Rate', value: formatPercent(sessions?.summary.completion_rate ?? 0), raw: false },
           { title: 'Avg Duration', value: formatDuration(sessions?.summary.avg_duration_seconds ?? 0), raw: false },
           { title: 'Revenue', value: formatIDR(revenue?.summary.total_revenue ?? 0), raw: false },
-        ].map((card, i) => (
-          <Card key={card.title} className="relative overflow-hidden">
-            <div
-              className="absolute top-0 left-0 right-0 h-[2px]"
-              style={{ background: cardAccents[i] }}
-            />
+        ].map((card) => (
+          <Card key={card.title} className="card-surface border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+              <CardTitle className="text-sm font-medium text-white/40">{card.title}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold font-display ${card.raw ? 'tabular-nums' : ''}`}>
+              <p className={`text-2xl font-bold font-display text-white ${card.raw ? 'tabular-nums' : ''}`}>
                 {card.value}
               </p>
             </CardContent>
@@ -66,29 +55,29 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
         <>
           {/* Session Timeseries */}
           {sessions && sessions.timeseries.length > 0 && (
-            <Card>
+            <Card className="card-surface border-0">
               <CardHeader>
-                <CardTitle className="text-lg font-display">Session History</CardTitle>
+                <CardTitle className="text-lg font-display text-white">Session History</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Period</TableHead>
-                      <TableHead>Sessions</TableHead>
-                      <TableHead>Completed</TableHead>
-                      <TableHead>Abandoned</TableHead>
-                      <TableHead>Avg Duration</TableHead>
+                    <TableRow className="border-white/[0.06] hover:bg-transparent">
+                      <TableHead className="text-white/35">Period</TableHead>
+                      <TableHead className="text-white/35">Sessions</TableHead>
+                      <TableHead className="text-white/35">Completed</TableHead>
+                      <TableHead className="text-white/35">Abandoned</TableHead>
+                      <TableHead className="text-white/35">Avg Duration</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sessions.timeseries.map((point) => (
-                      <TableRow key={point.period}>
-                        <TableCell className="font-medium">{point.period}</TableCell>
-                        <TableCell>{point.sessions}</TableCell>
-                        <TableCell>{point.completed}</TableCell>
-                        <TableCell>{point.abandoned}</TableCell>
-                        <TableCell>{formatDuration(point.avg_duration_seconds)}</TableCell>
+                      <TableRow key={point.period} className="border-white/[0.04] hover:bg-white/[0.02]">
+                        <TableCell className="font-medium text-white/70">{point.period}</TableCell>
+                        <TableCell className="text-white/50">{point.sessions}</TableCell>
+                        <TableCell className="text-white/50">{point.completed}</TableCell>
+                        <TableCell className="text-white/50">{point.abandoned}</TableCell>
+                        <TableCell className="text-white/50">{formatDuration(point.avg_duration_seconds)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -99,14 +88,14 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
           {/* State Distribution */}
           {sessions && Object.keys(sessions.state_distribution).length > 0 && (
-            <Card>
+            <Card className="card-surface border-0">
               <CardHeader>
-                <CardTitle className="text-lg font-display">State Distribution</CardTitle>
+                <CardTitle className="text-lg font-display text-white">State Distribution</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {Object.entries(sessions.state_distribution).map(([state, count]) => (
-                  <Badge key={state} variant="secondary">
-                    {state}: {count}
+                  <Badge key={state} variant="secondary" className="bg-white/[0.06] text-white/60 border-0">
+                    {state}: <span className="font-display tabular-nums ml-1">{count}</span>
                   </Badge>
                 ))}
               </CardContent>

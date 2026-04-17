@@ -29,11 +29,9 @@ export default function CaptureScreen() {
       setShowFlash(true);
       setPhase('snapping');
 
-      // Auto-dismiss flash overlay after 400ms
       const flashTimeout = window.setTimeout(() => setShowFlash(false), 400);
       timeoutsRef.current.push(flashTimeout);
 
-      // Trigger the backend snap (photo only, no AI)
       const snapTimeout = window.setTimeout(() => {
         if (sessionId) snapPhoto();
       }, 300);
@@ -60,26 +58,17 @@ export default function CaptureScreen() {
         />
       )}
 
-      {/* Gradient camera flash — auto-dismissed after 400ms */}
+      {/* Camera flash — clean white */}
       {showFlash && (
-        <div className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.6), rgba(236,72,153,0.6), rgba(255,255,255,0.9))',
-          }}
-        />
+        <div className="absolute inset-0 pointer-events-none bg-white/90" />
       )}
 
-      {/* Brief loading overlay while snap processes */}
+      {/* Loading overlay while snap processes */}
       {phase === 'snapping' && !showFlash && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4"
-          style={{ background: 'linear-gradient(180deg, rgba(15,10,26,0.9), rgba(15,10,26,0.95))' }}
-        >
-          <div className="w-14 h-14 border-4 border-kiosk-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-xl text-kiosk-text font-display font-semibold">Taking photo...</p>
-
-          {error && (
-            <p className="text-red-400 text-sm mt-4">{error}</p>
-          )}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface-0/95">
+          <div className="w-14 h-14 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xl text-white font-display font-semibold">Taking photo...</p>
+          {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
         </div>
       )}
 
@@ -90,14 +79,13 @@ export default function CaptureScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ background: 'linear-gradient(180deg, rgba(15,10,26,0.3), rgba(139,92,246,0.2), rgba(15,10,26,0.3))' }}
+            className="absolute inset-0 flex items-center justify-center bg-black/40"
           >
             <motion.p
               initial={{ scale: 0.5 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', bounce: 0.5, duration: 0.8 }}
-              className="text-5xl font-display font-black text-gradient-vibe drop-shadow-lg"
+              className="text-5xl font-display font-black text-white drop-shadow-lg"
             >
               Get Ready!
             </motion.p>
@@ -105,7 +93,7 @@ export default function CaptureScreen() {
         )}
       </AnimatePresence>
 
-      {/* Countdown numbers with bounce */}
+      {/* Countdown numbers */}
       <AnimatePresence>
         {phase === 'countdown' && count > 0 && (
           <motion.div
@@ -116,9 +104,7 @@ export default function CaptureScreen() {
             transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
             className="absolute inset-0 flex items-center justify-center"
           >
-            <span className="text-9xl font-display font-black text-white drop-shadow-2xl"
-              style={{ textShadow: '0 0 40px rgba(139,92,246,0.5), 0 0 80px rgba(236,72,153,0.3)' }}
-            >
+            <span className="text-9xl font-display font-black text-white drop-shadow-2xl">
               {count}
             </span>
           </motion.div>

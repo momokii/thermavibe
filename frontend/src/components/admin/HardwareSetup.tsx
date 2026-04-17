@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDuration, formatBytes } from '@/lib/formatters';
 import { toast } from 'sonner';
-import { Camera, Printer, Cpu, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { Camera, Printer, Cpu, Loader2 } from 'lucide-react';
 
 export default function HardwareSetup() {
   const { data: hw, isLoading } = useQuery({
@@ -28,7 +28,7 @@ export default function HardwareSetup() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+      <div className="flex items-center justify-center py-12 gap-2 text-white/40">
         <Loader2 className="h-5 w-5 animate-spin" />
         Loading hardware status...
       </div>
@@ -38,32 +38,28 @@ export default function HardwareSetup() {
   return (
     <div className="space-y-4">
       {/* Camera */}
-      <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500" />
+      <Card className="card-surface border-0">
         <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Camera className="h-4 w-4 text-violet-400" />
-            <CardTitle className="text-lg font-display">Camera</CardTitle>
+            <CardTitle className="text-base font-display text-white">Camera</CardTitle>
           </div>
           <Badge
-            variant={hw?.camera.connected ? 'default' : 'destructive'}
-            className={hw?.camera.connected ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25' : ''}
+            className={hw?.camera.connected
+              ? 'bg-emerald-500/20 text-emerald-300 border-0'
+              : 'bg-red-500/20 text-red-300 border-0'}
           >
-            {hw?.camera.connected ? (
-              <span className="flex items-center gap-1"><Wifi className="h-3 w-3" /> Connected</span>
-            ) : (
-              <span className="flex items-center gap-1"><WifiOff className="h-3 w-3" /> Disconnected</span>
-            )}
+            {hw?.camera.connected ? 'Connected' : 'Disconnected'}
           </Badge>
         </CardHeader>
         <CardContent className="space-y-3">
           {hw?.camera.active_device && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/40">
               {hw.camera.active_device.name} ({hw.camera.active_device.path})
             </p>
           )}
-          <p className="text-sm">
-            Status: <span className={hw?.camera.status.streaming ? 'text-emerald-400' : 'text-muted-foreground'}>
+          <p className="text-sm text-white/60">
+            Status: <span className={hw?.camera.status.streaming ? 'text-emerald-400' : 'text-white/40'}>
               {hw?.camera.status.streaming ? 'Streaming' : 'Idle'}
             </span>
           </p>
@@ -71,109 +67,110 @@ export default function HardwareSetup() {
             size="sm"
             onClick={() => testCameraMut.mutate()}
             disabled={testCameraMut.isPending}
-            className="bg-white/[0.06] hover:bg-white/[0.1] text-foreground border border-white/[0.08]"
-            variant="outline"
+            className="btn-secondary border-0 text-sm"
           >
-            {testCameraMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+            {testCameraMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
             Test Camera
           </Button>
         </CardContent>
       </Card>
 
       {/* Printer */}
-      <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-pink-500 via-rose-500 to-orange-500" />
+      <Card className="card-surface border-0">
         <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Printer className="h-4 w-4 text-pink-400" />
-            <CardTitle className="text-lg font-display">Printer</CardTitle>
+          <div className="flex items-center gap-2.5">
+            <Printer className="h-4 w-4 text-violet-400" />
+            <CardTitle className="text-base font-display text-white">Printer</CardTitle>
           </div>
           <Badge
-            variant={hw?.printer.connected ? 'default' : 'destructive'}
-            className={hw?.printer.connected ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25' : ''}
+            className={hw?.printer.connected
+              ? 'bg-emerald-500/20 text-emerald-300 border-0'
+              : 'bg-red-500/20 text-red-300 border-0'}
           >
-            {hw?.printer.connected ? (
-              <span className="flex items-center gap-1"><Wifi className="h-3 w-3" /> Connected</span>
-            ) : (
-              <span className="flex items-center gap-1"><WifiOff className="h-3 w-3" /> Disconnected</span>
-            )}
+            {hw?.printer.connected ? 'Connected' : 'Disconnected'}
           </Badge>
         </CardHeader>
         <CardContent className="space-y-3">
           {hw?.printer.device && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/40">
               {hw.printer.device.vendor} {hw.printer.device.model}
             </p>
           )}
-          <div className="text-sm space-x-1">
-            <span>Paper:</span>
-            <span className={hw?.printer.status.paper_ok ? 'text-emerald-400' : 'text-amber-400'}>
+          <div className="text-sm text-white/60">
+            Paper: <span className={hw?.printer.status.paper_ok ? 'text-emerald-400' : 'text-amber-400'}>
               {hw?.printer.status.paper_ok ? 'OK' : 'Low/Empty'}
             </span>
-            <span className="text-muted-foreground">|</span>
-            <span>Prints today: <span className="font-display tabular-nums">{hw?.printer.status.total_prints_today ?? 0}</span></span>
+            <span className="text-white/25 mx-1">|</span>
+            Prints today: <span className="font-display tabular-nums">{hw?.printer.status.total_prints_today ?? 0}</span>
           </div>
           <Button
             size="sm"
             onClick={() => testPrinterMut.mutate()}
             disabled={testPrinterMut.isPending}
-            className="bg-white/[0.06] hover:bg-white/[0.1] text-foreground border border-white/[0.08]"
-            variant="outline"
+            className="btn-secondary border-0 text-sm"
           >
-            {testPrinterMut.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+            {testPrinterMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
             Test Print
           </Button>
         </CardContent>
       </Card>
 
       {/* System Resources */}
-      <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" />
+      <Card className="card-surface border-0">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-cyan-400" />
-            <CardTitle className="text-lg font-display">System Resources</CardTitle>
+          <div className="flex items-center gap-2.5">
+            <Cpu className="h-4 w-4 text-violet-400" />
+            <CardTitle className="text-base font-display text-white">System Resources</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">CPU</span>
-              <span className="font-display tabular-nums">{hw?.system.cpu_usage_percent.toFixed(1)}%</span>
+              <span className="text-white/40">CPU</span>
+              <span className="font-display tabular-nums text-white/70">{hw?.system.cpu_usage_percent.toFixed(1)}%</span>
             </div>
-            <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-2.5 rounded-full bg-surface-2 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-violet-500 to-pink-500 transition-all duration-500"
-                style={{ width: `${hw?.system.cpu_usage_percent ?? 0}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${hw?.system.cpu_usage_percent ?? 0}%`,
+                  background: (hw?.system.cpu_usage_percent ?? 0) > 85 ? '#ef4444' : (hw?.system.cpu_usage_percent ?? 0) > 60 ? '#f59e0b' : '#8b5cf6',
+                }}
               />
             </div>
           </div>
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Memory</span>
-              <span className="font-display tabular-nums">{formatBytes((hw?.system.memory_usage_mb ?? 0) * 1024 * 1024)}</span>
+              <span className="text-white/40">Memory</span>
+              <span className="font-display tabular-nums text-white/70">{formatBytes((hw?.system.memory_usage_mb ?? 0) * 1024 * 1024)}</span>
             </div>
-            <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-2.5 rounded-full bg-surface-2 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-pink-500 to-orange-500 transition-all duration-500"
-                style={{ width: `${Math.min((hw?.system.memory_usage_mb ?? 0) / 4096 * 100, 100)}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min((hw?.system.memory_usage_mb ?? 0) / 4096 * 100, 100)}%`,
+                  background: Math.min((hw?.system.memory_usage_mb ?? 0) / 4096 * 100, 100) > 85 ? '#ef4444' : Math.min((hw?.system.memory_usage_mb ?? 0) / 4096 * 100, 100) > 60 ? '#f59e0b' : '#8b5cf6',
+                }}
               />
             </div>
           </div>
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Disk</span>
-              <span className="font-display tabular-nums">{hw?.system.disk_usage_percent.toFixed(1)}%</span>
+              <span className="text-white/40">Disk</span>
+              <span className="font-display tabular-nums text-white/70">{hw?.system.disk_usage_percent.toFixed(1)}%</span>
             </div>
-            <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-2.5 rounded-full bg-surface-2 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 transition-all duration-500"
-                style={{ width: `${hw?.system.disk_usage_percent ?? 0}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${hw?.system.disk_usage_percent ?? 0}%`,
+                  background: (hw?.system.disk_usage_percent ?? 0) > 85 ? '#ef4444' : (hw?.system.disk_usage_percent ?? 0) > 60 ? '#f59e0b' : '#8b5cf6',
+                }}
               />
             </div>
           </div>
-          <p className="text-sm text-muted-foreground pt-1">
-            Uptime: <span className="font-display tabular-nums">{formatDuration(hw?.system.uptime_seconds ?? 0)}</span>
+          <p className="text-sm text-white/35 pt-1">
+            Uptime: <span className="font-display tabular-nums text-white/50">{formatDuration(hw?.system.uptime_seconds ?? 0)}</span>
           </p>
         </CardContent>
       </Card>

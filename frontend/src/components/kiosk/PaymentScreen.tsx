@@ -36,8 +36,6 @@ export default function PaymentScreen() {
           currency: 'IDR',
         });
         setStatus('pending');
-
-        // Start countdown from payment timeout (default 120s)
         setCountdown(120);
       } catch {
         setStatus('error');
@@ -76,7 +74,6 @@ export default function PaymentScreen() {
 
         if (paymentStatus === 'confirmed') {
           setStatus('confirmed');
-          // Transition to capture after a brief success display
           setTimeout(() => setState('capture'), 1500);
         } else if (paymentStatus === 'expired' || paymentStatus === 'denied') {
           setStatus('expired');
@@ -99,11 +96,7 @@ export default function PaymentScreen() {
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden"
-      style={{
-        background: 'radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.12) 0%, transparent 60%), #0f0a1a',
-      }}
-    >
+    <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden bg-surface-0">
       <AnimatePresence mode="wait">
         {status === 'loading' && (
           <motion.div
@@ -113,8 +106,8 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-6"
           >
-            <div className="w-12 h-12 border-[3px] border-kiosk-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-xl text-kiosk-text/70 font-display">Preparing payment{dots}</p>
+            <div className="w-12 h-12 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xl text-white/60 font-display">Preparing payment{dots}</p>
           </motion.div>
         )}
 
@@ -126,67 +119,40 @@ export default function PaymentScreen() {
             exit={{ opacity: 0, y: -20 }}
             className="flex flex-col items-center"
           >
-            <h2 className="text-3xl font-display font-black text-gradient-vibe mb-8">Scan to Pay</h2>
+            <h2 className="text-3xl font-display font-black text-white mb-8">Scan to Pay</h2>
 
-            {/* Payment card: QR + Amount grouped together */}
-            <div className="glass-card rounded-3xl p-6 flex flex-col items-center gap-4"
-              style={{
-                boxShadow: '0 0 30px rgba(139,92,246,0.15), 0 0 60px rgba(236,72,153,0.08)',
-                border: '1px solid rgba(139,92,246,0.2)',
-              }}
-            >
+            {/* Payment card: QR + Amount */}
+            <div className="card-surface p-8 flex flex-col items-center gap-5">
               {/* QR code area */}
-              <div className="w-56 h-56 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+              <div className="w-56 h-56 rounded-xl flex items-center justify-center" style={{ background: 'var(--surface-2)' }}>
                 <div className="text-center">
-                  <div className="text-4xl mb-2 text-kiosk-text/30">QR</div>
-                  <p className="text-xs text-kiosk-text/30">Scan with your phone</p>
+                  <div className="text-4xl mb-2 text-white/25">QR</div>
+                  <p className="text-xs text-white/25">Scan with your phone</p>
                 </div>
               </div>
 
               {/* Amount */}
-              <p className="text-2xl font-display font-black text-gradient-vibe">
+              <p className="text-2xl font-display font-black text-white">
                 {formatCurrency(5000)}
               </p>
             </div>
 
-            {/* Status section: waiting text + countdown grouped */}
+            {/* Status: waiting + countdown */}
             <div className="flex items-center gap-3 mt-8">
-              {countdown !== null && countdown > 0 && (
-                <div className="relative w-10 h-10">
-                  <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
-                    <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
-                    <circle
-                      cx="20" cy="20" r="16" fill="none"
-                      stroke="url(#countdown-grad)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 16}`}
-                      strokeDashoffset={`${2 * Math.PI * 16 * (1 - countdown / 120)}`}
-                      className="transition-all duration-1000"
-                    />
-                    <defs>
-                      <linearGradient id="countdown-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#8b5cf6" />
-                        <stop offset="100%" stopColor="#ec4899" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
-              )}
-              <p className="text-kiosk-text/50 font-display">
+              <p className="text-white/45 font-display">
                 Waiting for payment{dots}
               </p>
               {countdown !== null && countdown > 0 && (
-                <span className="text-sm text-kiosk-text/40 font-mono tabular-nums">
+                <span className="text-sm text-white/35 font-mono tabular-nums bg-surface-1 px-2 py-1 rounded-md">
                   {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
                 </span>
               )}
             </div>
 
-            {/* Cancel button — proper touch target with visible affordance */}
+            {/* Cancel */}
             <button
               onClick={handleCancel}
-              className="mt-10 px-8 py-3 rounded-2xl text-sm text-kiosk-text/50 hover:text-kiosk-text/80 transition-colors font-display border border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04] active:bg-white/[0.06]"
+              className="mt-10 px-8 py-3 rounded-xl text-sm text-white/45 font-display btn-secondary"
             >
               Cancel
             </button>
@@ -201,19 +167,13 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-4"
           >
-            <div className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.05))',
-                border: '2px solid rgba(34,197,94,0.5)',
-                boxShadow: '0 0 20px rgba(34,197,94,0.2)',
-              }}
-            >
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-emerald-500/15 border-2 border-emerald-500/40">
               <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-2xl text-kiosk-text font-display font-bold">Payment Confirmed!</p>
-            <p className="text-kiosk-text/50 font-display">Starting your session...</p>
+            <p className="text-2xl text-white font-display font-bold">Payment Confirmed!</p>
+            <p className="text-white/45 font-display">Starting your session...</p>
           </motion.div>
         )}
 
@@ -225,26 +185,19 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-6"
           >
-            <div className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.05))',
-                border: '2px solid rgba(239,68,68,0.4)',
-                boxShadow: '0 0 20px rgba(239,68,68,0.15)',
-              }}
-            >
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500/15 border-2 border-red-500/40">
               <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
 
-            <p className="text-xl text-kiosk-text font-display font-semibold">
+            <p className="text-xl text-white font-display font-semibold">
               {status === 'expired' ? 'Payment Expired' : 'Payment Failed'}
             </p>
 
             <button
               onClick={handleCancel}
-              className="px-8 py-3 rounded-2xl text-white font-display font-semibold"
-              style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}
+              className="px-8 py-3 rounded-xl text-white font-display font-semibold btn-primary"
             >
               Go Back
             </button>

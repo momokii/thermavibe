@@ -37,8 +37,15 @@
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.606 0.25 292.717);
 
+  /* Surface system — real hex colors, not opacity */
+  --surface-0: #0f0a1a;
+  --surface-1: #181430;
+  --surface-2: #211c3a;
+  --surface-3: #2d2650;
+
+  /* Kiosk tokens */
   --kiosk-background: #0f0a1a;
-  --kiosk-surface: rgba(255, 255, 255, 0.06);
+  --kiosk-surface: #181430;
   --kiosk-primary: #8b5cf6;
   --kiosk-text: #fafafa;
 }
@@ -81,6 +88,12 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* Surface colors */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
   --color-kiosk-background: var(--kiosk-background);
   --color-kiosk-surface: var(--kiosk-surface);
   --color-kiosk-primary: var(--kiosk-primary);
@@ -121,9 +134,9 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Gradient text utility */
+/* Brand gradient text — reserved for brand wordmark only */
 .text-gradient-vibe {
-  background: linear-gradient(135deg, #8b5cf6, #ec4899, #f97316);
+  background: linear-gradient(135deg, #8b5cf6, #c084fc);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -136,141 +149,58 @@ html, body, #root {
   background-clip: text;
 }
 
-/* Glass card utility */
-.glass-card {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Glow border effect for photos */
-.glow-border {
-  box-shadow:
-    0 0 20px rgba(139, 92, 246, 0.3),
-    0 0 40px rgba(236, 72, 153, 0.2),
-    0 0 60px rgba(139, 92, 246, 0.1);
-}
-
-/* Gradient button */
-.btn-gradient {
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+/* Primary button — solid, no gradient */
+.btn-primary {
+  background: #7c3aed;
   color: white;
   border: none;
-  position: relative;
-  overflow: hidden;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-primary:hover {
+  background: #6d28d9;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
 }
 
-.btn-gradient::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #a78bfa, #f472b6);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+/* Secondary button — subtle surface */
+.btn-secondary {
+  background: var(--surface-2);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  transition: background 0.15s ease;
+}
+.btn-secondary:hover {
+  background: var(--surface-3);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-.btn-gradient:hover::before {
-  opacity: 1;
+/* Kiosk CTA — high contrast white button for kiosk */
+.btn-kiosk-cta {
+  background: white;
+  color: #0f0a1a;
+  border: none;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn-kiosk-cta:hover {
+  background: #f3f4f6;
 }
 
-.btn-gradient > * {
-  position: relative;
-  z-index: 1;
+/* Clean card — for admin surfaces */
+.card-surface {
+  background: var(--surface-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
-/* Decorative floating blobs */
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.15;
-  pointer-events: none;
+/* Input surface — distinct from card */
+.input-surface {
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
-.blob-violet {
-  background: #8b5cf6;
-}
-
-.blob-pink {
-  background: #ec4899;
-}
-
-.blob-orange {
-  background: #f97316;
-}
-
-/* Gradient ring animation for reveal photo */
-@keyframes rotate-gradient {
-  0% { --gradient-angle: 0deg; }
-  100% { --gradient-angle: 360deg; }
-}
-
-.gradient-ring {
-  position: relative;
-}
-
-.gradient-ring::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, #8b5cf6, #ec4899, #f97316, #8b5cf6);
-  animation: spin 4s linear infinite;
-  z-index: -1;
-}
-
-/* Sparkle decorations */
-@keyframes sparkle {
-  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1) rotate(180deg); }
-}
-
-.sparkle {
-  animation: sparkle 2s ease-in-out infinite;
-}
-
-/* Pulsing animation for idle CTA */
-@keyframes pulse-scale {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.05); opacity: 1; }
-}
-
-.animate-pulse-scale {
-  animation: pulse-scale 2s ease-in-out infinite;
-}
-
-/* Gradient shift for backgrounds */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient-shift {
-  background-size: 200% 200%;
-  animation: gradient-shift 8s ease infinite;
-}
-
-/* Spinner animation */
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin-slow {
-  animation: spin-slow 2s linear infinite;
-}
-
-/* Flash effect for capture */
-@keyframes flash {
-  0% { opacity: 0; }
-  50% { opacity: 0.8; }
-  100% { opacity: 0; }
-}
-
-.animate-flash {
-  animation: flash 0.3s ease-out;
+.input-surface:focus-within {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 /* Expanding ring pulse for processing */
@@ -311,4 +241,64 @@ html, body, #root {
 
 .float-particle {
   animation: float-particle 4s ease-in-out infinite;
+}
+
+/* Pulsing animation for idle CTA ring */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.08); opacity: 0.15; }
+  100% { transform: scale(1); opacity: 0.3; }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+/* Spinner animation */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
+/* Flash effect for capture */
+@keyframes flash {
+  0% { opacity: 0; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+.animate-flash {
+  animation: flash 0.3s ease-out;
+}
+
+/* Gradient shift for backgrounds */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Sparkle decorations */
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+.sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Gradient ring animation for reveal photo */
+@keyframes rotate-gradient {
+  0% { --gradient-angle: 0deg; }
+  100% { --gradient-angle: 360deg; }
 }

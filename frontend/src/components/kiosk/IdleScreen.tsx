@@ -21,33 +21,13 @@ export default function IdleScreen() {
 
   return (
     <div
-      className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative overflow-hidden"
+      className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative overflow-hidden bg-surface-0"
       style={{
-        background: 'radial-gradient(ellipse at 20% 50%, rgba(139,92,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, rgba(236,72,153,0.12) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(249,115,22,0.08) 0%, transparent 50%), #0f0a1a',
+        background: 'radial-gradient(ellipse at 50% 40%, rgba(139,92,246,0.08) 0%, transparent 65%)',
       }}
       onClick={handleTouch}
       onTouchStart={handleTouch}
     >
-      {/* Decorative floating blobs */}
-      <div className="blob blob-violet w-72 h-72 -top-20 -left-20 animate-float" />
-      <div className="blob blob-pink w-96 h-96 -bottom-32 -right-32 animate-float-slow" />
-      <div className="blob blob-orange w-48 h-48 top-1/3 right-10 animate-float-fast" />
-
-      {/* Main content */}
-      <motion.div
-        initial={{ opacity: 0, y: -30, scale: 0.9 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.34, 1.56, 0.64, 1] }}
-        className="text-center mb-10 relative z-10"
-      >
-        <h1 className="text-7xl font-display font-black text-gradient-vibe mb-5 tracking-tight">
-          VibePrint
-        </h1>
-        <p className="text-lg text-kiosk-text/60 font-medium tracking-wide">
-          AI-Powered Photobooth
-        </p>
-      </motion.div>
-
       <AnimatePresence>
         {error && (
           <motion.div
@@ -55,7 +35,7 @@ export default function IdleScreen() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mb-6 px-6 py-3 bg-red-500/20 border border-red-500/50 text-red-300 rounded-xl text-sm max-w-md text-center relative z-10"
+            className="absolute top-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
             onClick={(e) => e.stopPropagation()}
           >
             {error}
@@ -63,25 +43,44 @@ export default function IdleScreen() {
         )}
       </AnimatePresence>
 
-      {/* CTA Button */}
-      <motion.button
-        className="btn-gradient px-14 py-5 text-xl font-display font-bold rounded-2xl shadow-lg shadow-purple-500/25 relative z-10"
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-        disabled={isTransitioning}
+      {/* Brand */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="text-center mb-16 relative z-10"
       >
-        <span className="relative z-10">
+        <h1 className="text-7xl font-display font-black text-white mb-4 tracking-tight">
+          VibePrint
+        </h1>
+        <p className="text-lg text-white/50 font-medium tracking-wide">
+          AI-Powered Photobooth
+        </p>
+      </motion.div>
+
+      {/* CTA — solid white button with pulsing ring */}
+      <div className="relative z-10">
+        {/* Pulse ring behind button */}
+        <div className="absolute inset-0 rounded-2xl animate-pulse-ring bg-white/10" style={{ margin: '-8px' }} />
+
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="btn-kiosk-cta relative px-16 py-5 text-xl font-display font-bold rounded-2xl"
+          disabled={isTransitioning}
+        >
           {isTransitioning ? 'Starting...' : 'Touch to Start'}
-        </span>
-      </motion.button>
+        </motion.button>
+      </div>
 
       <motion.p
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.4 }}
-        transition={{ delay: 1.5 }}
-        className="absolute bottom-10 text-sm text-kiosk-text/40 z-10"
+        animate={{ opacity: 0.35 }}
+        transition={{ delay: 1.2 }}
+        className="absolute bottom-10 text-sm text-white/35 z-10"
       >
-        Tap anywhere to begin your vibe reading
+        Tap anywhere to begin
       </motion.p>
     </div>
   );

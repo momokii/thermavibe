@@ -23,14 +23,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      <aside className="w-60 border-r border-border flex flex-col">
-        {/* Brand header */}
+    <div className="flex h-screen bg-surface-0">
+      <aside className="w-56 border-r border-white/[0.06] flex flex-col">
+        {/* Brand */}
         <div className="p-5 pb-4">
-          <h1 className="text-xl font-display font-bold text-gradient-primary">VibePrint OS</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Admin Dashboard</p>
+          <h1 className="text-lg font-display font-bold text-white">VibePrint OS</h1>
+          <p className="text-xs text-white/35 mt-0.5">Admin Dashboard</p>
         </div>
-        <Separator />
+        <Separator className="bg-white/[0.06]" />
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -38,16 +38,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'text-foreground bg-white/5'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'bg-white/[0.06] text-white border-l-2 border-violet-500'
+                    : 'text-white/45 hover:bg-white/[0.03] hover:text-white/70'
                 }`}
-                style={isActive ? {
-                  borderLeft: '3px solid transparent',
-                  borderImage: 'linear-gradient(180deg, #8b5cf6, #ec4899) 1',
-                  paddingLeft: '9px',
-                } : undefined}
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
@@ -56,13 +51,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="p-3">
-          <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground" onClick={handleLogout}>
+          <Button variant="ghost" className="w-full justify-start gap-2 text-white/35 hover:text-white/70 hover:bg-white/[0.03]" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Logout
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <main className="flex-1 overflow-y-auto p-8">{children}</main>
     </div>
   );
 }

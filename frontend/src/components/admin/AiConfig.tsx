@@ -44,19 +44,18 @@ export default function AiConfig() {
   };
 
   return (
-    <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500" />
+    <Card className="card-surface border-0">
       <CardHeader>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Sparkles className="h-4 w-4 text-violet-400" />
-          <CardTitle className="font-display">AI Provider</CardTitle>
+          <CardTitle className="font-display text-white">AI Provider</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Provider</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="bg-white/[0.04] border-white/[0.08]">
+            <SelectTrigger className="input-surface text-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -70,41 +69,41 @@ export default function AiConfig() {
         </div>
         {provider !== 'mock' && provider !== 'ollama' && (
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs uppercase tracking-wider">API Key</Label>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">API Key</Label>
             <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="sk-..."
-              className="bg-white/[0.04] border-white/[0.08]"
+              className="input-surface text-white placeholder:text-white/20"
             />
           </div>
         )}
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Model</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Model</Label>
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="gpt-4o-mini"
-            className="bg-white/[0.04] border-white/[0.08]"
+            className="input-surface text-white placeholder:text-white/20"
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-muted-foreground text-xs uppercase tracking-wider">System Prompt</Label>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">System Prompt</Label>
           <Textarea
             rows={4}
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             placeholder="You are a vibe reading AI..."
-            className="bg-white/[0.04] border-white/[0.08] resize-none"
+            className="input-surface text-white placeholder:text-white/20 resize-none"
           />
         </div>
         <Button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="btn-gradient border-0 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+          className="btn-primary border-0"
         >
-          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
           {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}
         </Button>
       </CardContent>
