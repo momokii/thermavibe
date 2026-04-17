@@ -38,7 +38,6 @@ export default function ReviewScreen() {
     }
   }, [timeRemainingSeconds, photos.length, onExpire]);
 
-  // Format remaining time as MM:SS
   const mins = Math.floor(Math.max(0, timeRemainingSeconds) / 60);
   const secs = Math.floor(Math.max(0, timeRemainingSeconds) % 60);
   const timeDisplay = `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -48,9 +47,8 @@ export default function ReviewScreen() {
 
   return (
     <div className="w-full h-full flex flex-col bg-surface-0">
-      {/* Main content area */}
-      <div className="flex-1 flex items-center justify-center px-6 py-6 relative">
-        {/* Large preview of selected photo */}
+      {/* Photo area — constrained height so controls get room */}
+      <div className="flex items-center justify-center px-8 pt-8 pb-4" style={{ flex: '0 1 55%' }}>
         <AnimatePresence mode="wait">
           {selectedPhoto && (
             <motion.div
@@ -59,13 +57,13 @@ export default function ReviewScreen() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.3 }}
-              className="relative w-full max-w-lg aspect-[3/4] rounded-xl overflow-hidden"
+              className="relative w-auto h-full max-w-lg rounded-xl overflow-hidden"
               style={{ border: '1px solid rgba(255,255,255,0.12)' }}
             >
               <img
                 src={selectedPhoto.photo_url}
                 alt={`Photo ${selectedPhotoIndex + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
 
               {/* Photo number badge */}
@@ -73,7 +71,7 @@ export default function ReviewScreen() {
                 {selectedPhotoIndex + 1}/{photos.length}
               </div>
 
-              {/* Large countdown overlaid on photo */}
+              {/* Large countdown */}
               <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-lg backdrop-blur-sm font-mono font-bold text-lg tabular-nums ${
                 isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/80'
               }`}>
@@ -85,16 +83,17 @@ export default function ReviewScreen() {
 
         {/* Error overlay */}
         {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm z-10">
             {error}
           </div>
         )}
       </div>
 
-      {/* Thumbnail strip */}
-      {photos.length > 1 && (
-        <div className="px-6 pb-4">
-          <div className="flex gap-3 justify-center overflow-x-auto py-3 rounded-xl px-4" style={{ background: 'var(--surface-1)' }}>
+      {/* Bottom controls — generous space */}
+      <div className="flex flex-col justify-center px-8 pb-12 pt-2 gap-5">
+        {/* Thumbnail strip */}
+        {photos.length > 1 && (
+          <div className="flex gap-3 justify-center py-3 px-4 rounded-xl" style={{ background: 'var(--surface-1)' }}>
             {photos.map((photo, i) => (
               <button
                 key={i}
@@ -113,17 +112,15 @@ export default function ReviewScreen() {
               </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Action buttons */}
-      <div className="px-6 pb-12 pt-2">
-        <div className="flex gap-4">
+        {/* Action buttons — big, well-spaced */}
+        <div className="flex gap-5">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={retake}
             disabled={isTransitioning}
-            className="flex-1 py-4 rounded-xl text-white/70 text-lg font-display font-semibold
+            className="flex-1 py-5 rounded-xl text-white/70 text-lg font-display font-semibold
                        disabled:opacity-30 transition-all duration-150 btn-secondary"
           >
             Retake
@@ -133,7 +130,7 @@ export default function ReviewScreen() {
             whileTap={{ scale: 0.97 }}
             onClick={confirmSelection}
             disabled={isTransitioning || photos.length === 0}
-            className="flex-[2] py-4 rounded-xl text-white text-lg font-display font-bold
+            className="flex-[2] py-5 rounded-xl text-white text-lg font-display font-bold
                        disabled:opacity-30 transition-all duration-150 btn-primary"
           >
             {isTransitioning ? 'Analyzing...' : 'Analyze My Vibe'}

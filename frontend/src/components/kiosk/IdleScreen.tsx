@@ -43,31 +43,33 @@ export default function IdleScreen() {
         )}
       </AnimatePresence>
 
-      {/* Brand */}
+      {/* Brand — pushed up */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="text-center mb-16 relative z-10"
+        className="text-center relative z-10 mt-auto"
       >
-        <h1 className="text-7xl font-display font-black text-white mb-4 tracking-tight">
+        <h1 className="text-7xl font-display font-black text-white mb-5 tracking-tight">
           VibePrint
         </h1>
-        <p className="text-lg text-white/50 font-medium tracking-wide">
+        <p className="text-xl text-white/50 font-medium tracking-wide">
           AI-Powered Photobooth
         </p>
       </motion.div>
 
-      {/* CTA — solid white button with pulsing ring */}
-      <div className="relative z-10">
-        {/* Pulse ring behind button */}
-        <div className="absolute inset-0 rounded-2xl animate-pulse-ring bg-white/10" style={{ margin: '-8px' }} />
+      {/* Large CTA button with generous spacing */}
+      <div className="relative z-10 my-auto py-8">
+        {/* Wide pulse ring behind button */}
+        <div className="absolute inset-0 rounded-3xl animate-pulse-ring bg-white/8"
+          style={{ margin: '-16px', padding: '16px' }}
+        />
 
         <motion.button
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.4 }}
-          className="btn-kiosk-cta relative px-16 py-5 text-xl font-display font-bold rounded-2xl"
+          className="btn-kiosk-cta relative px-20 py-6 text-2xl font-display font-bold rounded-2xl"
           disabled={isTransitioning}
         >
           {isTransitioning ? 'Starting...' : 'Touch to Start'}
@@ -78,7 +80,7 @@ export default function IdleScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.35 }}
         transition={{ delay: 1.2 }}
-        className="absolute bottom-10 text-sm text-white/35 z-10"
+        className="absolute bottom-12 text-base text-white/35 z-10"
       >
         Tap anywhere to begin
       </motion.p>
