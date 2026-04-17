@@ -24,24 +24,30 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen bg-background">
-      <aside className="w-56 border-r border-border flex flex-col">
-        <div className="p-4">
-          <h1 className="text-lg font-bold">VibePrint OS</h1>
-          <p className="text-xs text-muted-foreground">Admin Dashboard</p>
+      <aside className="w-60 border-r border-border flex flex-col">
+        {/* Brand header */}
+        <div className="p-5 pb-4">
+          <h1 className="text-xl font-display font-bold text-gradient-primary">VibePrint OS</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Admin Dashboard</p>
         </div>
         <Separator />
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'text-foreground bg-white/5'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
+                style={isActive ? {
+                  borderLeft: '3px solid transparent',
+                  borderImage: 'linear-gradient(180deg, #8b5cf6, #ec4899) 1',
+                  paddingLeft: '9px',
+                } : undefined}
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
@@ -49,8 +55,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <div className="p-2">
-          <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleLogout}>
+        <div className="p-3">
+          <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
             Logout
           </Button>

@@ -37,9 +37,9 @@
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.606 0.25 292.717);
 
-  --kiosk-background: #0a0a0a;
-  --kiosk-surface: #1a1a1a;
-  --kiosk-primary: #6366f1;
+  --kiosk-background: #0f0a1a;
+  --kiosk-surface: rgba(255, 255, 255, 0.06);
+  --kiosk-primary: #8b5cf6;
   --kiosk-text: #fafafa;
 }
 
@@ -87,6 +87,7 @@
   --color-kiosk-text: var(--kiosk-text);
 
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
 }
 
 @layer base {
@@ -120,6 +121,115 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* Gradient text utility */
+.text-gradient-vibe {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-primary {
+  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass card utility */
+.glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glow border effect for photos */
+.glow-border {
+  box-shadow:
+    0 0 20px rgba(139, 92, 246, 0.3),
+    0 0 40px rgba(236, 72, 153, 0.2),
+    0 0 60px rgba(139, 92, 246, 0.1);
+}
+
+/* Gradient button */
+.btn-gradient {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: white;
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #a78bfa, #f472b6);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.btn-gradient:hover::before {
+  opacity: 1;
+}
+
+.btn-gradient > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Decorative floating blobs */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.blob-violet {
+  background: #8b5cf6;
+}
+
+.blob-pink {
+  background: #ec4899;
+}
+
+.blob-orange {
+  background: #f97316;
+}
+
+/* Gradient ring animation for reveal photo */
+@keyframes rotate-gradient {
+  0% { --gradient-angle: 0deg; }
+  100% { --gradient-angle: 360deg; }
+}
+
+.gradient-ring {
+  position: relative;
+}
+
+.gradient-ring::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, #8b5cf6, #ec4899, #f97316, #8b5cf6);
+  animation: spin 4s linear infinite;
+  z-index: -1;
+}
+
+/* Sparkle decorations */
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+.sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
 /* Pulsing animation for idle CTA */
 @keyframes pulse-scale {
   0%, 100% { transform: scale(1); opacity: 0.8; }
@@ -130,7 +240,7 @@ html, body, #root {
   animation: pulse-scale 2s ease-in-out infinite;
 }
 
-/* Gradient shift for idle background */
+/* Gradient shift for backgrounds */
 @keyframes gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -161,4 +271,44 @@ html, body, #root {
 
 .animate-flash {
   animation: flash 0.3s ease-out;
+}
+
+/* Expanding ring pulse for processing */
+@keyframes ring-pulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.ring-pulse {
+  animation: ring-pulse 2.5s ease-out infinite;
+}
+
+/* Floating particle for processing */
+@keyframes float-particle {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-30px) translateX(10px);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-50px) translateX(-5px);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-20px) translateX(15px);
+    opacity: 0.6;
+  }
+}
+
+.float-particle {
+  animation: float-particle 4s ease-in-out infinite;
 }

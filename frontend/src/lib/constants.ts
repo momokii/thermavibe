@@ -40,8 +40,11 @@ export const PROCESSING_MESSAGES = [
   'Reading your vibe...',
   'Analyzing your aura...',
   'Consulting the vibe oracle...',
-  'Decoding your energy...',
+  'Decoding your energy field...',
+  'Mixing your cosmic palette...',
+  'Tuning into your frequency...',
   'Almost there...',
-  'Sensing the frequencies...',
+  'Scanning the aesthetic matrix...',
+  'Distilling your essence...',
   'Channeling cosmic insights...',
 ] as const;

@@ -45,21 +45,30 @@ export default function ReviewScreen() {
   const isUrgent = timeRemainingSeconds < 10;
 
   const selectedPhoto = photos[selectedPhotoIndex];
+  const timerPercent = Math.min(100, (timeRemainingSeconds / 60) * 100);
 
   return (
-    <div className="w-full h-full flex flex-col bg-kiosk-background">
+    <div className="w-full h-full flex flex-col"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.08) 0%, transparent 60%), #0f0a1a',
+      }}
+    >
       {/* Main content area */}
       <div className="flex-1 flex items-center justify-center p-6 relative">
-        {/* Large preview of selected photo */}
+        {/* Large preview of selected photo with glowing border */}
         <AnimatePresence mode="wait">
           {selectedPhoto && (
             <motion.div
               key={selectedPhotoIndex}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.3 }}
-              className="relative w-full max-w-lg aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl"
+              className="relative w-full max-w-lg aspect-[3/4] rounded-2xl overflow-hidden glow-border"
+              style={{
+                boxShadow: '0 0 25px rgba(139,92,246,0.35), 0 0 50px rgba(236,72,153,0.2), 0 0 4px rgba(255,255,255,0.1)',
+                border: '2px solid rgba(139,92,246,0.4)',
+              }}
             >
               <img
                 src={selectedPhoto.photo_url}
@@ -67,11 +76,14 @@ export default function ReviewScreen() {
                 className="w-full h-full object-cover"
               />
 
-              {/* Photo number badge */}
-              <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full">
-                <span className="text-white text-sm font-medium">
-                  {selectedPhotoIndex + 1}/{photos.length}
-                </span>
+              {/* Photo number badge with gradient */}
+              <div className="absolute top-3 left-3 px-3 py-1.5 rounded-full text-white text-sm font-display font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                  boxShadow: '0 2px 8px rgba(139,92,246,0.4)',
+                }}
+              >
+                {selectedPhotoIndex + 1}/{photos.length}
               </div>
             </motion.div>
           )}
@@ -85,18 +97,18 @@ export default function ReviewScreen() {
         )}
       </div>
 
-      {/* Thumbnail strip */}
+      {/* Thumbnail strip with glass background */}
       {photos.length > 1 && (
         <div className="px-4 pb-3">
-          <div className="flex gap-3 justify-center overflow-x-auto py-2">
+          <div className="flex gap-3 justify-center overflow-x-auto py-2 glass-card rounded-2xl px-4">
             {photos.map((photo, i) => (
               <button
                 key={i}
                 onClick={() => selectPhoto(i)}
-                className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden transition-all duration-200 ${
                   i === selectedPhotoIndex
-                    ? 'border-kiosk-primary scale-110 shadow-lg shadow-kiosk-primary/30'
-                    : 'border-white/20 opacity-60 hover:opacity-90'
+                    ? 'scale-110 ring-2 ring-kiosk-primary shadow-lg shadow-kiosk-primary/40'
+                    : 'opacity-50 hover:opacity-80'
                 }`}
               >
                 <img
@@ -112,33 +124,32 @@ export default function ReviewScreen() {
 
       {/* Bottom bar: timer + actions */}
       <div className="px-6 pb-8 pt-3">
-        {/* Timer */}
-        <div className="flex justify-center mb-4">
-          <div
-            className={`px-4 py-2 rounded-full backdrop-blur-sm flex items-center gap-2 ${
-              isUrgent
-                ? 'bg-red-500/20 border border-red-500/50'
-                : 'bg-white/10 border border-white/20'
-            }`}
-          >
-            <svg
-              className={`w-4 h-4 ${isUrgent ? 'text-red-400 animate-pulse' : 'text-white/60'}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
+        {/* Timer ring */}
+        <div className="flex justify-center mb-5">
+          <div className="relative w-12 h-12">
+            {/* Background ring */}
+            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+              <circle
+                cx="24" cy="24" r="20" fill="none"
+                stroke={isUrgent ? '#ef4444' : 'url(#timer-gradient)'}
+                strokeWidth="3"
                 strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                strokeDasharray={`${2 * Math.PI * 20}`}
+                strokeDashoffset={`${2 * Math.PI * 20 * (1 - timerPercent / 100)}`}
+                className="transition-all duration-1000"
               />
+              <defs>
+                <linearGradient id="timer-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#8b5cf6" />
+                  <stop offset="100%" stopColor="#ec4899" />
+                </linearGradient>
+              </defs>
             </svg>
-            <span
-              className={`text-lg font-mono font-bold ${
-                isUrgent ? 'text-red-300' : 'text-white/80'
-              }`}
-            >
+            {/* Time text in center */}
+            <span className={`absolute inset-0 flex items-center justify-center text-xs font-mono font-bold ${
+              isUrgent ? 'text-red-400' : 'text-kiosk-text/70'
+            }`}>
               {timeDisplay}
             </span>
           </div>
@@ -150,9 +161,9 @@ export default function ReviewScreen() {
             whileTap={{ scale: 0.95 }}
             onClick={retake}
             disabled={isTransitioning}
-            className="flex-1 py-4 rounded-2xl border-2 border-white/30 text-white/80 text-lg font-semibold
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       hover:bg-white/10 active:bg-white/20 transition-colors"
+            className="flex-1 py-4 rounded-2xl text-kiosk-text/80 text-lg font-display font-semibold
+                       disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200
+                       glass-card hover:bg-white/10 active:bg-white/15"
           >
             Retake
           </motion.button>
@@ -161,10 +172,12 @@ export default function ReviewScreen() {
             whileTap={{ scale: 0.95 }}
             onClick={confirmSelection}
             disabled={isTransitioning || photos.length === 0}
-            className="flex-[2] py-4 rounded-2xl bg-kiosk-primary text-white text-lg font-semibold
-                       disabled:opacity-40 disabled:cursor-not-allowed
-                       hover:bg-kiosk-primary/90 active:bg-kiosk-primary/80 transition-colors
-                       shadow-lg shadow-kiosk-primary/25"
+            className="flex-[2] py-4 rounded-2xl text-white text-lg font-display font-bold
+                       disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200
+                       shadow-lg shadow-purple-500/25"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+            }}
           >
             {isTransitioning ? 'Analyzing...' : 'Analyze My Vibe'}
           </motion.button>

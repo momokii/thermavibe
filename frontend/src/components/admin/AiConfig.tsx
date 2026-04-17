@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 export default function AiConfig() {
   const queryClient = useQueryClient();
@@ -22,7 +23,6 @@ export default function AiConfig() {
   const [model, setModel] = useState(aiConfig.model as string ?? '');
   const [systemPrompt, setSystemPrompt] = useState(aiConfig.system_prompt as string ?? '');
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (aiConfig.provider) setProvider(aiConfig.provider as string);
     if (aiConfig.api_key) setApiKey(aiConfig.api_key as string);
@@ -44,15 +44,21 @@ export default function AiConfig() {
   };
 
   return (
-    <Card>
+    <Card className="bg-white/[0.03] border-white/[0.08] overflow-hidden relative">
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500" />
       <CardHeader>
-        <CardTitle>AI Provider</CardTitle>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-violet-400" />
+          <CardTitle className="font-display">AI Provider</CardTitle>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label>Provider</Label>
+          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Provider</Label>
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="bg-white/[0.04] border-white/[0.08]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="mock">Mock (Testing)</SelectItem>
               <SelectItem value="openai">OpenAI</SelectItem>
@@ -64,19 +70,41 @@ export default function AiConfig() {
         </div>
         {provider !== 'mock' && provider !== 'ollama' && (
           <div className="space-y-2">
-            <Label>API Key</Label>
-            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." />
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">API Key</Label>
+            <Input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-..."
+              className="bg-white/[0.04] border-white/[0.08]"
+            />
           </div>
         )}
         <div className="space-y-2">
-          <Label>Model</Label>
-          <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4o-mini" />
+          <Label className="text-muted-foreground text-xs uppercase tracking-wider">Model</Label>
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="gpt-4o-mini"
+            className="bg-white/[0.04] border-white/[0.08]"
+          />
         </div>
         <div className="space-y-2">
-          <Label>System Prompt</Label>
-          <Textarea rows={4} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} placeholder="You are a vibe reading AI..." />
+          <Label className="text-muted-foreground text-xs uppercase tracking-wider">System Prompt</Label>
+          <Textarea
+            rows={4}
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            placeholder="You are a vibe reading AI..."
+            className="bg-white/[0.04] border-white/[0.08] resize-none"
+          />
         </div>
-        <Button onClick={handleSave} disabled={saveMutation.isPending}>
+        <Button
+          onClick={handleSave}
+          disabled={saveMutation.isPending}
+          className="btn-gradient border-0 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+        >
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
           {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}
         </Button>
       </CardContent>

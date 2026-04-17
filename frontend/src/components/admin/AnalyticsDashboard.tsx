@@ -11,6 +11,13 @@ interface Props {
   mode?: 'summary' | 'full';
 }
 
+const cardAccents = [
+  'linear-gradient(90deg, #8b5cf6, transparent)',
+  'linear-gradient(90deg, #ec4899, transparent)',
+  'linear-gradient(90deg, #06b6d4, transparent)',
+  'linear-gradient(90deg, #f97316, transparent)',
+];
+
 export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['analytics-sessions'],
@@ -28,42 +35,31 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Analytics</h2>
+      <h2 className="text-2xl font-display font-bold">Analytics</h2>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Sessions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{sessions?.summary.total_sessions ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatPercent(sessions?.summary.completion_rate ?? 0)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Duration</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatDuration(sessions?.summary.avg_duration_seconds ?? 0)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatIDR(revenue?.summary.total_revenue ?? 0)}</p>
-          </CardContent>
-        </Card>
+        {[
+          { title: 'Total Sessions', value: sessions?.summary.total_sessions ?? 0, raw: true },
+          { title: 'Completion Rate', value: formatPercent(sessions?.summary.completion_rate ?? 0), raw: false },
+          { title: 'Avg Duration', value: formatDuration(sessions?.summary.avg_duration_seconds ?? 0), raw: false },
+          { title: 'Revenue', value: formatIDR(revenue?.summary.total_revenue ?? 0), raw: false },
+        ].map((card, i) => (
+          <Card key={card.title} className="relative overflow-hidden">
+            <div
+              className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{ background: cardAccents[i] }}
+            />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-2xl font-bold font-display ${card.raw ? 'tabular-nums' : ''}`}>
+                {card.value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {mode === 'full' && (
@@ -72,7 +68,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           {sessions && sessions.timeseries.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Session History</CardTitle>
+                <CardTitle className="text-lg font-display">Session History</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -88,7 +84,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                   <TableBody>
                     {sessions.timeseries.map((point) => (
                       <TableRow key={point.period}>
-                        <TableCell>{point.period}</TableCell>
+                        <TableCell className="font-medium">{point.period}</TableCell>
                         <TableCell>{point.sessions}</TableCell>
                         <TableCell>{point.completed}</TableCell>
                         <TableCell>{point.abandoned}</TableCell>
@@ -105,7 +101,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           {sessions && Object.keys(sessions.state_distribution).length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">State Distribution</CardTitle>
+                <CardTitle className="text-lg font-display">State Distribution</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {Object.entries(sessions.state_distribution).map(([state, count]) => (

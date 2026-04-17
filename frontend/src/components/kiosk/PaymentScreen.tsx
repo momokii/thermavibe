@@ -99,7 +99,11 @@ export default function PaymentScreen() {
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-kiosk-background p-8">
+    <div className="w-full h-full flex flex-col items-center justify-center p-8 relative overflow-hidden"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 30%, rgba(139,92,246,0.12) 0%, transparent 60%), #0f0a1a',
+      }}
+    >
       <AnimatePresence mode="wait">
         {status === 'loading' && (
           <motion.div
@@ -109,8 +113,8 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-6"
           >
-            <div className="w-12 h-12 border-3 border-kiosk-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-xl text-kiosk-text/70">Preparing payment{dots}</p>
+            <div className="w-12 h-12 border-[3px] border-kiosk-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-xl text-kiosk-text/70 font-display">Preparing payment{dots}</p>
           </motion.div>
         )}
 
@@ -122,34 +126,63 @@ export default function PaymentScreen() {
             exit={{ opacity: 0, y: -20 }}
             className="flex flex-col items-center gap-6"
           >
-            <h2 className="text-3xl font-bold text-kiosk-text">Scan to Pay</h2>
+            <h2 className="text-3xl font-display font-black text-gradient-vibe">Scan to Pay</h2>
 
-            <div className="w-64 h-64 bg-white rounded-2xl flex items-center justify-center p-4">
+            {/* QR code area with glass card + glow */}
+            <div className="w-64 h-64 glass-card rounded-2xl flex items-center justify-center p-4"
+              style={{
+                boxShadow: '0 0 30px rgba(139,92,246,0.15), 0 0 60px rgba(236,72,153,0.08)',
+                border: '1px solid rgba(139,92,246,0.2)',
+              }}
+            >
               <div className="text-center">
-                <div className="text-4xl mb-2">QR</div>
-                <p className="text-xs text-gray-500">
+                <div className="text-4xl mb-2 text-kiosk-text/30">QR</div>
+                <p className="text-xs text-kiosk-text/40">
                   {sessionId ? `Session: ${sessionId.slice(0, 8)}...` : 'Loading...'}
                 </p>
               </div>
             </div>
 
-            <p className="text-2xl font-semibold text-kiosk-primary">
+            {/* Amount with gradient text */}
+            <p className="text-2xl font-display font-black text-gradient-vibe">
               {formatCurrency(5000)}
             </p>
 
-            <p className="text-kiosk-text/60 text-center">
+            <p className="text-kiosk-text/50 font-display text-center">
               Waiting for payment{dots}
             </p>
 
             {countdown !== null && countdown > 0 && (
-              <p className="text-sm text-kiosk-text/40">
-                Expires in {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
-              </p>
+              <div className="flex items-center gap-2">
+                <div className="relative w-8 h-8">
+                  <svg className="w-8 h-8 -rotate-90" viewBox="0 0 32 32">
+                    <circle cx="16" cy="16" r="13" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+                    <circle
+                      cx="16" cy="16" r="13" fill="none"
+                      stroke="url(#countdown-grad)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 13}`}
+                      strokeDashoffset={`${2 * Math.PI * 13 * (1 - countdown / 120)}`}
+                      className="transition-all duration-1000"
+                    />
+                    <defs>
+                      <linearGradient id="countdown-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#8b5cf6" />
+                        <stop offset="100%" stopColor="#ec4899" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <span className="text-sm text-kiosk-text/40 font-mono">
+                  {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
             )}
 
             <button
               onClick={handleCancel}
-              className="mt-4 px-6 py-2 text-sm text-kiosk-text/50 hover:text-kiosk-text/80 transition-colors"
+              className="mt-4 px-6 py-2 text-sm text-kiosk-text/40 hover:text-kiosk-text/70 transition-colors font-display"
             >
               Cancel
             </button>
@@ -164,13 +197,19 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-4"
           >
-            <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.05))',
+                border: '2px solid rgba(34,197,94,0.5)',
+                boxShadow: '0 0 20px rgba(34,197,94,0.2)',
+              }}
+            >
               <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-2xl text-kiosk-text font-semibold">Payment Confirmed!</p>
-            <p className="text-kiosk-text/60">Starting your session...</p>
+            <p className="text-2xl text-kiosk-text font-display font-bold">Payment Confirmed!</p>
+            <p className="text-kiosk-text-muted/60 font-display">Starting your session...</p>
           </motion.div>
         )}
 
@@ -182,19 +221,26 @@ export default function PaymentScreen() {
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-6"
           >
-            <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.05))',
+                border: '2px solid rgba(239,68,68,0.4)',
+                boxShadow: '0 0 20px rgba(239,68,68,0.15)',
+              }}
+            >
               <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
 
-            <p className="text-xl text-kiosk-text font-semibold">
+            <p className="text-xl text-kiosk-text font-display font-semibold">
               {status === 'expired' ? 'Payment Expired' : 'Payment Failed'}
             </p>
 
             <button
               onClick={handleCancel}
-              className="px-8 py-3 bg-kiosk-primary text-white rounded-xl font-semibold"
+              className="px-8 py-3 rounded-2xl text-white font-display font-semibold"
+              style={{ background: 'linear-gradient(135deg, #8b5cf6, #ec4899)' }}
             >
               Go Back
             </button>

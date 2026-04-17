@@ -5,7 +5,7 @@ import PaymentConfig from '@/components/admin/PaymentConfig';
 export default function AdminConfigPage() {
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Configuration</h2>
+      <h2 className="text-2xl font-display font-bold text-gradient-primary">Configuration</h2>
       <Tabs defaultValue="ai">
         <TabsList>
           <TabsTrigger value="ai">AI Provider</TabsTrigger>

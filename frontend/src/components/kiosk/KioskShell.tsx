@@ -8,9 +8,9 @@ import RevealScreen from './RevealScreen';
 import PaymentScreen from './PaymentScreen';
 
 const screenTransition = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: 'easeOut' } },
-  exit: { opacity: 0, scale: 1.05, transition: { duration: 0.3, ease: 'easeIn' } },
+  initial: { opacity: 0, scale: 0.96, y: 8 },
+  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit: { opacity: 0, scale: 1.03, y: -8, transition: { duration: 0.3, ease: 'easeIn' } },
 };
 
 export default function KioskShell() {
