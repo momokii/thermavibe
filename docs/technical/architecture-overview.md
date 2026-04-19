@@ -11,6 +11,10 @@
 3. [Kiosk State Machine](#3-kiosk-state-machine)
 4. [Service Layer Architecture](#4-service-layer-architecture)
 5. [Docker Process Architecture](#5-docker-process-architecture)
+6. [Multi-Kiosk Architecture (Future)](multi-kiosk-architecture.md)
+
+> **Note:** VibePrint OS currently operates as a single-kiosk system. For the planned
+> multi-room / multi-kiosk architecture, see [multi-kiosk-architecture.md](multi-kiosk-architecture.md).
 
 ---
 

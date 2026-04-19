@@ -86,3 +86,4 @@ Before implementing any feature:
 - `backend/app/services/session_service.py` — Kiosk state machine (core business logic)
 - `frontend/src/stores/kioskStore.ts` — Frontend kiosk state mirror
 - `docs/technical/api-contract.md` — Complete API specification
+- `docs/technical/multi-kiosk-architecture.md` — Future multi-room architecture plan
