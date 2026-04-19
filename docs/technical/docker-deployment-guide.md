@@ -1,6 +1,8 @@
 # VibePrint OS -- Docker Deployment Guide
 
 > This document provides a complete guide for deploying VibePrint OS to production using Docker Compose on a single Linux machine (Ubuntu/Debian). It covers container architecture, environment configuration, USB device passthrough, Chromium kiosk launch, production checklist, updates, backup, and troubleshooting.
+>
+> **Scope:** This guide covers the **single-kiosk** deployment (one machine, one camera, one display). For multi-room deployments with a central server and distributed room agents, see [multi-kiosk-architecture.md](multi-kiosk-architecture.md).
 
 ---
 

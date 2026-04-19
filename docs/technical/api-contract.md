@@ -1,6 +1,8 @@
 # VibePrint OS -- REST API Contract
 
 > This document specifies the complete REST API contract for VibePrint OS. All endpoints are versioned under `/api/v1/`. Request and response bodies use JSON. Authentication for admin endpoints uses a Bearer token obtained from the PIN-based login endpoint.
+>
+> **Future note:** When multi-kiosk is implemented, this API will gain WebSocket endpoints (`/ws/agent`) for room agent communication, kiosk management endpoints (`/admin/kiosks`), and camera/printer operations will be proxied through WebSocket instead of direct hardware access. See [multi-kiosk-architecture.md](multi-kiosk-architecture.md) for details.
 
 ---
 
