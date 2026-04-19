@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskState } from '@/hooks/useKioskState';
 import { useKioskStore } from '@/stores/kioskStore';
@@ -9,21 +9,32 @@ export default function RevealScreen() {
   const storeReset = useKioskStore((s) => s.reset);
   const [displayedText, setDisplayedText] = useState('');
   const fullText = sessionData?.analysis_text ?? '';
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const typingDoneRef = useRef(false);
 
   // Typewriter effect
   useEffect(() => {
     if (!fullText) return;
     let i = 0;
+    typingDoneRef.current = false;
     const timer = setInterval(() => {
       if (i < fullText.length) {
-        setDisplayedText(fullText.slice(0, i + 1));
         i++;
+        setDisplayedText(fullText.slice(0, i));
       } else {
+        typingDoneRef.current = true;
         clearInterval(timer);
       }
-    }, 30);
+    }, 25);
     return () => clearInterval(timer);
   }, [fullText]);
+
+  // Auto-scroll to bottom as text types
+  useEffect(() => {
+    if (scrollRef.current && !typingDoneRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [displayedText]);
 
   // Print + auto-reset
   useEffect(() => {
@@ -50,76 +61,94 @@ export default function RevealScreen() {
 
   return (
     <div
-      className="kiosk-layout items-center justify-center cursor-pointer relative overflow-hidden bg-surface-0"
+      className="kiosk-layout relative bg-surface-0 cursor-pointer"
       onClick={handleTouch}
     >
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            key="error-banner"
-            initial={{ opacity: 0, y: -10 }}
+      {/* Scrollable content area — scrollbar hidden for kiosk */}
+      <div
+        ref={scrollRef}
+        className="kiosk-scroll"
+        style={{
+          paddingTop: 'max(2rem, var(--kiosk-safe-y))',
+          paddingBottom: '4rem',
+        }}
+      >
+        <div className="kiosk-scroll-inner">
+          {/* Header */}
+          <motion.h2
+            initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute left-1/2 -translate-x-1/2 px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md text-center z-10"
-            style={{ top: 'var(--kiosk-safe-y)' }}
+            transition={{ duration: 0.5 }}
+            className="text-3xl font-display font-black text-white text-center"
+            style={{ marginBottom: '2rem' }}
           >
-            {error}
-            <span className="block mt-1 text-xs text-red-300/50">Touch anywhere to go back</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Your Vibe Reading
+          </motion.h2>
 
-      {/* Header */}
-      <motion.h2
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-3xl font-display font-black text-white relative z-10"
-        style={{ marginBottom: '3rem' }}
-      >
-        Your Vibe Reading
-      </motion.h2>
-
-      {/* Photo with clean border */}
-      {sessionData?.capture_image_url && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
-          className="relative rounded-xl overflow-hidden aspect-square w-72"
-          style={{ marginBottom: '3rem', border: '2px solid rgba(255,255,255,0.12)' }}
-        >
-          <img
-            src={sessionData.capture_image_url}
-            alt="Your photo"
-            className="w-full h-full object-cover"
-          />
-        </motion.div>
-      )}
-
-      {/* Typewriter text */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
-        className="max-w-lg text-center relative z-10"
-      >
-        <p className="text-2xl text-white leading-relaxed whitespace-pre-line font-display font-medium">
-          {displayedText}
-          {displayedText.length < fullText.length && (
-            <span className="animate-pulse text-violet-400">|</span>
+          {/* Photo — centered, always fully visible */}
+          {sessionData?.capture_image_url && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+              className="flex justify-center"
+              style={{ marginBottom: '2rem' }}
+            >
+              <div
+                className="relative rounded-xl overflow-hidden aspect-square w-64"
+                style={{ border: '2px solid rgba(255,255,255,0.12)' }}
+              >
+                <img
+                  src={sessionData.capture_image_url}
+                  alt="Your photo"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </motion.div>
           )}
+
+          {/* Typewriter text */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="text-center px-4"
+          >
+            <p className="text-xl text-white leading-relaxed whitespace-pre-line font-display font-medium">
+              {displayedText}
+              {displayedText.length < fullText.length && (
+                <span className="animate-pulse text-violet-400">|</span>
+              )}
+            </p>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Fixed bottom bar */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        className="absolute bottom-0 left-0 right-0 py-3 text-center pointer-events-none"
+        style={{ paddingBottom: 'max(0.75rem, var(--kiosk-safe-y-bottom, 0.75rem))' }}
+      >
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              key="error-banner"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="px-6 py-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-sm max-w-md mx-auto text-center mb-3"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <p className="text-sm text-white/30">
+          Your receipt is printing... Touch to continue
         </p>
       </motion.div>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.4 }}
-        transition={{ delay: 2 }}
-        className="mt-8 text-sm text-white/35 relative z-10"
-      >
-        Your receipt is printing... Touch to continue
-      </motion.p>
     </div>
   );
 }

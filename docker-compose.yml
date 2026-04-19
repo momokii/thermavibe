@@ -55,6 +55,12 @@ services:
     devices:
       - /dev/bus/usb:/dev/bus/usb
       - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+    # Allow dynamic access to any new video device (e.g. phone camera hot-plug)
+    # without restarting the container or editing this file.
+    device_cgroup_rules:
+      - 'c 81:* rwm'
 
 volumes:
   postgres-data:

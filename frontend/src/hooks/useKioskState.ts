@@ -109,21 +109,17 @@ export function useKioskState() {
 
   const confirmSelection = useCallback(async () => {
     if (!sessionId) return;
+    // Immediately show the processing screen while the API call runs in the background
+    store.setState('processing');
     try {
-      store.setTransitioning(true);
       const response = await selectMut.mutateAsync({
         id: sessionId,
         photoIndex: selectedPhotoIndex,
       });
       store.setSession(sessionId, response.data as unknown as SessionResponse);
-      if (response.data.state !== 'reveal') {
-        store.setState('processing');
-      }
     } catch {
       store.reset();
       store.setError('Analysis failed. Please try again.');
-    } finally {
-      store.setTransitioning(false);
     }
   }, [selectMut, sessionId, selectedPhotoIndex, store]);
 
@@ -131,18 +127,14 @@ export function useKioskState() {
 
   const triggerCapture = useCallback(async () => {
     if (!sessionId) return;
+    // Immediately show the processing screen while the API call runs in the background
+    store.setState('processing');
     try {
-      store.setTransitioning(true);
       const response = await captureMut.mutateAsync(sessionId);
       store.setSession(sessionId, response.data as unknown as SessionResponse);
-      if (response.data.state !== 'reveal') {
-        store.setState('processing');
-      }
     } catch {
       store.setState('idle');
       store.setError('Capture failed. Please try again.');
-    } finally {
-      store.setTransitioning(false);
     }
   }, [captureMut, sessionId, store]);
 

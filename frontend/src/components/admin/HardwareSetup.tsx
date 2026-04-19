@@ -1,17 +1,40 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/api/adminApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { formatDuration, formatBytes } from '@/lib/formatters';
 import { toast } from 'sonner';
-import { Camera, Printer, Cpu, Loader2 } from 'lucide-react';
+import { Camera, Printer, Cpu, Loader2, RefreshCw } from 'lucide-react';
+import { CAMERA_STREAM_URL } from '@/lib/constants';
 
 export default function HardwareSetup() {
+  const queryClient = useQueryClient();
+  const [showPreview, setShowPreview] = useState(false);
+
   const { data: hw, isLoading } = useQuery({
     queryKey: ['hardware'],
     queryFn: () => adminApi.getHardwareStatus().then((r) => r.data),
     refetchInterval: 10000,
+  });
+
+  const { data: cameras, isLoading: camerasLoading } = useQuery({
+    queryKey: ['cameras'],
+    queryFn: () => adminApi.listCameras().then((r) => r.data),
+  });
+
+  const selectCameraMut = useMutation({
+    mutationFn: (deviceIndex: number) => adminApi.selectCamera(deviceIndex),
+    onSuccess: (response) => {
+      toast.success(`Switched to ${response.data.active_device.name}`);
+      queryClient.invalidateQueries({ queryKey: ['cameras'] });
+      queryClient.invalidateQueries({ queryKey: ['hardware'] });
+    },
+    onError: () => toast.error('Failed to switch camera'),
   });
 
   const testCameraMut = useMutation({
@@ -25,6 +48,9 @@ export default function HardwareSetup() {
     onSuccess: () => toast.success('Test print sent'),
     onError: () => toast.error('Print test failed'),
   });
+
+  const activeCamera = cameras?.devices.find((d) => d.is_active);
+  const detectedDevices = cameras?.devices.filter((d) => d.name && !d.name.includes('Camera ') || d.resolutions.length > 0) ?? [];
 
   if (isLoading) {
     return (
@@ -44,34 +70,112 @@ export default function HardwareSetup() {
             <Camera className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">Camera</CardTitle>
           </div>
-          <Badge
-            className={hw?.camera.connected
-              ? 'bg-emerald-500/20 text-emerald-300 border-0'
-              : 'bg-red-500/20 text-red-300 border-0'}
-          >
-            {hw?.camera.connected ? 'Connected' : 'Disconnected'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge
+              className={hw?.camera.connected
+                ? 'bg-emerald-500/20 text-emerald-300 border-0'
+                : 'bg-red-500/20 text-red-300 border-0'}
+            >
+              {hw?.camera.connected ? 'Connected' : 'Disconnected'}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 1.5rem' }}>
-          {hw?.camera.active_device && (
-            <p className="text-sm text-white/40">
-              {hw.camera.active_device.name} ({hw.camera.active_device.path})
-            </p>
+          {/* Camera device selector */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/40 uppercase tracking-wider">Active Camera</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white/40 hover:text-white/70 h-auto py-0.5 px-2 text-xs"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['cameras'] })}
+                disabled={camerasLoading}
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${camerasLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+            <Select
+              value={activeCamera ? String(activeCamera.index) : undefined}
+              onValueChange={(val) => selectCameraMut.mutate(Number(val))}
+              disabled={selectCameraMut.isPending}
+            >
+              <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
+                <SelectValue placeholder={detectedDevices.length === 0 ? 'No cameras detected' : 'Select camera...'} />
+              </SelectTrigger>
+              <SelectContent>
+                {(cameras?.devices ?? []).map((device) => (
+                  <SelectItem key={device.index} value={String(device.index)}>
+                    {device.path} — {device.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Active camera info */}
+          {activeCamera && (
+            <div className="text-sm text-white/40">
+              {activeCamera.path} — {activeCamera.name}
+              {activeCamera.resolutions.length > 0 && (
+                <span className="text-white/25 ml-2">
+                  ({activeCamera.resolutions.map((r) => `${r.width}x${r.height}`).join(', ')})
+                </span>
+              )}
+            </div>
           )}
+
+          {/* Streaming status */}
           <p className="text-sm text-white/60">
             Status: <span className={hw?.camera.status.streaming ? 'text-emerald-400' : 'text-white/40'}>
               {hw?.camera.status.streaming ? 'Streaming' : 'Idle'}
             </span>
           </p>
-          <Button
-            size="sm"
-            onClick={() => testCameraMut.mutate()}
-            disabled={testCameraMut.isPending}
-            className="btn-secondary border-0 text-sm"
-          >
-            {testCameraMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
-            Test Camera
-          </Button>
+
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => testCameraMut.mutate()}
+              disabled={testCameraMut.isPending}
+              className="btn-secondary border-0 text-sm"
+            >
+              {testCameraMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
+              Test Camera
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowPreview(!showPreview)}
+              className="btn-secondary border-0 text-sm"
+            >
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </Button>
+          </div>
+
+          {/* Camera preview */}
+          {showPreview && (
+            <div className="rounded-lg overflow-hidden bg-black/50" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+              <img
+                src={`${CAMERA_STREAM_URL}&t=${Date.now()}`}
+                alt="Camera preview"
+                className="w-full"
+                style={{ maxHeight: '360px', objectFit: 'contain' }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '';
+                  (e.target as HTMLImageElement).alt = 'Camera stream unavailable';
+                }}
+              />
+              <p className="text-xs text-white/25 text-center py-1.5">Live camera feed</p>
+            </div>
+          )}
+
+          {/* No cameras detected message */}
+          {detectedDevices.length === 0 && !camerasLoading && (
+            <div className="text-sm text-amber-400/70 bg-amber-500/10 rounded-lg px-4 py-3" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+              No cameras detected. Make sure your camera is connected and click Refresh to scan again.
+            </div>
+          )}
         </CardContent>
       </Card>
 

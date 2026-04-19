@@ -330,6 +330,44 @@ html, body, #root {
   100% { --gradient-angle: 360deg; }
 }
 
+/* Glow ring around photo during processing */
+.vibe-glow-ring {
+  background: conic-gradient(
+    from 0deg,
+    rgba(139, 92, 246, 0.4),
+    rgba(236, 72, 153, 0.3),
+    rgba(139, 92, 246, 0.1),
+    rgba(236, 72, 153, 0.3),
+    rgba(139, 92, 246, 0.4)
+  );
+  animation: spin-slow 3s linear infinite;
+  border-radius: 1rem;
+  filter: blur(8px);
+  opacity: 0.7;
+}
+
+/* Kiosk scrollable area — hidden scrollbar, centered when fits, scrollable when overflows */
+.kiosk-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Hide scrollbar — kiosk display */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.kiosk-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* Inner wrapper: auto margins center vertically when content fits, collapse when scrolling needed */
+.kiosk-scroll-inner {
+  width: 100%;
+  max-width: 36rem;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 /* Switch toggle */
 .vibe-switch {
   all: unset;

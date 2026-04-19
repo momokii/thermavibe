@@ -12,6 +12,8 @@ import type {
   RevenueAnalyticsResponse,
   HardwareStatusResponse,
   PrintTestResponse,
+  CameraListResponse,
+  CameraSelectResponse,
 } from './types';
 
 export const adminApi = {
@@ -35,6 +37,12 @@ export const adminApi = {
 
   testCamera: () =>
     apiClient.post('/admin/hardware/camera/test', null, { responseType: 'blob' }),
+
+  listCameras: () =>
+    apiClient.get<CameraListResponse>('/camera/devices'),
+
+  selectCamera: (deviceIndex: number) =>
+    apiClient.post<CameraSelectResponse>('/camera/select', { device_index: deviceIndex }),
 
   testPrinter: () =>
     apiClient.post<PrintTestResponse>('/admin/hardware/printer/test'),
