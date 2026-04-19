@@ -134,12 +134,13 @@ export default function HardwareSetup() {
           </p>
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               size="sm"
               onClick={() => testCameraMut.mutate()}
               disabled={testCameraMut.isPending}
               className="btn-secondary border-0 text-sm"
+              style={{ padding: '0.75rem 1.5rem' }}
             >
               {testCameraMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
               Test Camera
@@ -148,24 +149,29 @@ export default function HardwareSetup() {
               size="sm"
               onClick={() => setShowPreview(!showPreview)}
               className="btn-secondary border-0 text-sm"
+              style={{ padding: '0.75rem 1.5rem' }}
             >
               {showPreview ? 'Hide Preview' : 'Show Preview'}
             </Button>
           </div>
 
-          {/* Camera preview */}
+          {/* Camera preview — 1:1 aspect ratio matching kiosk photo frame */}
           {showPreview && (
-            <div className="rounded-lg overflow-hidden bg-black/50" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-              <img
-                src={`${CAMERA_STREAM_URL}&t=${Date.now()}`}
-                alt="Camera preview"
-                className="w-full"
-                style={{ maxHeight: '360px', objectFit: 'contain' }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '';
-                  (e.target as HTMLImageElement).alt = 'Camera stream unavailable';
-                }}
-              />
+            <div className="flex flex-col items-center">
+              <div
+                className="rounded-lg overflow-hidden aspect-square w-full max-w-xs"
+                style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                <img
+                  src={`${CAMERA_STREAM_URL}&t=${Date.now()}`}
+                  alt="Camera preview"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '';
+                    (e.target as HTMLImageElement).alt = 'Camera stream unavailable';
+                  }}
+                />
+              </div>
               <p className="text-xs text-white/25 text-center py-1.5">Live camera feed</p>
             </div>
           )}
