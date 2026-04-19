@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/api/adminApi';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -27,26 +27,22 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <h2 className="text-2xl font-display font-bold text-white">Analytics</h2>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {[
           { title: 'Total Sessions', value: sessions?.summary.total_sessions ?? 0, raw: true },
           { title: 'Completion Rate', value: formatPercent(sessions?.summary.completion_rate ?? 0), raw: false },
           { title: 'Avg Duration', value: formatDuration(sessions?.summary.avg_duration_seconds ?? 0), raw: false },
           { title: 'Revenue', value: formatIDR(revenue?.summary.total_revenue ?? 0), raw: false },
         ].map((card) => (
-          <Card key={card.title} className="card-surface border-0">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-white/40">{card.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className={`text-2xl font-bold font-display text-white ${card.raw ? 'tabular-nums' : ''}`}>
-                {card.value}
-              </p>
-            </CardContent>
+          <Card key={card.title} className="card-surface border-0" style={{ padding: '1.25rem' }}>
+            <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>{card.title}</p>
+            <p className={`text-2xl font-bold font-display text-white ${card.raw ? 'tabular-nums' : ''}`}>
+              {card.value}
+            </p>
           </Card>
         ))}
       </div>
@@ -56,10 +52,8 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           {/* Session Timeseries */}
           {sessions && sessions.timeseries.length > 0 && (
             <Card className="card-surface border-0">
-              <CardHeader>
-                <CardTitle className="text-lg font-display text-white">Session History</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <h3 className="text-lg font-display text-white" style={{ marginBottom: '1rem' }}>Session History</h3>
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/[0.06] hover:bg-transparent">
@@ -82,23 +76,23 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
+              </div>
             </Card>
           )}
 
           {/* State Distribution */}
           {sessions && Object.keys(sessions.state_distribution).length > 0 && (
             <Card className="card-surface border-0">
-              <CardHeader>
-                <CardTitle className="text-lg font-display text-white">State Distribution</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {Object.entries(sessions.state_distribution).map(([state, count]) => (
-                  <Badge key={state} variant="secondary" className="bg-white/[0.06] text-white/60 border-0">
-                    {state}: <span className="font-display tabular-nums ml-1">{count}</span>
-                  </Badge>
-                ))}
-              </CardContent>
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <h3 className="text-lg font-display text-white" style={{ marginBottom: '1rem' }}>State Distribution</h3>
+                <div className="flex flex-wrap gap-3">
+                  {Object.entries(sessions.state_distribution).map(([state, count]) => (
+                    <Badge key={state} variant="secondary" className="bg-white/[0.06] text-white/60 border-0" style={{ padding: '0.5rem 0.75rem' }}>
+                      {state}: <span className="font-display tabular-nums ml-1">{count}</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             </Card>
           )}
         </>

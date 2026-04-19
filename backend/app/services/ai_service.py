@@ -73,6 +73,7 @@ async def analyze_image(
     image_bytes: bytes,
     session_id: uuid.UUID | None = None,
     prompt: str | None = None,
+    ai_config: dict[str, str] | None = None,
 ) -> AIAnalyzeResponse:
     """Analyze an image using the configured AI provider.
 
@@ -81,8 +82,8 @@ async def analyze_image(
     Args:
         image_bytes: Raw image bytes.
         session_id: Optional session ID for logging.
-        provider: Override provider (defaults to settings).
         prompt: Override system prompt (defaults to settings).
+        ai_config: Runtime config from database. Falls back to env vars if None.
 
     Returns:
         AIAnalyzeResponse with analysis text and metadata.
@@ -90,11 +91,12 @@ async def analyze_image(
     Raises:
         AIFallbackExhausted: If all providers fail.
     """
-    system_prompt = prompt or settings.ai_system_prompt
+    cfg = ai_config or {}
+    system_prompt = prompt or cfg.get('system_prompt', settings.ai_system_prompt)
     compressed = compress_image(image_bytes)
     b64_image = encode_image_base64(compressed)
 
-    provider = settings.ai_provider
+    provider = cfg.get('provider', settings.ai_provider)
     provider_chain = _build_provider_chain(provider)
 
     last_error: Exception | None = None
@@ -107,6 +109,7 @@ async def analyze_image(
                 b64_image=b64_image,
                 system_prompt=system_prompt,
                 session_id=session_id,
+                cfg=cfg,
             )
             latency = int((time.monotonic() - start) * 1000)
             result.latency_ms = latency
@@ -147,6 +150,7 @@ async def _dispatch_to_provider(
     b64_image: str,
     system_prompt: str,
     session_id: uuid.UUID | None = None,
+    cfg: dict[str, str] | None = None,
 ) -> AIAnalyzeResponse:
     """Dispatch analysis to a specific provider.
 
@@ -155,6 +159,7 @@ async def _dispatch_to_provider(
         b64_image: Base64-encoded image.
         system_prompt: System prompt for the AI.
         session_id: Session ID for logging.
+        cfg: Runtime config dict from database.
 
     Returns:
         AIAnalyzeResponse.
@@ -174,23 +179,27 @@ async def _dispatch_to_provider(
     if dispatcher is None:
         raise AIProviderError(f'Unknown provider: {provider_name}', provider_name)
 
-    return await dispatcher(b64_image, system_prompt)
+    return await dispatcher(b64_image, system_prompt, cfg=cfg)
 
 
-async def _analyze_openai(b64_image: str, system_prompt: str) -> AIAnalyzeResponse:
+async def _analyze_openai(b64_image: str, system_prompt: str, cfg: dict[str, str] | None = None) -> AIAnalyzeResponse:
     """Analyze image using OpenAI Vision API."""
-    if not settings.openai_api_key:
+    _cfg = cfg or {}
+    api_key = _cfg.get('openai_api_key', settings.openai_api_key)
+    model = _cfg.get('model', settings.ai_model)
+
+    if not api_key:
         raise AIProviderError('OpenAI API key not configured', AIProvider.OPENAI)
 
     async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT) as client:
         response = await client.post(
             'https://api.openai.com/v1/chat/completions',
             headers={
-                'Authorization': f'Bearer {settings.openai_api_key}',
+                'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json',
             },
             json={
-                'model': settings.ai_model,
+                'model': model,
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {
@@ -221,7 +230,7 @@ async def _analyze_openai(b64_image: str, system_prompt: str) -> AIAnalyzeRespon
     return AIAnalyzeResponse(
         analysis_text=text,
         provider=AIProvider.OPENAI,
-        model=settings.ai_model,
+        model=model,
         latency_ms=0,  # Set by caller
         tokens_used=TokenUsage(
             input=usage.get('prompt_tokens', 0),
@@ -230,9 +239,12 @@ async def _analyze_openai(b64_image: str, system_prompt: str) -> AIAnalyzeRespon
     )
 
 
-async def _analyze_anthropic(b64_image: str, system_prompt: str) -> AIAnalyzeResponse:
+async def _analyze_anthropic(b64_image: str, system_prompt: str, cfg: dict[str, str] | None = None) -> AIAnalyzeResponse:
     """Analyze image using Anthropic Claude Vision API."""
-    if not settings.anthropic_api_key:
+    _cfg = cfg or {}
+    api_key = _cfg.get('anthropic_api_key', settings.anthropic_api_key)
+
+    if not api_key:
         raise AIProviderError('Anthropic API key not configured', AIProvider.ANTHROPIC)
 
     model = 'claude-sonnet-4-20250514'
@@ -241,7 +253,7 @@ async def _analyze_anthropic(b64_image: str, system_prompt: str) -> AIAnalyzeRes
         response = await client.post(
             'https://api.anthropic.com/v1/messages',
             headers={
-                'x-api-key': settings.anthropic_api_key,
+                'x-api-key': api_key,
                 'anthropic-version': '2023-06-01',
                 'Content-Type': 'application/json',
             },
@@ -287,16 +299,19 @@ async def _analyze_anthropic(b64_image: str, system_prompt: str) -> AIAnalyzeRes
     )
 
 
-async def _analyze_google(b64_image: str, system_prompt: str) -> AIAnalyzeResponse:
+async def _analyze_google(b64_image: str, system_prompt: str, cfg: dict[str, str] | None = None) -> AIAnalyzeResponse:
     """Analyze image using Google Gemini Vision API."""
-    if not settings.google_api_key:
+    _cfg = cfg or {}
+    api_key = _cfg.get('google_api_key', settings.google_api_key)
+
+    if not api_key:
         raise AIProviderError('Google API key not configured', AIProvider.GOOGLE)
 
     model = 'gemini-1.5-flash'
 
     async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT) as client:
         response = await client.post(
-            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.google_api_key}',
+            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}',
             json={
                 'contents': [
                     {
@@ -330,13 +345,17 @@ async def _analyze_google(b64_image: str, system_prompt: str) -> AIAnalyzeRespon
     )
 
 
-async def _analyze_ollama(b64_image: str, system_prompt: str) -> AIAnalyzeResponse:
+async def _analyze_ollama(b64_image: str, system_prompt: str, cfg: dict[str, str] | None = None) -> AIAnalyzeResponse:
     """Analyze image using local Ollama API."""
-    model = settings.ai_model if settings.ai_model != 'gpt-4o' else 'llama3.2-vision'
+    _cfg = cfg or {}
+    model = _cfg.get('model', settings.ai_model)
+    if model == 'gpt-4o':
+        model = 'llama3.2-vision'
+    base_url = _cfg.get('ollama_base_url', settings.ollama_base_url)
 
     async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT) as client:
         response = await client.post(
-            f'{settings.ollama_base_url}/api/generate',
+            f'{base_url}/api/generate',
             json={
                 'model': model,
                 'prompt': f'{system_prompt}\n\nAnalyze this photo and give me a vibe reading.',
@@ -360,7 +379,7 @@ async def _analyze_ollama(b64_image: str, system_prompt: str) -> AIAnalyzeRespon
     )
 
 
-async def _analyze_mock(b64_image: str, system_prompt: str) -> AIAnalyzeResponse:
+async def _analyze_mock(b64_image: str, system_prompt: str, cfg: dict[str, str] | None = None) -> AIAnalyzeResponse:
     """Return a mock vibe reading for development/testing.
 
     Always succeeds — used as the final fallback in the chain.

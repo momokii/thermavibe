@@ -56,6 +56,18 @@ async def lifespan(app: FastAPI):
         version='0.1.0',
     )
 
+    # Seed default config values into database
+    try:
+        from app.core.database import async_session_maker
+        from app.services.config_service import seed_default_configs
+
+        async with async_session_maker() as db:
+            created = await seed_default_configs(db)
+            if created > 0:
+                logger.info('config_seeded', new_entries=created)
+    except Exception as exc:
+        logger.warning('config_seed_failed', error=str(exc))
+
     # Run health checks (log warnings for unavailable services)
     db_health = await check_database_health()
     printer_health = check_printer_status()

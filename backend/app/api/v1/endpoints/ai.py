@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.core.exceptions import VibePrintError
 from app.schemas.ai import AIAnalyzeResponse
-from app.services import ai_service, session_service
+from app.services import ai_service, config_service, session_service
 
 router = APIRouter()
 
@@ -37,10 +37,13 @@ async def analyze_image(
             message='Image must be under 10MB.',
         )
 
+    ai_config = await config_service.get_ai_config(db)
+
     result = await ai_service.analyze_image(
         image_bytes=image_bytes,
         session_id=session_id,
         prompt=prompt,
+        ai_config=ai_config,
     )
 
     # If a session_id was provided, store the AI response

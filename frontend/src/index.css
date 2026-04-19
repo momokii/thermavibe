@@ -329,3 +329,39 @@ html, body, #root {
   0% { --gradient-angle: 0deg; }
   100% { --gradient-angle: 360deg; }
 }
+
+/* Switch toggle */
+.vibe-switch {
+  all: unset;
+  width: 4rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: #2d2650;
+  position: relative;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+  box-sizing: border-box;
+}
+.vibe-switch[data-state="checked"] {
+  background-color: #7c3aed;
+}
+.vibe-switch:focus-visible {
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
+}
+.vibe-switch-thumb {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background-color: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+.vibe-switch[data-state="checked"] .vibe-switch-thumb {
+  transform: translateX(1.7rem);
+}

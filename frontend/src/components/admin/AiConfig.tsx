@@ -19,13 +19,19 @@ export default function AiConfig() {
 
   const aiConfig = config?.categories?.ai ?? {};
   const [provider, setProvider] = useState(aiConfig.provider as string ?? 'mock');
-  const [apiKey, setApiKey] = useState(aiConfig.api_key as string ?? '');
+  const [openaiKey, setOpenaiKey] = useState(aiConfig.openai_api_key as string ?? '');
+  const [anthropicKey, setAnthropicKey] = useState(aiConfig.anthropic_api_key as string ?? '');
+  const [googleKey, setGoogleKey] = useState(aiConfig.google_api_key as string ?? '');
+  const [ollamaUrl, setOllamaUrl] = useState(aiConfig.ollama_base_url as string ?? 'http://localhost:11434');
   const [model, setModel] = useState(aiConfig.model as string ?? '');
   const [systemPrompt, setSystemPrompt] = useState(aiConfig.system_prompt as string ?? '');
 
   useEffect(() => {
     if (aiConfig.provider) setProvider(aiConfig.provider as string);
-    if (aiConfig.api_key) setApiKey(aiConfig.api_key as string);
+    if (aiConfig.openai_api_key) setOpenaiKey(aiConfig.openai_api_key as string);
+    if (aiConfig.anthropic_api_key) setAnthropicKey(aiConfig.anthropic_api_key as string);
+    if (aiConfig.google_api_key) setGoogleKey(aiConfig.google_api_key as string);
+    if (aiConfig.ollama_base_url) setOllamaUrl(aiConfig.ollama_base_url as string);
     if (aiConfig.model) setModel(aiConfig.model as string);
     if (aiConfig.system_prompt) setSystemPrompt(aiConfig.system_prompt as string);
   }, [aiConfig]);
@@ -40,22 +46,30 @@ export default function AiConfig() {
   });
 
   const handleSave = () => {
-    saveMutation.mutate({ provider, api_key: apiKey, model, system_prompt: systemPrompt });
+    saveMutation.mutate({
+      provider,
+      openai_api_key: openaiKey,
+      anthropic_api_key: anthropicKey,
+      google_api_key: googleKey,
+      ollama_base_url: ollamaUrl,
+      model,
+      system_prompt: systemPrompt,
+    });
   };
 
   return (
     <Card className="card-surface border-0">
-      <CardHeader>
+      <CardHeader style={{ padding: '1.5rem' }}>
         <div className="flex items-center gap-2.5">
           <Sparkles className="h-4 w-4 text-violet-400" />
           <CardTitle className="font-display text-white">AI Provider</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2">
+      <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0 2rem 2rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="input-surface text-white">
+            <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -67,28 +81,68 @@ export default function AiConfig() {
             </SelectContent>
           </Select>
         </div>
-        {provider !== 'mock' && provider !== 'ollama' && (
-          <div className="space-y-2">
-            <Label className="text-xs text-white/40 uppercase tracking-wider">API Key</Label>
+        {provider === 'openai' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">OpenAI API Key</Label>
             <Input
               type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              value={openaiKey}
+              onChange={(e) => setOpenaiKey(e.target.value)}
               placeholder="sk-..."
               className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
             />
           </div>
         )}
-        <div className="space-y-2">
+        {provider === 'anthropic' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Anthropic API Key</Label>
+            <Input
+              type="password"
+              value={anthropicKey}
+              onChange={(e) => setAnthropicKey(e.target.value)}
+              placeholder="sk-ant-..."
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
+            />
+          </div>
+        )}
+        {provider === 'google' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Google API Key</Label>
+            <Input
+              type="password"
+              value={googleKey}
+              onChange={(e) => setGoogleKey(e.target.value)}
+              placeholder="AI..."
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
+            />
+          </div>
+        )}
+        {provider === 'ollama' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Ollama Base URL</Label>
+            <Input
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              placeholder="http://localhost:11434"
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
+            />
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Model</Label>
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="gpt-4o-mini"
             className="input-surface text-white placeholder:text-white/20"
+            style={{ padding: '0.75rem 1rem' }}
           />
         </div>
-        <div className="space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">System Prompt</Label>
           <Textarea
             rows={4}
@@ -96,12 +150,14 @@ export default function AiConfig() {
             onChange={(e) => setSystemPrompt(e.target.value)}
             placeholder="You are a vibe reading AI..."
             className="input-surface text-white placeholder:text-white/20 resize-none"
+            style={{ padding: '0.75rem 1rem' }}
           />
         </div>
         <Button
           onClick={handleSave}
           disabled={saveMutation.isPending}
           className="btn-primary border-0"
+          style={{ alignSelf: 'flex-start', padding: '0.75rem 1.5rem' }}
         >
           {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
           {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}

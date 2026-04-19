@@ -36,10 +36,10 @@ export default function HardwareSetup() {
   }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Camera */}
       <Card className="card-surface border-0">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between" style={{ padding: '1.5rem' }}>
           <div className="flex items-center gap-2.5">
             <Camera className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">Camera</CardTitle>
@@ -52,7 +52,7 @@ export default function HardwareSetup() {
             {hw?.camera.connected ? 'Connected' : 'Disconnected'}
           </Badge>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 1.5rem' }}>
           {hw?.camera.active_device && (
             <p className="text-sm text-white/40">
               {hw.camera.active_device.name} ({hw.camera.active_device.path})
@@ -77,7 +77,7 @@ export default function HardwareSetup() {
 
       {/* Printer */}
       <Card className="card-surface border-0">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between" style={{ padding: '1.5rem' }}>
           <div className="flex items-center gap-2.5">
             <Printer className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">Printer</CardTitle>
@@ -90,7 +90,7 @@ export default function HardwareSetup() {
             {hw?.printer.connected ? 'Connected' : 'Disconnected'}
           </Badge>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 1.5rem' }}>
           {hw?.printer.device && (
             <p className="text-sm text-white/40">
               {hw.printer.device.vendor} {hw.printer.device.model}
@@ -117,14 +117,14 @@ export default function HardwareSetup() {
 
       {/* System Resources */}
       <Card className="card-surface border-0">
-        <CardHeader>
+        <CardHeader style={{ padding: '1.5rem' }}>
           <div className="flex items-center gap-2.5">
             <Cpu className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">System Resources</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
+        <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0 1.5rem 1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div className="flex justify-between text-sm">
               <span className="text-white/40">CPU</span>
               <span className="font-display tabular-nums text-white/70">{hw?.system.cpu_usage_percent.toFixed(1)}%</span>
@@ -139,7 +139,7 @@ export default function HardwareSetup() {
               />
             </div>
           </div>
-          <div className="space-y-1.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div className="flex justify-between text-sm">
               <span className="text-white/40">Memory</span>
               <span className="font-display tabular-nums text-white/70">{formatBytes((hw?.system.memory_usage_mb ?? 0) * 1024 * 1024)}</span>
@@ -154,7 +154,7 @@ export default function HardwareSetup() {
               />
             </div>
           </div>
-          <div className="space-y-1.5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div className="flex justify-between text-sm">
               <span className="text-white/40">Disk</span>
               <span className="font-display tabular-nums text-white/70">{hw?.system.disk_usage_percent.toFixed(1)}%</span>
@@ -169,7 +169,7 @@ export default function HardwareSetup() {
               />
             </div>
           </div>
-          <p className="text-sm text-white/35 pt-1">
+          <p className="text-sm text-white/35" style={{ paddingTop: '0.5rem' }}>
             Uptime: <span className="font-display tabular-nums text-white/50">{formatDuration(hw?.system.uptime_seconds ?? 0)}</span>
           </p>
         </CardContent>

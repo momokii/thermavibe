@@ -47,21 +47,21 @@ export default function PaymentConfig() {
 
   return (
     <Card className="card-surface border-0">
-      <CardHeader>
+      <CardHeader style={{ padding: '1.5rem' }}>
         <div className="flex items-center gap-2.5">
           <CreditCard className="h-4 w-4 text-violet-400" />
           <CardTitle className="font-display text-white">Payment Settings</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="flex items-center justify-between py-1">
+      <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0 2rem 2rem' }}>
+        <div className="flex items-center justify-between" style={{ padding: '0.5rem 0' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Enable Payment</Label>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
-        <div className="space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
           <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="input-surface text-white">
+            <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -71,27 +71,29 @@ export default function PaymentConfig() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Amount (IDR)</Label>
           <Input
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className="input-surface text-white placeholder:text-white/20"
+            style={{ padding: '0.75rem 1rem' }}
           />
         </div>
         {provider !== 'mock' && (
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label className="text-xs text-white/40 uppercase tracking-wider">Server Key</Label>
             <Input
               type="password"
               value={serverKey}
               onChange={(e) => setServerKey(e.target.value)}
               className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
             />
           </div>
         )}
-        <div className="flex items-center justify-between py-1">
+        <div className="flex items-center justify-between" style={{ padding: '0.5rem 0' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Sandbox Mode</Label>
           <Switch checked={sandbox} onCheckedChange={setSandbox} />
         </div>
@@ -99,6 +101,7 @@ export default function PaymentConfig() {
           onClick={handleSave}
           disabled={saveMutation.isPending}
           className="btn-primary border-0"
+          style={{ alignSelf: 'flex-start', padding: '0.75rem 1.5rem' }}
         >
           {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
           {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}

@@ -27,9 +27,13 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'camera_resolution_height': {'value': str(settings.camera_resolution_height), 'description': 'Camera capture height'},
     },
     ConfigCategory.AI: {
-        'ai_provider': {'value': settings.ai_provider, 'description': 'Active AI provider (openai, anthropic, google, ollama, mock)'},
-        'ai_model': {'value': settings.ai_model, 'description': 'Model identifier for the AI provider'},
-        'ai_system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for AI analysis'},
+        'provider': {'value': settings.ai_provider, 'description': 'Active AI provider (openai, anthropic, google, ollama, mock)'},
+        'openai_api_key': {'value': settings.openai_api_key, 'description': 'OpenAI API key'},
+        'anthropic_api_key': {'value': settings.anthropic_api_key, 'description': 'Anthropic API key'},
+        'google_api_key': {'value': settings.google_api_key, 'description': 'Google Gemini API key'},
+        'ollama_base_url': {'value': settings.ollama_base_url, 'description': 'Ollama base URL for local inference'},
+        'model': {'value': settings.ai_model, 'description': 'Model identifier for the AI provider'},
+        'system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for AI analysis'},
     },
     ConfigCategory.PAYMENT: {
         'payment_enabled': {'value': str(settings.payment_enabled).lower(), 'description': 'Enable payment step'},
@@ -180,3 +184,26 @@ async def seed_default_configs(db: AsyncSession) -> int:
         logger.info('config_seeded', new_entries=created)
 
     return created
+
+
+async def get_ai_config(db: AsyncSession) -> dict[str, str]:
+    """Get AI configuration from database, falling back to env-var defaults.
+
+    Args:
+        db: Async database session.
+
+    Returns:
+        Dict with keys: provider, openai_api_key, anthropic_api_key,
+        google_api_key, ollama_base_url, model, system_prompt.
+    """
+    db_values = await get_configs_by_category(db, ConfigCategory.AI)
+
+    return {
+        'provider': db_values.get('provider', settings.ai_provider),
+        'openai_api_key': db_values.get('openai_api_key', settings.openai_api_key),
+        'anthropic_api_key': db_values.get('anthropic_api_key', settings.anthropic_api_key),
+        'google_api_key': db_values.get('google_api_key', settings.google_api_key),
+        'ollama_base_url': db_values.get('ollama_base_url', settings.ollama_base_url),
+        'model': db_values.get('model', settings.ai_model),
+        'system_prompt': db_values.get('system_prompt', settings.ai_system_prompt),
+    }

@@ -140,6 +140,7 @@ async def select_photo(
     REVEAL.
     """
     from app.services.ai_service import analyze_image
+    from app.services import config_service
 
     # Select photo and transition REVIEW → PROCESSING
     session = await session_service.select_and_process(
@@ -158,10 +159,12 @@ async def select_photo(
         photo_bytes = f.read()
 
     # Run AI analysis
+    ai_config = await config_service.get_ai_config(db)
     try:
         ai_result = await analyze_image(
             image_bytes=photo_bytes,
             session_id=session_id,
+            ai_config=ai_config,
         )
         log.info(
             'ai_analysis_complete',
@@ -273,6 +276,7 @@ async def capture_photo(
     Prefer the /snap → /select flow for multi-photo support.
     """
     from app.services.ai_service import analyze_image
+    from app.services import config_service
     from app.services.camera_service import capture_frame as camera_capture
 
     # Transition to CAPTURE if still in IDLE
@@ -300,10 +304,12 @@ async def capture_photo(
     )
 
     # AI analysis
+    ai_config = await config_service.get_ai_config(db)
     try:
         ai_result = await analyze_image(
             image_bytes=photo_bytes,
             session_id=session_id,
+            ai_config=ai_config,
         )
         log.info(
             'ai_analysis_complete',
