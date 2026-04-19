@@ -37,8 +37,11 @@ logger = structlog.get_logger(__name__)
 _MAX_IMAGE_DIMENSION = 1024
 _JPEG_QUALITY = 85
 
-# Provider timeout in seconds
+# Provider timeout in seconds (cloud APIs respond fast)
 _PROVIDER_TIMEOUT = 45
+
+# Ollama runs on CPU and needs significantly more time for vision inference
+_OLLAMA_TIMEOUT = 180
 
 
 def compress_image(image_bytes: bytes) -> bytes:
@@ -367,7 +370,7 @@ async def _analyze_ollama(b64_image: str, system_prompt: str, cfg: dict[str, str
         model = 'llama3.2-vision'
     base_url = _cfg.get('ollama_base_url', settings.ollama_base_url)
 
-    async with httpx.AsyncClient(timeout=_PROVIDER_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=_OLLAMA_TIMEOUT) as client:
         response = await client.post(
             f'{base_url}/api/generate',
             json={

@@ -27,6 +27,8 @@ services:
       # Use only the backend stage (skip frontend build — you run `npm run dev` separately)
       target: backend-runtime
     container_name: vibeprint-app-dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     # Mount the backend source code so changes are picked up instantly by --reload.
     # This lets you edit Python files on the host and see changes without rebuilding.

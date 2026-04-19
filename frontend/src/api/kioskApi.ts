@@ -24,13 +24,17 @@ export const kioskApi = {
     apiClient.post<SnapResponse>(`/kiosk/session/${id}/snap`),
 
   select: (id: string, data: SelectRequest) =>
-    apiClient.post<CaptureResponse>(`/kiosk/session/${id}/select`, data),
+    apiClient.post<CaptureResponse>(`/kiosk/session/${id}/select`, data, {
+      timeout: 180000,
+    }),
 
   retake: (id: string) =>
     apiClient.post<SessionResponse>(`/kiosk/session/${id}/retake`),
 
   capture: (id: string) =>
-    apiClient.post<CaptureResponse>(`/kiosk/session/${id}/capture`),
+    apiClient.post<CaptureResponse>(`/kiosk/session/${id}/capture`, {
+      timeout: 180000,
+    }),
 
   print: (id: string, includePhoto = true) =>
     apiClient.post<SuccessMessage>(`/kiosk/session/${id}/print`, {
