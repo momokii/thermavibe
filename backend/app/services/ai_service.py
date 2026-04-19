@@ -1,8 +1,16 @@
 """AI provider dispatch service — provider-agnostic image analysis.
 
-Dispatches image analysis requests to the configured AI provider
-with automatic fallback chain:
-    OpenAI → Anthropic → Google → Ollama → Mock (template-based)
+Dispatches image analysis requests to the configured AI provider.
+When a real provider (OpenAI, Anthropic, Google, Ollama) is selected,
+the system will fall back to other real providers on failure, but will
+NOT fall back to mock. Mock is only used when explicitly selected.
+
+Fallback chains (no mock fallback):
+    OpenAI → Anthropic → Google
+    Anthropic → OpenAI → Google
+    Google → OpenAI → Anthropic
+    Ollama → (no fallback)
+    Mock → (no fallback, mock only)
 
 Each provider adapter follows the same interface for consistent behavior.
 """
@@ -133,14 +141,20 @@ async def analyze_image(
 def _build_provider_chain(primary: str) -> list[str]:
     """Build a fallback chain starting with the primary provider.
 
-    The chain always ends with 'mock' as the last resort.
+    NOTE: Mock is only used when explicitly selected. Real providers do NOT
+    fall back to mock — they exhaust their chain and raise AIFallbackExhausted.
+    This ensures users get proper error feedback when credentials are invalid.
     """
+    # Mock is only used when explicitly selected
+    if primary == AIProvider.MOCK:
+        return [AIProvider.MOCK]
+
+    # Real providers fall back to each other, but NOT to mock
     chain_map: dict[str, list[str]] = {
-        AIProvider.OPENAI: [AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.GOOGLE, AIProvider.MOCK],
-        AIProvider.ANTHROPIC: [AIProvider.ANTHROPIC, AIProvider.OPENAI, AIProvider.GOOGLE, AIProvider.MOCK],
-        AIProvider.GOOGLE: [AIProvider.GOOGLE, AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.MOCK],
-        AIProvider.OLLAMA: [AIProvider.OLLAMA, AIProvider.MOCK],
-        AIProvider.MOCK: [AIProvider.MOCK],
+        AIProvider.OPENAI: [AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.GOOGLE],
+        AIProvider.ANTHROPIC: [AIProvider.ANTHROPIC, AIProvider.OPENAI, AIProvider.GOOGLE],
+        AIProvider.GOOGLE: [AIProvider.GOOGLE, AIProvider.OPENAI, AIProvider.ANTHROPIC],
+        AIProvider.OLLAMA: [AIProvider.OLLAMA],
     }
     return chain_map.get(primary, [AIProvider.MOCK])
 

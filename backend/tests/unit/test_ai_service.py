@@ -107,10 +107,10 @@ class TestBuildProviderChain:
     @pytest.mark.parametrize(
         ('primary', 'expected_chain'),
         [
-            (AIProvider.OPENAI, [AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.GOOGLE, AIProvider.MOCK]),
-            (AIProvider.ANTHROPIC, [AIProvider.ANTHROPIC, AIProvider.OPENAI, AIProvider.GOOGLE, AIProvider.MOCK]),
-            (AIProvider.GOOGLE, [AIProvider.GOOGLE, AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.MOCK]),
-            (AIProvider.OLLAMA, [AIProvider.OLLAMA, AIProvider.MOCK]),
+            (AIProvider.OPENAI, [AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.GOOGLE]),
+            (AIProvider.ANTHROPIC, [AIProvider.ANTHROPIC, AIProvider.OPENAI, AIProvider.GOOGLE]),
+            (AIProvider.GOOGLE, [AIProvider.GOOGLE, AIProvider.OPENAI, AIProvider.ANTHROPIC]),
+            (AIProvider.OLLAMA, [AIProvider.OLLAMA]),
             (AIProvider.MOCK, [AIProvider.MOCK]),
         ],
     )
@@ -126,13 +126,13 @@ class TestBuildProviderChain:
         chain = _build_provider_chain('nonexistent_provider')
         assert chain == [AIProvider.MOCK]
 
-    def test_mock_is_always_last(self) -> None:
-        """Every chain should end with 'mock' as the fallback."""
+    def test_real_providers_dont_fallback_to_mock(self) -> None:
+        """Real providers should NOT fall back to mock — only mock when explicitly selected."""
         from app.services.ai_service import _build_provider_chain
 
         for provider in [AIProvider.OPENAI, AIProvider.ANTHROPIC, AIProvider.GOOGLE, AIProvider.OLLAMA]:
             chain = _build_provider_chain(provider)
-            assert chain[-1] == AIProvider.MOCK
+            assert AIProvider.MOCK not in chain
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +211,9 @@ class TestAnalyzeImageMock:
 
     @pytest.mark.asyncio
     async def test_fallback_to_mock_on_provider_failure(self, sample_image_bytes: bytes) -> None:
-        """When the primary provider fails, the chain should fall back to mock."""
+        """When a real provider is selected and all real providers fail, should raise AIFallbackExhausted.
+        Mock is NOT used as a fallback when a real provider is explicitly selected.
+        """
         from app.services.ai_service import analyze_image
 
         with patch('app.services.ai_service.settings') as mock_settings:
@@ -226,10 +228,9 @@ class TestAnalyzeImageMock:
                 mock_anthropic.side_effect = AIProviderError('Anthropic down', AIProvider.ANTHROPIC)
                 mock_google.side_effect = AIProviderError('Google down', AIProvider.GOOGLE)
 
-                response = await analyze_image(sample_image_bytes)
-
-        # Should fall through to mock
-        assert response.provider == AIProvider.MOCK
+                # Should raise AIFallbackExhausted since mock is not in the fallback chain for real providers
+                with pytest.raises(AIFallbackExhausted):
+                    await analyze_image(sample_image_bytes)
 
     @pytest.mark.asyncio
     async def test_all_providers_exhausted_raises(self, sample_image_bytes: bytes) -> None:
