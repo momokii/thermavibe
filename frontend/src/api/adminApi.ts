@@ -12,6 +12,7 @@ import type {
   RevenueAnalyticsResponse,
   HardwareStatusResponse,
   PrintTestResponse,
+  PrintStatusResponse,
   CameraListResponse,
   CameraSelectResponse,
 } from './types';
@@ -44,6 +45,12 @@ export const adminApi = {
   selectCamera: (deviceIndex: number) =>
     apiClient.post<CameraSelectResponse>('/camera/select', { device_index: deviceIndex }),
 
+  selectPrinter: (vendorId: string, productId: string) =>
+    apiClient.post<PrintStatusResponse>('/printer/select', { vendor_id: vendorId, product_id: productId }),
+
   testPrinter: () =>
     apiClient.post<PrintTestResponse>('/admin/hardware/printer/test'),
+
+  listPrinters: () =>
+    apiClient.get<{ devices: Array<{ vendor_id: string; product_id: string; description: string }> }>('/printer/devices'),
 };

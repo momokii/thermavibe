@@ -157,6 +157,8 @@ class PrinterDeviceInfo(BaseModel):
     vendor: str
     model: str
     usb_path: str
+    vendor_id: str = ''
+    product_id: str = ''
 
 
 class PrinterStatusDetail(BaseModel):

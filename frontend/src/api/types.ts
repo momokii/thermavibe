@@ -293,6 +293,8 @@ export interface PrinterDeviceInfo {
   vendor: string;
   model: string;
   usb_path: string;
+  vendor_id: string;
+  product_id: string;
 }
 
 export interface PrinterStatusDetail {

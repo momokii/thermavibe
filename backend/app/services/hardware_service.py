@@ -133,6 +133,8 @@ def _get_printer_status() -> PrinterHardwareStatus:
                     vendor=status.printer.vendor,
                     model=status.printer.model,
                     usb_path=f'USB VID:{status.printer.vendor_id} PID:{status.printer.product_id}',
+                    vendor_id=status.printer.vendor_id,
+                    product_id=status.printer.product_id,
                 ),
                 status=PrinterStatusDetail(
                     paper_ok=status.status.paper_ok if status.status else False,

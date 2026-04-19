@@ -49,6 +49,25 @@ export default function HardwareSetup() {
     onError: () => toast.error('Print test failed'),
   });
 
+  const { data: printers, isLoading: printersLoading } = useQuery({
+    queryKey: ['printers'],
+    queryFn: () => adminApi.listPrinters().then((r) => r.data),
+  });
+
+  const selectPrinterMut = useMutation({
+    mutationFn: ({ vendorId, productId }: { vendorId: string; productId: string }) =>
+      adminApi.selectPrinter(vendorId, productId),
+    onSuccess: (response) => {
+      const p = response.data.printer;
+      toast.success(p ? `Switched to ${p.vendor} ${p.model}` : 'Printer selected');
+      queryClient.invalidateQueries({ queryKey: ['printers'] });
+      queryClient.invalidateQueries({ queryKey: ['hardware'] });
+    },
+    onError: () => toast.error('Failed to switch printer'),
+  });
+
+  const printerDevices = printers?.devices ?? [];
+
   const activeCamera = cameras?.devices.find((d) => d.is_active);
   const detectedDevices = cameras?.devices.filter((d) => d.name && !d.name.includes('Camera ') || d.resolutions.length > 0) ?? [];
 
@@ -178,7 +197,7 @@ export default function HardwareSetup() {
 
           {/* No cameras detected message */}
           {detectedDevices.length === 0 && !camerasLoading && (
-            <div className="text-sm text-amber-400/70 bg-amber-500/10 rounded-lg px-4 py-3" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+            <div className="text-sm text-amber-400/70 bg-amber-500/10 rounded-lg" style={{ border: '1px solid rgba(245,158,11,0.15)', padding: '0.75rem 1rem' }}>
               No cameras detected. Make sure your camera is connected and click Refresh to scan again.
             </div>
           )}
@@ -201,11 +220,54 @@ export default function HardwareSetup() {
           </Badge>
         </CardHeader>
         <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0 1.5rem 1.5rem' }}>
+          {/* Printer device selector */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/40 uppercase tracking-wider">Active Printer</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white/40 hover:text-white/70 h-auto py-0.5 px-2 text-xs"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['printers'] })}
+                disabled={printersLoading}
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${printersLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+            <Select
+              value={hw?.printer.device
+                ? `${hw.printer.device.vendor_id}:${hw.printer.device.product_id}`
+                : undefined}
+              onValueChange={(val) => {
+                const parts = val.split(':');
+                const vid = parts[0] ?? '';
+                const pid = parts[1] ?? '';
+                selectPrinterMut.mutate({ vendorId: vid, productId: pid });
+              }}
+              disabled={selectPrinterMut.isPending}
+            >
+              <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
+                <SelectValue placeholder={printerDevices.length === 0 ? 'No printers detected' : 'Select printer...'} />
+              </SelectTrigger>
+              <SelectContent>
+                {printerDevices.map((device) => (
+                  <SelectItem key={`${device.vendor_id}:${device.product_id}`} value={`${device.vendor_id}:${device.product_id}`}>
+                    {device.description} ({device.vendor_id}:{device.product_id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Active printer info */}
           {hw?.printer.device && (
-            <p className="text-sm text-white/40">
-              {hw.printer.device.vendor} {hw.printer.device.model}
-            </p>
+            <div className="text-sm text-white/40">
+              {hw.printer.device.vendor} — {hw.printer.device.model}
+            </div>
           )}
+
+          {/* Status row */}
           <div className="text-sm text-white/60">
             Paper: <span className={hw?.printer.status.paper_ok ? 'text-emerald-400' : 'text-amber-400'}>
               {hw?.printer.status.paper_ok ? 'OK' : 'Low/Empty'}
@@ -213,15 +275,25 @@ export default function HardwareSetup() {
             <span className="text-white/25 mx-1">|</span>
             Prints today: <span className="font-display tabular-nums">{hw?.printer.status.total_prints_today ?? 0}</span>
           </div>
+
+          {/* Action button */}
           <Button
             size="sm"
             onClick={() => testPrinterMut.mutate()}
             disabled={testPrinterMut.isPending}
             className="btn-secondary border-0 text-sm"
+            style={{ padding: '0.75rem 1.5rem' }}
           >
             {testPrinterMut.isPending ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : null}
             Test Print
           </Button>
+
+          {/* No printers detected message */}
+          {printerDevices.length === 0 && !printersLoading && (
+            <div className="text-sm text-amber-400/70 bg-amber-500/10 rounded-lg" style={{ border: '1px solid rgba(245,158,11,0.15)', padding: '0.75rem 1rem' }}>
+              No printers detected. Make sure your thermal printer is connected via USB and click Refresh to scan again.
+            </div>
+          )}
         </CardContent>
       </Card>
 

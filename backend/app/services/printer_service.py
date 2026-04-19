@@ -28,9 +28,16 @@ _printer = None
 _last_print_at: datetime | None = None
 _total_prints_today: int = 0
 
+# Dynamic printer IDs — override settings when changed via admin UI.
+_active_vendor_id: str = settings.printer_vendor_id
+_active_product_id: str = settings.printer_product_id
+
 
 def _get_printer():
     """Get or initialize the ESC/POS printer connection.
+
+    Uses the dynamic _active_vendor_id / _active_product_id which may be
+    updated at runtime via select_printer().
 
     Returns:
         escpos printer instance.
@@ -51,8 +58,8 @@ def _get_printer():
     try:
         from escpos.printer import Usb
 
-        vendor_id = int(settings.printer_vendor_id, 16)
-        product_id = int(settings.printer_product_id, 16)
+        vendor_id = int(_active_vendor_id, 16)
+        product_id = int(_active_product_id, 16)
 
         _printer = Usb(vendor_id, product_id)
         return _printer
@@ -73,9 +80,9 @@ def get_printer_status() -> PrintStatusResponse:
             connected=True,
             printer=PrinterInfo(
                 vendor='USB',
-                model=f'VID:{settings.printer_vendor_id} PID:{settings.printer_product_id}',
-                vendor_id=settings.printer_vendor_id,
-                product_id=settings.printer_product_id,
+                model=f'VID:{_active_vendor_id} PID:{_active_product_id}',
+                vendor_id=_active_vendor_id,
+                product_id=_active_product_id,
             ),
             status=PrintHardwareStatus(
                 paper_ok=True,
@@ -98,6 +105,38 @@ def get_printer_status() -> PrintStatusResponse:
         )
 
 
+def select_printer(vendor_id: str, product_id: str) -> PrintStatusResponse:
+    """Set the active USB printer by vendor/product ID.
+
+    Tears down any existing printer connection and updates the module-level
+    IDs so the next _get_printer() call opens the new device.
+
+    Args:
+        vendor_id: USB vendor ID hex string (e.g. "0x04b8").
+        product_id: USB product ID hex string (e.g. "0x0e15").
+
+    Returns:
+        PrintStatusResponse after attempting connection.
+    """
+    global _printer, _active_vendor_id, _active_product_id
+
+    # Tear down existing connection
+    if _printer is not None:
+        try:
+            _printer.close()
+        except Exception:
+            pass
+        _printer = None
+
+    _active_vendor_id = vendor_id
+    _active_product_id = product_id
+
+    logger.info('printer_selected', vendor_id=vendor_id, product_id=product_id)
+
+    # Attempt connection and return status
+    return get_printer_status()
+
+
 def print_test_page() -> PrintTestResponse:
     """Print a test page to verify printer connectivity.
 
@@ -114,7 +153,7 @@ def print_test_page() -> PrintTestResponse:
         printer.set(align='center', bold=False, height=1)
         printer.text('Test Print\n')
         printer.text('-' * 32 + '\n')
-        printer.text(f'Printer: {settings.printer_vendor_id}:{settings.printer_product_id}\n')
+        printer.text(f'Printer: {_active_vendor_id}:{_active_product_id}\n')
         printer.text(f'Paper Width: {settings.printer_paper_width} dots\n')
         printer.text(f'Time: {datetime.now(timezone.utc).isoformat()}\n')
         printer.text('-' * 32 + '\n')
@@ -131,9 +170,9 @@ def print_test_page() -> PrintTestResponse:
             message='Test print sent successfully',
             printer_info=PrinterInfo(
                 vendor='USB',
-                model=f'VID:{settings.printer_vendor_id} PID:{settings.printer_product_id}',
-                vendor_id=settings.printer_vendor_id,
-                product_id=settings.printer_product_id,
+                model=f'VID:{_active_vendor_id} PID:{_active_product_id}',
+                vendor_id=_active_vendor_id,
+                product_id=_active_product_id,
             ),
         )
     except PrinterOfflineError:
