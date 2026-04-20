@@ -64,10 +64,14 @@ export default function AiConfig() {
           <Sparkles className="h-4 w-4 text-violet-400" />
           <CardTitle className="font-display text-white">AI Provider</CardTitle>
         </div>
+        <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
+          Configure the AI service that analyzes photos and generates vibe readings. The selected provider handles all image analysis.
+        </p>
       </CardHeader>
       <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0 2rem 2rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
+          <p className="text-xs text-white/25">The AI engine used for photo analysis. Each provider has different models and pricing.</p>
           <Select value={provider} onValueChange={setProvider}>
             <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
               <SelectValue />
@@ -84,6 +88,7 @@ export default function AiConfig() {
         {provider === 'openai' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label className="text-xs text-white/40 uppercase tracking-wider">OpenAI API Key</Label>
+            <p className="text-xs text-white/25">Your OpenAI API key. Required to use GPT-4o Vision for photo analysis.</p>
             <Input
               type="password"
               value={openaiKey}
@@ -97,6 +102,7 @@ export default function AiConfig() {
         {provider === 'anthropic' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label className="text-xs text-white/40 uppercase tracking-wider">Anthropic API Key</Label>
+            <p className="text-xs text-white/25">Your Anthropic API key. Required to use Claude Vision for photo analysis.</p>
             <Input
               type="password"
               value={anthropicKey}
@@ -110,6 +116,7 @@ export default function AiConfig() {
         {provider === 'google' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label className="text-xs text-white/40 uppercase tracking-wider">Google API Key</Label>
+            <p className="text-xs text-white/25">Your Google AI API key. Required to use Gemini Vision for photo analysis.</p>
             <Input
               type="password"
               value={googleKey}
@@ -123,6 +130,7 @@ export default function AiConfig() {
         {provider === 'ollama' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <Label className="text-xs text-white/40 uppercase tracking-wider">Ollama Base URL</Label>
+            <p className="text-xs text-white/25">URL where Ollama is running. Use <code className="text-white/40">host.docker.internal:11434</code> if the backend runs in Docker.</p>
             <Input
               value={ollamaUrl}
               onChange={(e) => setOllamaUrl(e.target.value)}
@@ -134,6 +142,7 @@ export default function AiConfig() {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Model</Label>
+          <p className="text-xs text-white/25">The specific model to use. Example: <code className="text-white/40">gpt-4o-mini</code> (OpenAI), <code className="text-white/40">llava-phi3</code> (Ollama).</p>
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
@@ -144,6 +153,7 @@ export default function AiConfig() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">System Prompt</Label>
+          <p className="text-xs text-white/25">Instructions that shape how the AI responds. This tells the AI how to interpret photos and what kind of reading to generate.</p>
           <Textarea
             rows={4}
             value={systemPrompt}

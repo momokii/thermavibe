@@ -304,6 +304,9 @@ export default function HardwareSetup() {
             <Cpu className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">System Resources</CardTitle>
           </div>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
+            Real-time resource usage for the kiosk host. High CPU or memory may affect camera and AI performance.
+          </p>
         </CardHeader>
         <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0 1.5rem 1.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

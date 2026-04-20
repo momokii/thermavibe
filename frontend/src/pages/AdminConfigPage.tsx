@@ -5,7 +5,12 @@ import PaymentConfig from '@/components/admin/PaymentConfig';
 export default function AdminConfigPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <h2 className="text-2xl font-display font-bold text-white">Configuration</h2>
+      <div>
+        <h2 className="text-2xl font-display font-bold text-white">Configuration</h2>
+        <p className="text-sm text-white/30" style={{ marginTop: '0.25rem' }}>
+          Manage AI provider, payment settings, and kiosk behavior.
+        </p>
+      </div>
       <Tabs defaultValue="ai">
         <TabsList>
           <TabsTrigger value="ai">AI Provider</TabsTrigger>
