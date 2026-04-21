@@ -59,7 +59,7 @@ async def get_session_analytics(
     completed_sessions = completed_result.scalar() or 0
 
     abandoned_sessions = total_sessions - completed_sessions
-    completion_rate = (completed_sessions / total_sessions * 100) if total_sessions > 0 else 0.0
+    completion_rate = (completed_sessions / total_sessions) if total_sessions > 0 else 0.0
 
     avg_duration_stmt = select(
         func.avg(
@@ -110,9 +110,19 @@ async def get_session_analytics(
     ts_result = await db.execute(timeseries_stmt)
     ts_rows = ts_result.all()
 
+    def _fmt_period(val: object, group: str) -> str:
+        """Format a period value from date_trunc to a clean string."""
+        if hasattr(val, 'strftime'):
+            if group == 'week':
+                return val.strftime('%Y-W%W')
+            if group == 'month':
+                return val.strftime('%Y-%m')
+            return val.strftime('%Y-%m-%d')
+        return str(val)
+
     timeseries = [
         SessionTimeseriesPoint(
-            period=str(row.period),
+            period=_fmt_period(row.period, trunc),
             sessions=row.total,
             completed=row.completed or 0,
             abandoned=(row.total - (row.completed or 0)),
@@ -192,9 +202,18 @@ async def get_revenue_analytics(
     ts_result = await db.execute(timeseries_stmt)
     ts_rows = ts_result.all()
 
+    def _fmt_period_rev(val: object, group: str) -> str:
+        if hasattr(val, 'strftime'):
+            if group == 'week':
+                return val.strftime('%Y-W%W')
+            if group == 'month':
+                return val.strftime('%Y-%m')
+            return val.strftime('%Y-%m-%d')
+        return str(val)
+
     timeseries = [
         RevenueTimeseriesPoint(
-            period=str(row.period),
+            period=_fmt_period_rev(row.period, trunc),
             revenue=int(row.revenue or 0),
             transactions=row.transactions or 0,
             refunds=0,
