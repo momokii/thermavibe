@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminStore } from '@/stores/adminStore';
 import { Button } from '@/components/ui/button';
@@ -12,15 +13,50 @@ const navItems = [
   { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
 ];
 
+/** Check interval for session expiry (every 60 seconds). */
+const SESSION_CHECK_INTERVAL_MS = 60_000;
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const logout = useAdminStore((s) => s.logout);
+  const expiresAt = useAdminStore((s) => s.expiresAt);
   const navigate = useNavigate();
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
   };
+
+  // Proactive session expiry check
+  useEffect(() => {
+    const checkExpiry = () => {
+      if (!expiresAt) return;
+      const expiryMs = new Date(expiresAt).getTime();
+      if (Date.now() >= expiryMs) {
+        handleLogout();
+      }
+    };
+
+    // Check immediately on mount
+    checkExpiry();
+
+    // Then check periodically
+    timerRef.current = setInterval(checkExpiry, SESSION_CHECK_INTERVAL_MS);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [expiresAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // React to 401 events from the API client (expired/invalid token)
+  useEffect(() => {
+    const onUnauthorized = () => {
+      handleLogout();
+    };
+    window.addEventListener('admin:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('admin:unauthorized', onUnauthorized);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex h-screen bg-surface-0">

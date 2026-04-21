@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # Admin
     admin_pin: str = "1234"
+    admin_session_ttl_hours: int = 24
 
     # CORS
     cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"

@@ -22,12 +22,15 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Clear token on 401 responses
+// Clear token on 401 responses and notify the app
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
+      // Dispatch a custom event so the admin layout can react
+      // without importing the store (avoids circular deps)
+      window.dispatchEvent(new CustomEvent('admin:unauthorized'));
     }
     return Promise.reject(error);
   },

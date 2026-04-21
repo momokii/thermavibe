@@ -263,6 +263,7 @@ cp .env.example .env
 | `PAYMENT_PROVIDER` | `mock` | Payment provider: `mock`, `midtrans`, or `xendit` |
 | `PAYMENT_AMOUNT` | `5000` | Payment amount in IDR |
 | `ADMIN_PIN` | `1234` | PIN for admin dashboard access |
+| `ADMIN_SESSION_TTL_HOURS` | `24` | Admin session duration in hours before auto-logout |
 | `PRINTER_VENDOR_ID` | `0x04b8` | USB vendor ID of thermal printer |
 | `PRINTER_PRODUCT_ID` | `0x0e15` | USB product ID of thermal printer |
 | `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0) |

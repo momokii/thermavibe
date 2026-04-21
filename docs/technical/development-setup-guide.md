@@ -132,6 +132,7 @@ Review and edit the `.env` file. The following table describes each variable:
 | `APP_HOST` | Host to bind the backend | `0.0.0.0` |
 | `APP_PORT` | Port to bind the backend | `8000` |
 | `ADMIN_PIN` | Admin dashboard PIN code | `1234` |
+| `ADMIN_SESSION_TTL_HOURS` | Admin session duration in hours before auto-logout | `24` |
 | `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `DEBUG` |
 
 #### AI Provider Configuration

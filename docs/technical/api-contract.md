@@ -40,7 +40,7 @@ Admin endpoints require a Bearer token in the `Authorization` header:
 Authorization: Bearer <jwt_token>
 ```
 
-The token is obtained by calling `POST /api/v1/admin/login` with the admin PIN. Tokens expire after 24 hours by default.
+The token is obtained by calling `POST /api/v1/admin/login` with the admin PIN. Token expiry is configurable via `ADMIN_SESSION_TTL_HOURS` (default: 24 hours). The frontend auto-logouts when the session expires.
 
 Non-admin endpoints (kiosk flow, camera, AI) do not require authentication. They are intended for use by the kiosk UI running on the same machine.
 
@@ -794,7 +794,12 @@ Authenticate with the admin PIN and receive a JWT token for subsequent admin API
 }
 ```
 
-**Error Responses:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `token` | string | JWT token for authenticated requests |
+| `token_type` | string | Always `"Bearer"` |
+| `expires_in` | number | Token lifetime in seconds (`ADMIN_SESSION_TTL_HOURS * 3600`) |
+| `expires_at` | string | ISO 8601 timestamp when the token expires |
 
 | Status | Code | Description |
 |--------|------|-------------|
@@ -1161,3 +1166,44 @@ Print a test receipt to verify the thermal printer is working. Identical to `POS
 |--------|------|-------------|
 | 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
 | 503 | `PRINTER_ERROR` | Printer not available or print job failed |
+
+---
+
+### `GET /api/v1/printer/devices`
+
+List detected USB printer devices via `lsusb`. Scans all USB devices and maps known ESC/POS vendor IDs.
+
+**Authentication:** Admin (Bearer token required)
+
+**Response (200 OK):**
+
+```json
+{
+  "devices": [
+    {
+      "vendor_id": "0x04b8",
+      "product_id": "0x0202",
+      "description": "Epson Seiko Epson Corp."
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/v1/printer/select`
+
+Switch the active USB printer at runtime. Tears down any existing printer connection and connects to the specified device.
+
+**Authentication:** Admin (Bearer token required)
+
+**Request Body:**
+
+```json
+{
+  "vendor_id": "0x154f",
+  "product_id": "0x0522"
+}
+```
+
+**Response (200 OK):** Returns `PrintStatusResponse` (same as `GET /printer/status`).

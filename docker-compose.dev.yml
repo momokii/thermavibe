@@ -103,6 +103,8 @@ services:
       # ── Admin ────────────────────────────────────────────────────────────
       # PIN code to access the admin dashboard. Default is 1234 for dev.
       ADMIN_PIN: ${ADMIN_PIN:-1234}
+      # Session duration in hours before auto-logout.
+      ADMIN_SESSION_TTL_HOURS: ${ADMIN_SESSION_TTL_HOURS:-24}
 
     # Override the default command to enable hot-reload.
     # The base docker-compose.yml starts uvicorn without --reload for production.

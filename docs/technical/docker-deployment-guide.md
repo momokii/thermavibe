@@ -208,6 +208,7 @@ Create a `.env` file in the project root. The following table describes every va
 | `APP_SECRET_KEY` | Yes | (none) | **MUST be changed.** Used for JWT token signing. Generate with `openssl rand -hex 32` |
 | `APP_PORT` | No | `8000` | Keep default unless port 8000 is in use on the host |
 | `ADMIN_PIN` | Yes | (none) | **MUST be changed.** Set a 4-8 digit PIN for admin dashboard access |
+| `ADMIN_SESSION_TTL_HOURS` | No | `24` | Admin session duration in hours. Auto-logouts after expiry. |
 | `LOG_LEVEL` | No | `INFO` | `INFO` for production. Use `WARNING` or `ERROR` to reduce log volume |
 
 #### AI Provider

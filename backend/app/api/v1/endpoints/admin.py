@@ -39,10 +39,12 @@ async def login(
     token = create_access_token(subject='admin')
     expires_at = get_token_expiry()
 
+    ttl_seconds = settings.admin_session_ttl_hours * 3600
+
     return LoginResponse(
         token=token,
         token_type='Bearer',
-        expires_in=86400,  # 24 hours
+        expires_in=ttl_seconds,
         expires_at=expires_at,
     )
 

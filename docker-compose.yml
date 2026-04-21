@@ -36,6 +36,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-thermavibe}:${POSTGRES_PASSWORD:-thermavibe}@postgres:5432/${POSTGRES_DB:-thermavibe}
       APP_SECRET_KEY: ${APP_SECRET_KEY:-change-me-in-production}
       ADMIN_PIN: ${ADMIN_PIN:-1234}
+      ADMIN_SESSION_TTL_HOURS: ${ADMIN_SESSION_TTL_HOURS:-24}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

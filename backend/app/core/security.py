@@ -100,7 +100,7 @@ def create_access_token(
         Encoded JWT token string.
     """
     if expires_delta is None:
-        expires_delta = timedelta(hours=24)
+        expires_delta = timedelta(hours=settings.admin_session_ttl_hours)
 
     now = datetime.now(timezone.utc)
     expire = now + expires_delta
@@ -158,4 +158,4 @@ def get_token_expiry(timestamp: datetime | None = None) -> datetime:
         Expiry datetime (24 hours from the given timestamp).
     """
     base = timestamp or datetime.now(timezone.utc)
-    return base + timedelta(hours=24)
+    return base + timedelta(hours=settings.admin_session_ttl_hours)
