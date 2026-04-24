@@ -3,7 +3,7 @@
  * Typed functions for all photobooth-specific endpoints.
  */
 
-import { apiClient } from './client';
+import apiClient from './client';
 import type {
   PhotoboothSnapResponse,
   FrameSelectRequest,

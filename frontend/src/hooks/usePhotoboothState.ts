@@ -10,7 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useKioskStore } from '@/stores/kioskStore';
 import { photoboothApi } from '@/api/photoboothApi';
 import { kioskApi } from '@/api/kioskApi';
-import type { FrameSelectRequest, ArrangeRequest } from '@/api/types';
+import type { FrameSelectRequest, ArrangeRequest, SessionCreateRequest, SessionResponse, PhotoboothSnapResponse, ShareResponse } from '@/api/types';
 
 export function usePhotoboothState() {
   const state = useKioskStore((s) => s.state);
@@ -28,7 +28,7 @@ export function usePhotoboothState() {
   const snapMutation = useMutation({
     mutationFn: (id: string) => photoboothApi.snap(id),
     onMutate: () => setTransitioning(true),
-    onSuccess: (response) => {
+    onSuccess: (response: { data: PhotoboothSnapResponse }) => {
       const data = response.data;
       setPhotos(
         Array.from({ length: data.total_photos }, (_, i) => ({
@@ -47,7 +47,7 @@ export function usePhotoboothState() {
   const doneMutation = useMutation({
     mutationFn: (id: string) => photoboothApi.doneCapture(id),
     onMutate: () => setTransitioning(true),
-    onSuccess: (response) => {
+    onSuccess: (response: { data: SessionResponse }) => {
       const data = response.data;
       if (sessionId) setSession(sessionId, data);
       setTransitioning(false);
@@ -62,7 +62,7 @@ export function usePhotoboothState() {
     mutationFn: ({ id, data }: { id: string; data: FrameSelectRequest }) =>
       photoboothApi.selectFrame(id, data),
     onMutate: () => setTransitioning(true),
-    onSuccess: (response) => {
+    onSuccess: (response: { data: SessionResponse }) => {
       const data = response.data;
       if (sessionId) setSession(sessionId, data);
       setTransitioning(false);
@@ -77,7 +77,7 @@ export function usePhotoboothState() {
     mutationFn: ({ id, data }: { id: string; data: ArrangeRequest }) =>
       photoboothApi.arrange(id, data),
     onMutate: () => setTransitioning(true),
-    onSuccess: (response) => {
+    onSuccess: (response: { data: SessionResponse }) => {
       const data = response.data;
       if (sessionId) setSession(sessionId, data);
       const { setPhotoboothCompositeUrl } = useKioskStore.getState();
@@ -103,7 +103,7 @@ export function usePhotoboothState() {
   const retakeMutation = useMutation({
     mutationFn: (id: string) => photoboothApi.retake(id),
     onMutate: () => setTransitioning(true),
-    onSuccess: (response) => {
+    onSuccess: (response: { data: SessionResponse }) => {
       const data = response.data;
       if (sessionId) setSession(sessionId, data);
       setPhotos([]);
@@ -129,7 +129,7 @@ export function usePhotoboothState() {
       const response = await kioskApi.createSession({
         payment_enabled: false,
         session_type: 'photobooth',
-      } as Record<string, unknown>);
+      } satisfies SessionCreateRequest);
       const data = response.data;
       setSession(data.id, data);
       useKioskStore.getState().setSessionType('photobooth');
@@ -223,6 +223,6 @@ export function usePhotoboothState() {
     isSnapping: snapMutation.isPending,
     isArranging: arrangeMutation.isPending,
     isPrinting: printMutation.isPending,
-    shareData: shareMutation.data?.data ?? null,
+    shareData: (shareMutation.data as { data: ShareResponse } | undefined)?.data ?? null,
   };
 }

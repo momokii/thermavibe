@@ -45,6 +45,7 @@ export interface SelectRequest {
 
 export interface SessionCreateRequest {
   payment_enabled: boolean;
+  session_type?: SessionType;
 }
 
 export interface SessionResponse {
