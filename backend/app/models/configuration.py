@@ -24,6 +24,7 @@ class ConfigCategory(str, enum.Enum):
     PAYMENT = 'payment'
     KIOSK = 'kiosk'
     GENERAL = 'general'
+    PHOTOBOOTH = 'photobooth'
 
 
 class OperatorConfig(Base):

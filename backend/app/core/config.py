@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     admin_pin: str = "1234"
     admin_session_ttl_hours: int = 24
 
+    # Photobooth
+    photobooth_enabled: bool = True
+    photobooth_capture_time_limit_seconds: int = 30
+    photobooth_max_photos: int = 8
+    photobooth_min_photos: int = 2
+    photobooth_default_layout_rows: int = 4
+    photobooth_watermark_enabled: bool = False
+    photobooth_watermark_text: str = "VibePrint OS"
+    photobooth_composite_retention_hours: int = 168
+    photobooth_share_url_ttl_seconds: int = 300
+
     # CORS
     cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"
 

@@ -60,11 +60,16 @@ async def lifespan(app: FastAPI):
     try:
         from app.core.database import async_session_maker
         from app.services.config_service import seed_default_configs
+        from app.services.theme_service import seed_builtin_themes
 
         async with async_session_maker() as db:
-            created = await seed_default_configs(db)
-            if created > 0:
-                logger.info('config_seeded', new_entries=created)
+            config_created = await seed_default_configs(db)
+            if config_created > 0:
+                logger.info('config_seeded', new_entries=config_created)
+
+            themes_created = await seed_builtin_themes(db)
+            if themes_created > 0:
+                logger.info('builtin_themes_seeded', new_themes=themes_created)
     except Exception as exc:
         logger.warning('config_seed_failed', error=str(exc))
 

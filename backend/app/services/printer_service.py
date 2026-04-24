@@ -301,3 +301,43 @@ def _wrap_text(text: str, chars_per_line: int = 32) -> str:
         lines.append(current_line)
 
     return '\n'.join(lines)
+
+
+def print_photobooth_strip(composite_image_path: str) -> dict:
+    """Print a photobooth strip using the thermal printer.
+
+    Dithers and scales the composite image to paper width.
+
+    Args:
+        composite_image_path: Path to the composite JPEG image.
+
+    Returns:
+        Dict with success status and message.
+
+    Raises:
+        PrinterError: If printing fails.
+        PrinterOfflineError: If printer is not connected.
+    """
+    global _last_print_at, _total_prints_today
+
+    printer = _get_printer()
+
+    try:
+        # Load and dither the composite
+        with open(composite_image_path, 'rb') as f:
+            image_bytes = f.read()
+
+        dithered = _dither_image(image_bytes, width=settings.printer_paper_width)
+        printer.image(dithered, impl='bitImageRaster')
+        printer.text('\n')
+        printer.cut()
+
+        _last_print_at = datetime.now(timezone.utc)
+        _total_prints_today += 1
+
+        logger.info('photobooth_strip_printed', path=composite_image_path)
+
+        return {'success': True, 'message': 'Photobooth strip printed successfully'}
+    except Exception as exc:
+        logger.exception('photobooth_print_failed', error=str(exc))
+        raise PrinterError(f'Photobooth strip print failed: {exc}') from exc

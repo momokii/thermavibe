@@ -19,7 +19,12 @@ from app.core.database import Base
 
 
 class KioskState(str, enum.Enum):
-    """Valid states for the kiosk state machine."""
+    """Valid states for the kiosk state machine.
+
+    Shared states (both flows): IDLE, PAYMENT, CAPTURE, RESET
+    Vibe Check states: REVIEW, PROCESSING, REVEAL
+    Photobooth states: FRAME_SELECT, ARRANGE, COMPOSITING, PHOTOBOOTH_REVEAL
+    """
 
     IDLE = 'idle'
     PAYMENT = 'payment'
@@ -27,7 +32,18 @@ class KioskState(str, enum.Enum):
     REVIEW = 'review'
     PROCESSING = 'processing'
     REVEAL = 'reveal'
+    FRAME_SELECT = 'frame_select'
+    ARRANGE = 'arrange'
+    COMPOSITING = 'compositing'
+    PHOTOBOOTH_REVEAL = 'photobooth_reveal'
     RESET = 'reset'
+
+
+class SessionType(str, enum.Enum):
+    """Session type discriminator."""
+
+    VIBE_CHECK = 'vibe_check'
+    PHOTOBOOTH = 'photobooth'
 
 
 class PaymentStatus(str, enum.Enum):
@@ -90,6 +106,14 @@ class KioskSession(Base):
     )
     photo_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     photos: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=list)
+    session_type: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default=SessionType.VIBE_CHECK,
+        index=True,
+    )
+    composite_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    photobooth_layout: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     ai_response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_provider_used: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -121,6 +145,7 @@ class KioskSession(Base):
     __table_args__ = (
         Index('idx_kiosk_sessions_state', 'state'),
         Index('idx_kiosk_sessions_created_at', created_at.desc()),
+        Index('idx_kiosk_sessions_session_type', 'session_type'),
         Index(
             'idx_kiosk_sessions_not_cleared',
             'id',

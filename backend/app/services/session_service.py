@@ -27,12 +27,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import SessionNotFoundError, StateTransitionError
 from app.models.analytics import EventType
-from app.models.session import KioskSession, KioskState, PaymentStatus
+from app.models.session import KioskSession, KioskState, PaymentStatus, SessionType
 
 logger = structlog.get_logger(__name__)
 
-# Valid state transition map: current_state → set of allowed target states
-VALID_TRANSITIONS: dict[str, set[str]] = {
+# Valid state transition maps per session type
+# Vibe Check flow: IDLE → PAYMENT → CAPTURE → REVIEW → PROCESSING → REVEAL → RESET
+VIBE_CHECK_TRANSITIONS: dict[str, set[str]] = {
     KioskState.IDLE: {KioskState.PAYMENT, KioskState.CAPTURE},
     KioskState.PAYMENT: {KioskState.CAPTURE, KioskState.RESET},
     KioskState.CAPTURE: {KioskState.REVIEW, KioskState.PROCESSING, KioskState.RESET},
@@ -42,22 +43,40 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     KioskState.RESET: {KioskState.IDLE},
 }
 
+# Photobooth flow: IDLE → PAYMENT → CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL → RESET
+PHOTOBOOTH_TRANSITIONS: dict[str, set[str]] = {
+    KioskState.IDLE: {KioskState.PAYMENT, KioskState.CAPTURE},
+    KioskState.PAYMENT: {KioskState.CAPTURE, KioskState.RESET},
+    KioskState.CAPTURE: {KioskState.FRAME_SELECT, KioskState.RESET},
+    KioskState.FRAME_SELECT: {KioskState.ARRANGE, KioskState.CAPTURE, KioskState.RESET},
+    KioskState.ARRANGE: {KioskState.COMPOSITING, KioskState.FRAME_SELECT, KioskState.RESET},
+    KioskState.COMPOSITING: {KioskState.PHOTOBOOTH_REVEAL, KioskState.RESET},
+    KioskState.PHOTOBOOTH_REVEAL: {KioskState.RESET},
+    KioskState.RESET: {KioskState.IDLE},
+}
+
+# Keep old name for backward compatibility
+VALID_TRANSITIONS = VIBE_CHECK_TRANSITIONS
+
 
 async def create_session(
     db: AsyncSession,
     payment_enabled: bool = False,
+    session_type: str = SessionType.VIBE_CHECK,
 ) -> KioskSession:
     """Create a new kiosk session in IDLE state.
 
     Args:
         db: Async database session.
         payment_enabled: Whether payment is required for this session.
+        session_type: Type of session ('vibe_check' or 'photobooth').
 
     Returns:
         The newly created KioskSession.
     """
     session = KioskSession(
         state=KioskState.IDLE,
+        session_type=session_type,
         payment_status=PaymentStatus.NONE if not payment_enabled else None,
     )
     db.add(session)
@@ -132,7 +151,14 @@ async def transition_state(
     if current == target_state:
         return session
 
-    allowed = VALID_TRANSITIONS.get(current, set())
+    # Select transition map based on session type
+    transitions = (
+        PHOTOBOOTH_TRANSITIONS
+        if session.session_type == SessionType.PHOTOBOOTH
+        else VIBE_CHECK_TRANSITIONS
+    )
+
+    allowed = transitions.get(current, set())
     if target_state not in allowed:
         raise StateTransitionError(current, target_state)
 
@@ -571,7 +597,8 @@ async def select_and_process(
 async def _clear_session_data(db: AsyncSession, session: KioskSession) -> None:
     """Clear sensitive session data for privacy.
 
-    Deletes all photo files from disk and wipes session fields.
+    Deletes all individual photo files from disk. For photobooth sessions,
+    preserves the composite image path but clears the photos array.
 
     Args:
         db: Async database session.
@@ -597,6 +624,8 @@ async def _clear_session_data(db: AsyncSession, session: KioskSession) -> None:
     session.photo_path = None
     session.photos = []
     session.cleared_at = datetime.now(timezone.utc)
+    # Note: composite_image_path is preserved for photobooth sessions
+    # so admin can view results. Cleanup is handled by retention policy.
 
 
 def _make_event(
@@ -625,6 +654,10 @@ def _state_to_event_type(state: str) -> EventType:
         KioskState.REVIEW: EventType.CAPTURE_COMPLETE,
         KioskState.PROCESSING: EventType.AI_REQUEST_SENT,
         KioskState.REVEAL: EventType.AI_RESPONSE_RECEIVED,
+        KioskState.FRAME_SELECT: EventType.PHOTOBOOTH_FRAME_SELECT,
+        KioskState.ARRANGE: EventType.PHOTOBOOTH_ARRANGE,
+        KioskState.COMPOSITING: EventType.PHOTOBOOTH_COMPOSITE_GENERATED,
+        KioskState.PHOTOBOOTH_REVEAL: EventType.AI_RESPONSE_RECEIVED,
         KioskState.RESET: EventType.SESSION_TIMEOUT,
     }
     return mapping.get(state, EventType.SESSION_START)

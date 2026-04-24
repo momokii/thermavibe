@@ -3,13 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminStore } from '@/stores/adminStore';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { LayoutDashboard, Settings, HardDrive, BarChart3, LogOut } from 'lucide-react';
+import { LayoutDashboard, Settings, HardDrive, BarChart3, Camera, LogOut } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 const navItems = [
   { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
   { label: 'Configuration', path: '/admin/config', icon: Settings },
   { label: 'Hardware', path: '/admin/hardware', icon: HardDrive },
+  { label: 'Photobooth', path: '/admin/photobooth', icon: Camera },
   { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
 ];
 

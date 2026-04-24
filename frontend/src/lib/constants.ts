@@ -14,6 +14,17 @@ export const KIOSK_STATES = {
   RESET: 'reset',
 } as const;
 
+/** Photobooth-specific states. */
+export const PHOTOBOOTH_STATES = {
+  FRAME_SELECT: 'frame_select',
+  ARRANGE: 'arrange',
+  COMPOSITING: 'compositing',
+  PHOTOBOOTH_REVEAL: 'photobooth_reveal',
+} as const;
+
+/** Frontend-only pseudo-state for feature selection. */
+export const FEATURE_SELECT_STATE = 'feature_select' as const;
+
 /** Default countdown duration in seconds before capture. */
 export const COUNTDOWN_SECONDS = 3;
 

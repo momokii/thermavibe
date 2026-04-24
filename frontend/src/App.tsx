@@ -8,6 +8,7 @@ import AdminDashboardPage from '@/pages/AdminDashboardPage';
 import AdminConfigPage from '@/pages/AdminConfigPage';
 import AdminHardwarePage from '@/pages/AdminHardwarePage';
 import AdminAnalyticsPage from '@/pages/AdminAnalyticsPage';
+import AdminPhotoboothPage from '@/pages/AdminPhotoboothPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,6 +28,7 @@ function App() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="config" element={<AdminConfigPage />} />
             <Route path="hardware" element={<AdminHardwarePage />} />
+            <Route path="photobooth" element={<AdminPhotoboothPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

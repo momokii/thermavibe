@@ -2,10 +2,31 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskState } from '@/hooks/useKioskState';
 import { useKioskStore } from '@/stores/kioskStore';
+import { usePhotoboothState } from '@/hooks/usePhotoboothState';
+import { FEATURE_SELECT_STATE } from '@/lib/constants';
+import { photoboothApi } from '@/api/photoboothApi';
 
 export default function IdleScreen() {
   const { startSession, isTransitioning, error } = useKioskState();
+  const { startPhotoboothSession } = usePhotoboothState();
   const setError = useKioskStore((s) => s.setError);
+  const featuresLoaded = useKioskStore((s) => s.featuresLoaded);
+
+  // Fetch feature flags on first mount
+  useEffect(() => {
+    if (!featuresLoaded) {
+      photoboothApi
+        .getFeatures()
+        .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean } }) => {
+          const { vibe_check_enabled, photobooth_enabled } = res.data;
+          useKioskStore.getState().setFeatures(vibe_check_enabled, photobooth_enabled);
+        })
+        .catch(() => {
+          // Default: both enabled
+          useKioskStore.getState().setFeatures(true, true);
+        });
+    }
+  }, [featuresLoaded]);
 
   // Auto-clear error after 4 seconds
   useEffect(() => {
@@ -16,7 +37,20 @@ export default function IdleScreen() {
   }, [error, setError]);
 
   const handleTouch = () => {
-    if (!isTransitioning) startSession();
+    if (isTransitioning) return;
+
+    const { vibeCheckEnabled, photoboothEnabled, setState } = useKioskStore.getState();
+
+    if (vibeCheckEnabled && photoboothEnabled) {
+      // Both features enabled → show selection screen
+      setState(FEATURE_SELECT_STATE);
+    } else if (photoboothEnabled && !vibeCheckEnabled) {
+      // Only photobooth → start photobooth directly
+      startPhotoboothSession();
+    } else {
+      // Only vibe check (or default) → start vibe check directly
+      startSession();
+    }
   };
 
   return (

@@ -23,6 +23,13 @@ from app.schemas.kiosk import (
     SessionResponse,
     SnapResponse,
 )
+from app.schemas.photobooth import (
+    ArrangeRequest,
+    FeaturesResponse,
+    FrameSelectRequest,
+    PhotoboothSnapResponse,
+    ShareResponse,
+)
 from app.schemas.print import PrintJobRequest
 from app.services import session_service
 
@@ -41,10 +48,15 @@ async def create_session(
     db: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> SessionResponse:
-    """Create a new kiosk session."""
+    """Create a new kiosk session.
+
+    Accepts optional session_type ('vibe_check' or 'photobooth').
+    Default is 'vibe_check' for backward compatibility.
+    """
     session = await session_service.create_session(
         db=db,
         payment_enabled=body.payment_enabled or settings.payment_enabled,
+        session_type=body.session_type,
     )
     return _session_to_response(session, settings)
 
@@ -385,6 +397,283 @@ async def finish_session(
     """End a session and clear all data for privacy."""
     result = await session_service.finish_session(db, session_id)
     return SessionFinishResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# Photobooth flow
+# ---------------------------------------------------------------------------
+
+@router.post('/session/{session_id}/photobooth/snap', response_model=PhotoboothSnapResponse)
+async def photobooth_snap(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> PhotoboothSnapResponse:
+    """Snap a photo in photobooth mode. Stays in CAPTURE state."""
+    from app.services.camera_service import capture_frame as camera_capture
+    from app.services import photobooth_service
+
+    session = await session_service.get_session(db, session_id)
+
+    # Transition to CAPTURE if still in IDLE
+    if session.state == 'idle':
+        session = await session_service.start_session(
+            db=db,
+            session_id=session_id,
+            payment_enabled=False,
+        )
+
+    # Capture photo
+    photo_bytes = await camera_capture()
+
+    # Save to disk
+    existing = list(session.photos or [])
+    photo_index = len(existing)
+    photo_path = f'/tmp/vibeprint_pb_snap_{session_id}_{photo_index}.jpg'
+    with open(photo_path, 'wb') as f:
+        f.write(photo_bytes)
+
+    # Save photo (stays in CAPTURE state)
+    session = await photobooth_service.snap_photobooth_photo(
+        db=db,
+        session_id=session_id,
+        photo_path=photo_path,
+    )
+
+    # Calculate time remaining
+    time_limit = settings.photobooth_capture_time_limit_seconds
+    first_snap_at = existing[0].get('captured_at') if existing else session.created_at.isoformat()
+    try:
+        from datetime import datetime, timezone
+        started = datetime.fromisoformat(first_snap_at)
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    except (ValueError, TypeError):
+        elapsed = 0.0
+    time_remaining = max(0.0, time_limit - elapsed)
+
+    return PhotoboothSnapResponse(
+        id=session.id,
+        state=session.state,
+        photo_url=f'/api/v1/kiosk/session/{session_id}/photo/{photo_index}',
+        photo_index=photo_index,
+        total_photos=len(session.photos or []),
+        time_remaining_seconds=time_remaining,
+    )
+
+
+@router.post('/session/{session_id}/photobooth/done', response_model=SessionResponse)
+async def photobooth_done_capture(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
+    """Finish capture phase and move to frame selection."""
+    from app.services import photobooth_service
+
+    session = await photobooth_service.finish_capture(db=db, session_id=session_id)
+    return _session_to_response(session, settings)
+
+
+@router.post('/session/{session_id}/photobooth/frame', response_model=SessionResponse)
+async def photobooth_select_frame(
+    session_id: UUID,
+    body: FrameSelectRequest,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
+    """Select frame theme and layout, then move to arrange."""
+    from app.services import photobooth_service
+
+    session = await photobooth_service.select_frame(
+        db=db,
+        session_id=session_id,
+        theme_id=body.theme_id,
+        layout_rows=body.layout_rows,
+    )
+    return _session_to_response(session, settings)
+
+
+@router.post('/session/{session_id}/photobooth/arrange', response_model=SessionResponse)
+async def photobooth_arrange(
+    session_id: UUID,
+    body: ArrangeRequest,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
+    """Assign photos to slots and trigger composite generation."""
+    from app.services import photobooth_service
+
+    # Assign photos
+    session = await photobooth_service.arrange_photos(
+        db=db,
+        session_id=session_id,
+        photo_assignments=body.photo_assignments,
+    )
+
+    # Generate composite (transitions to PHOTOBOOTH_REVEAL)
+    session = await photobooth_service.generate_composite(
+        db=db,
+        session_id=session_id,
+    )
+
+    return _session_to_response(session, settings)
+
+
+@router.get('/session/{session_id}/photobooth/composite')
+async def get_photobooth_composite(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Serve the generated photobooth composite image."""
+    session = await session_service.get_session(db, session_id)
+
+    if not session.composite_image_path:
+        raise SessionNotFoundError(str(session_id))
+
+    if not os.path.exists(session.composite_image_path):
+        raise SessionNotFoundError(str(session_id))
+
+    return FileResponse(
+        session.composite_image_path,
+        media_type='image/jpeg',
+        filename=f'vibeprint_strip_{session_id}.jpg',
+    )
+
+
+@router.post('/session/{session_id}/photobooth/print', response_model=SuccessMessage)
+async def photobooth_print(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+) -> SuccessMessage:
+    """Print the photobooth strip on the thermal printer."""
+    session = await session_service.get_session(db, session_id)
+
+    if not session.composite_image_path or not os.path.exists(session.composite_image_path):
+        return SuccessMessage(message='No composite image to print')
+
+    try:
+        from app.services.printer_service import print_photobooth_strip
+        result = print_photobooth_strip(session.composite_image_path)
+        return SuccessMessage(message=result.get('message', 'Print sent'))
+    except Exception as exc:
+        return SuccessMessage(message=f'Print failed: {exc}')
+
+
+@router.post('/session/{session_id}/photobooth/retake', response_model=SessionResponse)
+async def photobooth_retake(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
+    """Go back to CAPTURE from FRAME_SELECT to retake photos."""
+    from app.services import photobooth_service
+
+    session = await photobooth_service.retake_photobooth(db=db, session_id=session_id)
+    return _session_to_response(session, settings)
+
+
+@router.get('/session/{session_id}/photobooth/share', response_model=ShareResponse)
+async def photobooth_share(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ShareResponse:
+    """Generate a temporary share URL for the composite image."""
+    from app.services.share_service import generate_share_token
+
+    session = await session_service.get_session(db, session_id)
+
+    if not session.composite_image_path:
+        raise SessionNotFoundError(str(session_id))
+
+    ttl = settings.photobooth_share_url_ttl_seconds
+    token, expires_at = generate_share_token(str(session_id), ttl_seconds=ttl)
+
+    share_url = f'/api/v1/kiosk/share/{token}'
+
+    return ShareResponse(
+        share_url=share_url,
+        expires_in=ttl,
+        qr_data=share_url,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public share endpoint (no auth needed)
+# ---------------------------------------------------------------------------
+
+@router.get('/share/{token}')
+async def serve_shared_composite(
+    token: str,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Serve a composite image via a temporary share token."""
+    from app.services.share_service import validate_share_token
+
+    session_id = validate_share_token(token)
+
+    session = await session_service.get_session(db, UUID(session_id))
+
+    if not session.composite_image_path or not os.path.exists(session.composite_image_path):
+        raise SessionNotFoundError(session_id)
+
+    return FileResponse(
+        session.composite_image_path,
+        media_type='image/jpeg',
+        filename=f'vibeprint_strip_{session_id}.jpg',
+    )
+
+
+# ---------------------------------------------------------------------------
+# Feature flags (public, no auth)
+# ---------------------------------------------------------------------------
+
+@router.get('/features', response_model=FeaturesResponse)
+async def get_features(
+    db: AsyncSession = Depends(get_db_session),
+) -> FeaturesResponse:
+    """Get enabled features for kiosk initialization."""
+    from app.services import config_service
+
+    photobooth_config = await config_service.get_configs_by_category(db, 'photobooth')
+    photobooth_enabled = photobooth_config.get('photobooth_enabled', 'true').lower() == 'true'
+
+    # Vibe check is always enabled (at least one feature must be on)
+    return FeaturesResponse(
+        vibe_check_enabled=True,
+        photobooth_enabled=photobooth_enabled,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Public photobooth theme listing (no auth needed)
+# ---------------------------------------------------------------------------
+
+@router.get('/photobooth/themes')
+async def list_public_themes(
+    db: AsyncSession = Depends(get_db_session),
+):
+    """List enabled photobooth themes for the kiosk (public, no auth)."""
+    from app.services import theme_service
+    from app.schemas.photobooth import ThemeResponse
+
+    themes = await theme_service.list_themes(db, enabled_only=True)
+    return [
+        ThemeResponse(
+            id=t.id,
+            name=t.name,
+            display_name=t.display_name,
+            config=t.config,
+            preview_image_url=None,
+            is_builtin=t.is_builtin,
+            is_enabled=t.is_enabled,
+            is_default=t.is_default,
+            sort_order=t.sort_order,
+            created_at=t.created_at,
+            updated_at=t.updated_at,
+        )
+        for t in themes
+    ]
 
 
 # ---------------------------------------------------------------------------

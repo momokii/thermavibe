@@ -106,6 +106,18 @@ services:
       # Session duration in hours before auto-logout.
       ADMIN_SESSION_TTL_HOURS: ${ADMIN_SESSION_TTL_HOURS:-24}
 
+      # ── Photobooth ──────────────────────────────────────────────────────
+      # Photobooth feature toggle and settings.
+      PHOTOBOOTH_ENABLED: ${PHOTOBOOTH_ENABLED:-true}
+      PHOTOBOOTH_CAPTURE_TIME_LIMIT_SECONDS: ${PHOTOBOOTH_CAPTURE_TIME_LIMIT_SECONDS:-30}
+      PHOTOBOOTH_MAX_PHOTOS: ${PHOTOBOOTH_MAX_PHOTOS:-8}
+      PHOTOBOOTH_MIN_PHOTOS: ${PHOTOBOOTH_MIN_PHOTOS:-2}
+      PHOTOBOOTH_DEFAULT_LAYOUT_ROWS: ${PHOTOBOOTH_DEFAULT_LAYOUT_ROWS:-4}
+      PHOTOBOOTH_WATERMARK_ENABLED: ${PHOTOBOOTH_WATERMARK_ENABLED:-false}
+      PHOTOBOOTH_WATERMARK_TEXT: ${PHOTOBOOTH_WATERMARK_TEXT:-VibePrint OS}
+      PHOTOBOOTH_COMPOSITE_RETENTION_HOURS: ${PHOTOBOOTH_COMPOSITE_RETENTION_HOURS:-168}
+      PHOTOBOOTH_SHARE_URL_TTL_SECONDS: ${PHOTOBOOTH_SHARE_URL_TTL_SECONDS:-300}
+
     # Override the default command to enable hot-reload.
     # The base docker-compose.yml starts uvicorn without --reload for production.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

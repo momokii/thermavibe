@@ -18,6 +18,11 @@ class SessionCreateRequest(BaseModel):
         default=False,
         description='Whether the payment step is enabled for this session',
     )
+    session_type: str = Field(
+        default='vibe_check',
+        pattern=r'^(vibe_check|photobooth)$',
+        description='Session type: vibe_check or photobooth',
+    )
 
 
 class PhotoEntry(BaseModel):

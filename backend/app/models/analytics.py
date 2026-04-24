@@ -31,6 +31,10 @@ class EventType(str, enum.Enum):
     PRINT_FAILED = 'print_failed'
     ERROR = 'error'
     SESSION_TIMEOUT = 'session_timeout'
+    PHOTOBOOTH_CAPTURE_START = 'photobooth_capture_start'
+    PHOTOBOOTH_FRAME_SELECT = 'photobooth_frame_select'
+    PHOTOBOOTH_ARRANGE = 'photobooth_arrange'
+    PHOTOBOOTH_COMPOSITE_GENERATED = 'photobooth_composite_generated'
 
 
 class PrintJobStatus(str, enum.Enum):

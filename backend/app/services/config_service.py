@@ -52,6 +52,17 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'app_env': {'value': settings.app_env, 'description': 'Application environment'},
         'admin_pin': {'value': settings.admin_pin, 'description': 'Admin PIN for dashboard access'},
     },
+    ConfigCategory.PHOTOBOOTH: {
+        'photobooth_enabled': {'value': str(getattr(settings, 'photobooth_enabled', True)).lower(), 'description': 'Enable photobooth feature'},
+        'photobooth_capture_time_limit_seconds': {'value': str(getattr(settings, 'photobooth_capture_time_limit_seconds', 30)), 'description': 'Capture time limit in seconds'},
+        'photobooth_max_photos': {'value': str(getattr(settings, 'photobooth_max_photos', 8)), 'description': 'Maximum photos per session'},
+        'photobooth_min_photos': {'value': str(getattr(settings, 'photobooth_min_photos', 2)), 'description': 'Minimum photos per session'},
+        'photobooth_default_layout_rows': {'value': str(getattr(settings, 'photobooth_default_layout_rows', 4)), 'description': 'Default layout rows (1-4)'},
+        'photobooth_watermark_enabled': {'value': str(getattr(settings, 'photobooth_watermark_enabled', False)).lower(), 'description': 'Enable watermark on strips'},
+        'photobooth_watermark_text': {'value': getattr(settings, 'photobooth_watermark_text', 'VibePrint OS'), 'description': 'Watermark text'},
+        'photobooth_composite_retention_hours': {'value': str(getattr(settings, 'photobooth_composite_retention_hours', 168)), 'description': 'Composite retention period in hours (0 = forever)'},
+        'photobooth_share_url_ttl_seconds': {'value': str(getattr(settings, 'photobooth_share_url_ttl_seconds', 300)), 'description': 'Share URL TTL in seconds'},
+    },
 }
 
 

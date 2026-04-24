@@ -192,5 +192,15 @@ def status_code_for_error(code: str) -> int:
         'AUTH_TOKEN_INVALID': 401,
         'AUTH_TOKEN_EXPIRED': 401,
         'RATE_LIMITED': 429,
+        'SHARE_INVALID': 400,
+        'SHARE_EXPIRED': 410,
+        'THEME_NOT_FOUND': 404,
+        'THEME_BUILTIN': 403,
+        'NO_PHOTOS': 400,
+        'INVALID_LAYOUT': 400,
+        'INVALID_PHOTO_INDEX': 400,
+        'INCOMPLETE_ARRANGEMENT': 400,
+        'MAX_PHOTOS_REACHED': 400,
+        'MIN_PHOTOS_NOT_MET': 400,
     }
     return mapping.get(code, 500)

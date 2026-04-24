@@ -1,11 +1,17 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
+import { FEATURE_SELECT_STATE } from '@/lib/constants';
 import IdleScreen from './IdleScreen';
+import FeatureSelectScreen from './FeatureSelectScreen';
 import CaptureScreen from './CaptureScreen';
 import ReviewScreen from './ReviewScreen';
 import ProcessingScreen from './ProcessingScreen';
 import RevealScreen from './RevealScreen';
 import PaymentScreen from './PaymentScreen';
+import PhotoboothCaptureScreen from './PhotoboothCaptureScreen';
+import FrameSelectScreen from './FrameSelectScreen';
+import ArrangeScreen from './ArrangeScreen';
+import PhotoboothRevealScreen from './PhotoboothRevealScreen';
 
 const screenTransition = {
   initial: { opacity: 0, scale: 0.96, y: 8 },
@@ -15,6 +21,7 @@ const screenTransition = {
 
 export default function KioskShell() {
   const state = useKioskStore((s) => s.state);
+  const sessionType = useKioskStore((s) => s.sessionType);
 
   return (
     <div
@@ -27,9 +34,14 @@ export default function KioskShell() {
             <IdleScreen />
           </motion.div>
         )}
+        {state === FEATURE_SELECT_STATE && (
+          <motion.div key="feature_select" {...screenTransition} className="absolute inset-0">
+            <FeatureSelectScreen />
+          </motion.div>
+        )}
         {state === 'capture' && (
           <motion.div key="capture" {...screenTransition} className="absolute inset-0">
-            <CaptureScreen />
+            {sessionType === 'photobooth' ? <PhotoboothCaptureScreen /> : <CaptureScreen />}
           </motion.div>
         )}
         {state === 'review' && (
@@ -50,6 +62,26 @@ export default function KioskShell() {
         {state === 'payment' && (
           <motion.div key="payment" {...screenTransition} className="absolute inset-0">
             <PaymentScreen />
+          </motion.div>
+        )}
+        {state === 'frame_select' && (
+          <motion.div key="frame_select" {...screenTransition} className="absolute inset-0">
+            <FrameSelectScreen />
+          </motion.div>
+        )}
+        {state === 'arrange' && (
+          <motion.div key="arrange" {...screenTransition} className="absolute inset-0">
+            <ArrangeScreen />
+          </motion.div>
+        )}
+        {state === 'compositing' && (
+          <motion.div key="compositing" {...screenTransition} className="absolute inset-0">
+            <ProcessingScreen />
+          </motion.div>
+        )}
+        {state === 'photobooth_reveal' && (
+          <motion.div key="photobooth_reveal" {...screenTransition} className="absolute inset-0">
+            <PhotoboothRevealScreen />
           </motion.div>
         )}
         {state === 'reset' && (

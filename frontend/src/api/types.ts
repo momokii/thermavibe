@@ -5,9 +5,23 @@
 
 // --- Enums ---
 
-export type KioskState = 'idle' | 'payment' | 'capture' | 'review' | 'processing' | 'reveal' | 'reset';
+export type KioskState =
+  | 'idle'
+  | 'payment'
+  | 'capture'
+  | 'review'
+  | 'processing'
+  | 'reveal'
+  | 'frame_select'
+  | 'arrange'
+  | 'compositing'
+  | 'photobooth_reveal'
+  | 'feature_select'
+  | 'reset';
 
 export type PaymentStatusValue = 'none' | 'pending' | 'confirmed' | 'expired' | 'denied' | 'refunded';
+
+export type SessionType = 'vibe_check' | 'photobooth';
 
 // --- Kiosk ---
 
@@ -36,6 +50,7 @@ export interface SessionCreateRequest {
 export interface SessionResponse {
   id: string;
   state: KioskState;
+  session_type?: SessionType;
   payment_enabled: boolean;
   payment_status: PaymentStatusValue | null;
   captured_at: string | null;
@@ -49,6 +64,8 @@ export interface SessionResponse {
   expires_at: string | null;
   photos: PhotoEntry[];
   capture_time_limit: number | null;
+  photobooth_layout?: PhotoboothLayout | null;
+  composite_image_url?: string | null;
 }
 
 export interface CaptureResponse {
@@ -338,4 +355,108 @@ export interface ErrorEnvelope {
 
 export interface SuccessMessage {
   message: string;
+}
+
+// --- Photobooth ---
+
+export interface PhotoboothLayout {
+  theme_id?: number;
+  theme_name?: string;
+  layout_rows: number;
+  photo_assignments?: Record<string, number>;
+}
+
+export interface PhotoboothSnapResponse {
+  id: string;
+  state: KioskState;
+  photo_url: string;
+  photo_index: number;
+  total_photos: number;
+  time_remaining_seconds: number;
+}
+
+export interface FrameSelectRequest {
+  theme_id: number;
+  layout_rows: number;
+}
+
+export interface ArrangeRequest {
+  photo_assignments: Record<number, number>;
+}
+
+export interface ShareResponse {
+  share_url: string;
+  expires_in: number;
+  qr_data: string;
+}
+
+export interface FeaturesResponse {
+  vibe_check_enabled: boolean;
+  photobooth_enabled: boolean;
+}
+
+// --- Theme ---
+
+export interface BackgroundConfig {
+  type: 'solid' | 'gradient';
+  color: string;
+  gradient_start?: string;
+  gradient_end?: string;
+}
+
+export interface PhotoSlotConfig {
+  border_width: number;
+  border_color: string;
+  border_radius: number;
+  padding: number;
+  shadow: boolean;
+}
+
+export interface ThemeConfig {
+  background: BackgroundConfig;
+  photo_slot: PhotoSlotConfig;
+  decorations: {
+    top_banner: boolean;
+    banner_text: string;
+    divider_style: 'line' | 'dotted' | 'none';
+    divider_color: string;
+    date_format: string;
+  };
+  font: {
+    family: string;
+    color: string;
+    size: number;
+  };
+  watermark: {
+    enabled: boolean;
+    text: string;
+    position: string;
+    opacity: number;
+  };
+}
+
+export interface ThemeResponse {
+  id: number;
+  name: string;
+  display_name: string;
+  config: ThemeConfig;
+  preview_image_url: string | null;
+  is_builtin: boolean;
+  is_enabled: boolean;
+  is_default: boolean;
+  sort_order: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ThemeCreateRequest {
+  name: string;
+  display_name: string;
+  config: ThemeConfig;
+}
+
+export interface ThemeUpdateRequest {
+  display_name?: string;
+  config?: ThemeConfig;
+  sort_order?: number;
 }
