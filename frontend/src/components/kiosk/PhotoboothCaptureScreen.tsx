@@ -105,7 +105,7 @@ export default function PhotoboothCaptureScreen() {
       </div>
 
       {/* Bottom controls */}
-      <div className="flex-[2] flex flex-col items-center justify-center gap-5 pb-6" style={{ paddingTop: '1.5rem' }}>
+      <div className="flex-[2] flex flex-col items-center justify-center gap-6 pb-10" style={{ paddingTop: '3rem' }}>
         {/* Thumbnail strip of captured photos */}
         {photos.length > 0 && (
           <div className="flex gap-3 justify-center px-4 py-2">
@@ -130,12 +130,12 @@ export default function PhotoboothCaptureScreen() {
         )}
 
         {/* Action buttons */}
-        <div className="flex flex-col items-center gap-4 w-full px-6">
+        <div className="flex flex-col items-center gap-4 w-full px-8">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleSnap}
             disabled={isSnapping || photos.length >= maxPhotos || timeLeft <= 0}
-            className="px-16 py-5 rounded-full text-white text-2xl font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
+            className="w-2/8 h-12 py-5 rounded-2xl text-white text-2xl font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
           >
             {isSnapping ? 'Snapping...' : 'Snap!'}
           </motion.button>
@@ -146,7 +146,7 @@ export default function PhotoboothCaptureScreen() {
               animate={{ opacity: 1, scale: 1 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleDone}
-              className="px-10 py-3 rounded-xl text-white/70 text-base font-display font-semibold transition-all duration-150 btn-secondary"
+              className="w-2/8 h-12 rounded-2xl text-white/70 text-lg font-display font-semibold transition-all duration-150 btn-secondary"
             >
               Done ({photos.length})
             </motion.button>
