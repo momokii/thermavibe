@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
-import { CAMERA_STREAM_URL } from '@/lib/constants';
+import { CAMERA_STREAM_URL, FEATURE_SELECT_STATE } from '@/lib/constants';
 
 const DEFAULT_TIMER_SECONDS = 30;
 const DEFAULT_MAX_PHOTOS = 8;
@@ -15,6 +15,9 @@ export default function PhotoboothCaptureScreen() {
   const { snapPhotoboothPhoto, finishCapture, isSnapping } = usePhotoboothState();
   const captureStartedAt = useKioskStore((s) => s.captureStartedAt);
   const setCaptureStartedAt = useKioskStore((s) => s.setCaptureStartedAt);
+  const reset = useKioskStore((s) => s.reset);
+
+  const [timedOutEmpty, setTimedOutEmpty] = useState(false);
 
   const timerSeconds = timeLimitSeconds || DEFAULT_TIMER_SECONDS;
   const maxPhotos = DEFAULT_MAX_PHOTOS;
@@ -35,13 +38,26 @@ export default function PhotoboothCaptureScreen() {
       const remaining = Math.max(0, timerSeconds - elapsed);
       setTimeLeft(remaining);
 
-      if (remaining <= 0 && photos.length > 0) {
+      if (remaining <= 0) {
         clearInterval(interval);
-        finishCapture();
+        if (photos.length > 0) {
+          finishCapture();
+        } else {
+          setTimedOutEmpty(true);
+        }
       }
     }, 100);
     return () => clearInterval(interval);
   }, [captureStartedAt, photos.length, finishCapture, timerSeconds]);
+
+  // Auto-redirect back to feature select after timeout with no photos
+  useEffect(() => {
+    if (!timedOutEmpty) return;
+    const timer = setTimeout(() => {
+      reset();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [timedOutEmpty, reset]);
 
   const handleSnap = useCallback(() => {
     if (isSnapping || photos.length >= maxPhotos || timeLeft <= 0) return;
@@ -64,6 +80,23 @@ export default function PhotoboothCaptureScreen() {
 
   return (
     <div className="kiosk-layout bg-surface-0 relative overflow-hidden">
+      {/* Time's up overlay — no photos taken */}
+      <AnimatePresence>
+        {timedOutEmpty && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-6"
+          >
+            <div className="text-6xl" role="img" aria-label="clock">⏰</div>
+            <h2 className="text-3xl font-display font-black text-white">Time's Up!</h2>
+            <p className="text-white/50 text-base">No photos were taken.</p>
+            <p className="text-white/30 text-sm">Returning to menu...</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Camera feed — top portion */}
       <div className="flex-[3] flex flex-col items-center justify-center relative" style={{ paddingTop: 'var(--kiosk-safe-y)' }}>
         {/* Status badges — above camera */}
