@@ -129,13 +129,13 @@ export default function PhotoboothCaptureScreen() {
           </div>
         )}
 
-        {/* Action buttons — kiosk-sized touch targets */}
-        <div className="flex gap-4 w-full max-w-lg px-6">
+        {/* Action buttons */}
+        <div className="flex flex-col items-center gap-4 w-full px-6">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleSnap}
             disabled={isSnapping || photos.length >= maxPhotos || timeLeft <= 0}
-            className="flex-[2] py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
+            className="px-16 py-5 rounded-full text-white text-2xl font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
           >
             {isSnapping ? 'Snapping...' : 'Snap!'}
           </motion.button>
@@ -146,7 +146,7 @@ export default function PhotoboothCaptureScreen() {
               animate={{ opacity: 1, scale: 1 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleDone}
-              className="flex-1 py-4 rounded-xl text-white/70 text-lg font-display font-semibold transition-all duration-150 btn-secondary"
+              className="px-10 py-3 rounded-xl text-white/70 text-base font-display font-semibold transition-all duration-150 btn-secondary"
             >
               Done ({photos.length})
             </motion.button>
