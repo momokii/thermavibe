@@ -17,12 +17,14 @@ interface KioskStore {
   // Session type
   sessionType: SessionType;
 
-  // Feature flags (fetched on init)
+  // Feature flags (fetched on init from admin config)
   vibeCheckEnabled: boolean;
   photoboothEnabled: boolean;
   featuresLoaded: boolean;
   photoboothMaxPhotos: number;
   photoboothMinPhotos: number;
+  photoboothCaptureTimeLimit: number;
+  photoboothDefaultLayoutRows: number;
 
   // Photobooth-specific state
   photoboothThemeId: number | null;
@@ -40,7 +42,7 @@ interface KioskStore {
   setTimeLimit: (seconds: number) => void;
   setCaptureStartedAt: (ts: number | null) => void;
   setSessionType: (type: SessionType) => void;
-  setFeatures: (vibeCheck: boolean, photobooth: boolean, maxPhotos: number, minPhotos: number) => void;
+  setFeatures: (data: { vibeCheck: boolean; photobooth: boolean; maxPhotos: number; minPhotos: number; captureTimeLimit: number; defaultLayoutRows: number }) => void;
   setPhotoboothThemeId: (id: number | null) => void;
   setPhotoboothLayoutRows: (rows: number) => void;
   setPhotoboothPhotoAssignments: (assignments: Record<number, number>) => void;
@@ -64,6 +66,8 @@ const initialState = {
   featuresLoaded: false,
   photoboothMaxPhotos: 8,
   photoboothMinPhotos: 2,
+  photoboothCaptureTimeLimit: 30,
+  photoboothDefaultLayoutRows: 4,
   photoboothThemeId: null as number | null,
   photoboothLayoutRows: 4,
   photoboothPhotoAssignments: {} as Record<number, number>,
@@ -82,8 +86,17 @@ export const useKioskStore = create<KioskStore>((set) => ({
   setTimeLimit: (seconds) => set({ timeLimitSeconds: seconds }),
   setCaptureStartedAt: (ts) => set({ captureStartedAt: ts }),
   setSessionType: (type) => set({ sessionType: type }),
-  setFeatures: (vibeCheck, photobooth, maxPhotos, minPhotos) =>
-    set({ vibeCheckEnabled: vibeCheck, photoboothEnabled: photobooth, featuresLoaded: true, photoboothMaxPhotos: maxPhotos, photoboothMinPhotos: minPhotos }),
+  setFeatures: ({ vibeCheck, photobooth, maxPhotos, minPhotos, captureTimeLimit, defaultLayoutRows }) =>
+    set({
+      vibeCheckEnabled: vibeCheck,
+      photoboothEnabled: photobooth,
+      featuresLoaded: true,
+      photoboothMaxPhotos: maxPhotos,
+      photoboothMinPhotos: minPhotos,
+      photoboothCaptureTimeLimit: captureTimeLimit,
+      photoboothDefaultLayoutRows: defaultLayoutRows,
+      photoboothLayoutRows: defaultLayoutRows,
+    }),
   setPhotoboothThemeId: (id) => set({ photoboothThemeId: id }),
   setPhotoboothLayoutRows: (rows) => set({ photoboothLayoutRows: rows }),
   setPhotoboothPhotoAssignments: (assignments) => set({ photoboothPhotoAssignments: assignments }),

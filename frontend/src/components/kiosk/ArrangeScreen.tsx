@@ -10,14 +10,14 @@ export default function ArrangeScreen() {
   const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
   const photoboothPhotoAssignments = useKioskStore((s) => s.photoboothPhotoAssignments);
-  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
+  const captureTimeLimit = useKioskStore((s) => s.photoboothCaptureTimeLimit);
   const { arrangePhotos, isArranging, arrangeError } = usePhotoboothState();
 
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<Record<number, number>>(photoboothPhotoAssignments);
 
   // Timer state
-  const [timeLeft, setTimeLeft] = useState(timeLimitSeconds || DEFAULT_TIMER_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(captureTimeLimit);
   const isUrgent = timeLeft <= 10;
 
   const handlePhotoClick = (photoIdx: number) => {

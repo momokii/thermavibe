@@ -643,6 +643,8 @@ async def get_features(
     photobooth_enabled = photobooth_config.get('photobooth_enabled', 'true').lower() == 'true'
     max_photos = int(photobooth_config.get('photobooth_max_photos', '8'))
     min_photos = int(photobooth_config.get('photobooth_min_photos', '2'))
+    capture_time_limit = int(photobooth_config.get('photobooth_capture_time_limit_seconds', '30'))
+    default_layout_rows = int(photobooth_config.get('photobooth_default_layout_rows', '4'))
 
     # Vibe check is always enabled (at least one feature must be on)
     return FeaturesResponse(
@@ -650,6 +652,8 @@ async def get_features(
         photobooth_enabled=photobooth_enabled,
         photobooth_max_photos=max_photos,
         photobooth_min_photos=min_photos,
+        photobooth_capture_time_limit_seconds=capture_time_limit,
+        photobooth_default_layout_rows=default_layout_rows,
     )
 
 

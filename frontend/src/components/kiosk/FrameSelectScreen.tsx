@@ -11,7 +11,7 @@ const DEFAULT_TIMER_SECONDS = 30;
 
 export default function FrameSelectScreen() {
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
-  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
+  const captureTimeLimit = useKioskStore((s) => s.photoboothCaptureTimeLimit);
   const { selectFrame, isTransitioning } = usePhotoboothState();
 
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null);
@@ -19,7 +19,7 @@ export default function FrameSelectScreen() {
   const [triedWithoutTheme, setTriedWithoutTheme] = useState(false);
 
   // Timer state
-  const [timeLeft, setTimeLeft] = useState(timeLimitSeconds || DEFAULT_TIMER_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(captureTimeLimit);
   const isUrgent = timeLeft <= 10;
 
   // Fetch available themes

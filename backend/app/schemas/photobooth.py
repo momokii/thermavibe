@@ -150,6 +150,8 @@ class FeaturesResponse(BaseModel):
     photobooth_enabled: bool = True
     photobooth_max_photos: int = 8
     photobooth_min_photos: int = 2
+    photobooth_capture_time_limit_seconds: int = 30
+    photobooth_default_layout_rows: int = 4
 
 
 # ---------------------------------------------------------------------------

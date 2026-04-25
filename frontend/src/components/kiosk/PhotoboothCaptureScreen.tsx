@@ -10,7 +10,7 @@ export default function PhotoboothCaptureScreen() {
   const streamUrl = CAMERA_STREAM_URL;
   const photos = useKioskStore((s) => s.photos);
   const sessionId = useKioskStore((s) => s.sessionId);
-  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
+  const captureTimeLimit = useKioskStore((s) => s.photoboothCaptureTimeLimit);
   const maxPhotos = useKioskStore((s) => s.photoboothMaxPhotos);
   const minPhotos = useKioskStore((s) => s.photoboothMinPhotos);
   const { snapPhotoboothPhoto, finishCapture, isSnapping } = usePhotoboothState();
@@ -20,7 +20,7 @@ export default function PhotoboothCaptureScreen() {
 
   const [timedOutEmpty, setTimedOutEmpty] = useState(false);
 
-  const timerSeconds = timeLimitSeconds || DEFAULT_TIMER_SECONDS;
+  const timerSeconds = captureTimeLimit;
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
 
   // Start timer on mount

@@ -396,6 +396,8 @@ export interface FeaturesResponse {
   photobooth_enabled: boolean;
   photobooth_max_photos: number;
   photobooth_min_photos: number;
+  photobooth_capture_time_limit_seconds: number;
+  photobooth_default_layout_rows: number;
 }
 
 // --- Theme ---
