@@ -163,7 +163,39 @@ Returns the health status of the application and its dependencies.
 
 ---
 
-## 3. Kiosk Flow
+## 3. Kiosk Features & Configuration
+
+### `GET /api/v1/kiosk/features`
+
+Returns enabled features and photobooth configuration for kiosk initialization. This is the primary endpoint the frontend uses to load runtime settings (all values come from the database, managed via the admin panel).
+
+**Authentication:** None
+
+**Response:**
+
+```json
+{
+  "vibe_check_enabled": true,
+  "photobooth_enabled": true,
+  "photobooth_max_photos": 8,
+  "photobooth_min_photos": 2,
+  "photobooth_capture_time_limit_seconds": 30,
+  "photobooth_default_layout_rows": 4
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `vibe_check_enabled` | boolean | Always true (at least one feature must be on) |
+| `photobooth_enabled` | boolean | Whether the photobooth feature is available |
+| `photobooth_max_photos` | integer | Maximum photos per session (admin-configurable) |
+| `photobooth_min_photos` | integer | Minimum photos before "Done" button appears |
+| `photobooth_capture_time_limit_seconds` | integer | Capture timer duration in seconds |
+| `photobooth_default_layout_rows` | integer | Default photo slots in strip (1-4) |
+
+---
+
+## 4. Kiosk Flow
 
 ### `POST /api/v1/kiosk/session`
 
@@ -377,7 +409,7 @@ End the kiosk session and clear all session data. The session transitions to RES
 
 ---
 
-## 4. Camera
+## 5. Camera
 
 ### `GET /api/v1/camera/stream`
 
@@ -482,7 +514,7 @@ Set the active camera device for capture and streaming.
 
 ---
 
-## 5. AI
+## 6. AI
 
 ### `POST /api/v1/ai/analyze`
 
@@ -534,7 +566,7 @@ curl -X POST http://localhost:8000/api/v1/ai/analyze \
 
 ---
 
-## 6. Payment
+## 7. Payment
 
 ### `POST /api/v1/payment/create-qr`
 
@@ -675,7 +707,7 @@ Payment status values: `PENDING`, `PAID`, `EXPIRED`, `FAILED`, `REFUNDED`.
 
 ---
 
-## 7. Print
+## 8. Print
 
 ### `POST /api/v1/print/test`
 
@@ -763,7 +795,7 @@ Check the current status of the thermal printer connection.
 
 ---
 
-## 8. Admin
+## 9. Admin
 
 ### `POST /api/v1/admin/login`
 

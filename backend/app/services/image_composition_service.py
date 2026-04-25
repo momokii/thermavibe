@@ -102,7 +102,7 @@ def compose_photobooth_strip(
         _draw_watermark(
             canvas,
             watermark_text or wm_cfg.get('text', ''),
-            wm_cfg.get('opacity', 0.3),
+            wm_cfg.get('opacity', 0.6),
             font_cfg,
         )
 
@@ -279,7 +279,7 @@ def _draw_watermark(
     # Create overlay
     overlay = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    font = _get_font(font_cfg, size=18)
+    font = _get_font(font_cfg, size=28)
     alpha = int(255 * opacity)
 
     color = _hex_to_rgb(font_cfg.get('color', '#ffffff'))

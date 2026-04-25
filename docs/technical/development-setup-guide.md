@@ -183,6 +183,23 @@ Review and edit the `.env` file. The following table describes each variable:
 | `CAMERA_RESOLUTION_HEIGHT` | Capture resolution height | `720` |
 | `CAMERA_MJPEG_QUALITY` | JPEG compression quality (1-100) | `85` |
 
+#### Photobooth Configuration
+
+Photobooth settings are managed through the **Admin Dashboard** (`/admin`), not through environment variables. They are stored in the PostgreSQL database and take effect immediately.
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Photobooth | Toggle the photobooth feature on/off | Enabled |
+| Capture Time Limit | Seconds users have to take photos | 30s |
+| Max Photos | Maximum photos per session | 8 |
+| Min Photos | Minimum photos before "Done" button appears | 2 |
+| Default Layout Rows | Default photo slots in strip (1-4) | 4 |
+| Watermark Enabled | Add text watermark to strips | Disabled |
+| Watermark Text | Text shown on watermark | VibePrint OS |
+| Composite Retention | Hours to keep strips for admin viewing | 168h (7 days) |
+
+The `.env` values are only used as seed defaults when the database is first initialized. After that, all photobooth configuration is read from the database at runtime.
+
 ---
 
 ## 3. Start Database
