@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
 
-const DEFAULT_TIMER_SECONDS = 30;
-
 export default function ArrangeScreen() {
   const photos = useKioskStore((s) => s.photos);
   const sessionId = useKioskStore((s) => s.sessionId);

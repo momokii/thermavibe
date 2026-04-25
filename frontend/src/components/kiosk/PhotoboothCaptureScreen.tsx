@@ -4,8 +4,6 @@ import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
 import { CAMERA_STREAM_URL } from '@/lib/constants';
 
-const DEFAULT_TIMER_SECONDS = 30;
-
 export default function PhotoboothCaptureScreen() {
   const streamUrl = CAMERA_STREAM_URL;
   const photos = useKioskStore((s) => s.photos);

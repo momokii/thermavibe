@@ -7,7 +7,6 @@ import { photoboothApi } from '@/api/photoboothApi';
 import type { ThemeResponse } from '@/api/types';
 
 const LAYOUT_OPTIONS = [1, 2, 3, 4];
-const DEFAULT_TIMER_SECONDS = 30;
 
 export default function FrameSelectScreen() {
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
