@@ -394,6 +394,8 @@ export interface ShareResponse {
 export interface FeaturesResponse {
   vibe_check_enabled: boolean;
   photobooth_enabled: boolean;
+  photobooth_max_photos: number;
+  photobooth_min_photos: number;
 }
 
 // --- Theme ---

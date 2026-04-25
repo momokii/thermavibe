@@ -17,13 +17,13 @@ export default function IdleScreen() {
     if (!featuresLoaded) {
       photoboothApi
         .getFeatures()
-        .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean } }) => {
-          const { vibe_check_enabled, photobooth_enabled } = res.data;
-          useKioskStore.getState().setFeatures(vibe_check_enabled, photobooth_enabled);
+        .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number } }) => {
+          const { vibe_check_enabled, photobooth_enabled, photobooth_max_photos, photobooth_min_photos } = res.data;
+          useKioskStore.getState().setFeatures(vibe_check_enabled, photobooth_enabled, photobooth_max_photos, photobooth_min_photos);
         })
         .catch(() => {
-          // Default: both enabled
-          useKioskStore.getState().setFeatures(true, true);
+          // Default: both enabled, standard limits
+          useKioskStore.getState().setFeatures(true, true, 8, 2);
         });
     }
   }, [featuresLoaded]);

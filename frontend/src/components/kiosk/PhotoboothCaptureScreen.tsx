@@ -5,13 +5,14 @@ import { usePhotoboothState } from '@/hooks/usePhotoboothState';
 import { CAMERA_STREAM_URL } from '@/lib/constants';
 
 const DEFAULT_TIMER_SECONDS = 30;
-const DEFAULT_MAX_PHOTOS = 8;
 
 export default function PhotoboothCaptureScreen() {
   const streamUrl = CAMERA_STREAM_URL;
   const photos = useKioskStore((s) => s.photos);
   const sessionId = useKioskStore((s) => s.sessionId);
   const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
+  const maxPhotos = useKioskStore((s) => s.photoboothMaxPhotos);
+  const minPhotos = useKioskStore((s) => s.photoboothMinPhotos);
   const { snapPhotoboothPhoto, finishCapture, isSnapping } = usePhotoboothState();
   const captureStartedAt = useKioskStore((s) => s.captureStartedAt);
   const setCaptureStartedAt = useKioskStore((s) => s.setCaptureStartedAt);
@@ -20,7 +21,6 @@ export default function PhotoboothCaptureScreen() {
   const [timedOutEmpty, setTimedOutEmpty] = useState(false);
 
   const timerSeconds = timeLimitSeconds || DEFAULT_TIMER_SECONDS;
-  const maxPhotos = DEFAULT_MAX_PHOTOS;
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
 
   // Start timer on mount
@@ -40,7 +40,7 @@ export default function PhotoboothCaptureScreen() {
 
       if (remaining <= 0) {
         clearInterval(interval);
-        if (photos.length > 0) {
+        if (photos.length >= minPhotos) {
           finishCapture();
         } else {
           setTimedOutEmpty(true);
@@ -65,8 +65,8 @@ export default function PhotoboothCaptureScreen() {
   }, [isSnapping, photos.length, timeLeft, snapPhotoboothPhoto]);
 
   const handleDone = useCallback(() => {
-    if (photos.length >= 2) finishCapture();
-  }, [photos.length, finishCapture]);
+    if (photos.length >= minPhotos) finishCapture();
+  }, [photos.length, minPhotos, finishCapture]);
 
   const isUrgent = timeLeft <= 10;
 
@@ -174,7 +174,7 @@ export default function PhotoboothCaptureScreen() {
             {isSnapping ? 'Snapping...' : 'Snap!'}
           </motion.button>
 
-          {photos.length >= 2 && (
+          {photos.length >= minPhotos && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}

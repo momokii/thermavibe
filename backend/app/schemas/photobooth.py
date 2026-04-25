@@ -148,6 +148,8 @@ class FeaturesResponse(BaseModel):
 
     vibe_check_enabled: bool = True
     photobooth_enabled: bool = True
+    photobooth_max_photos: int = 8
+    photobooth_min_photos: int = 2
 
 
 # ---------------------------------------------------------------------------

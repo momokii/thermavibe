@@ -641,11 +641,15 @@ async def get_features(
 
     photobooth_config = await config_service.get_configs_by_category(db, 'photobooth')
     photobooth_enabled = photobooth_config.get('photobooth_enabled', 'true').lower() == 'true'
+    max_photos = int(photobooth_config.get('photobooth_max_photos', '8'))
+    min_photos = int(photobooth_config.get('photobooth_min_photos', '2'))
 
     # Vibe check is always enabled (at least one feature must be on)
     return FeaturesResponse(
         vibe_check_enabled=True,
         photobooth_enabled=photobooth_enabled,
+        photobooth_max_photos=max_photos,
+        photobooth_min_photos=min_photos,
     )
 
 
