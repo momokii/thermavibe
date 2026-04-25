@@ -120,7 +120,8 @@ export default function FeatureSelectScreen() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.35 }}
         transition={{ delay: 1 }}
-        className="text-sm text-white/30 mt-8"
+        className="text-sm text-white/30"
+        style={{ marginTop: '3rem' }}
       >
         {isTransitioning ? 'Starting...' : 'Tap to choose'}
       </motion.p>
