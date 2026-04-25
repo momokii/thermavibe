@@ -11,15 +11,15 @@ export default function ThemeManager() {
   const queryClient = useQueryClient();
 
   const { data: themes = [], isLoading } = useQuery({
-    queryKey: ['photobooth-themes'],
-    queryFn: () => photoboothApi.listAllThemes().then((r) => r.data),
+    queryKey: ['admin-photobooth-themes'],
+    queryFn: () => photoboothApi.listAllThemes().then((r: { data: ThemeResponse[] }) => r.data),
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
       photoboothApi.toggleTheme(id, enabled),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['photobooth-themes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-photobooth-themes'] });
       toast.success('Theme updated');
     },
     onError: () => toast.error('Failed to update theme'),
@@ -28,7 +28,7 @@ export default function ThemeManager() {
   const defaultMutation = useMutation({
     mutationFn: (id: number) => photoboothApi.setDefaultTheme(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['photobooth-themes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-photobooth-themes'] });
       toast.success('Default theme set');
     },
     onError: () => toast.error('Failed to set default'),
@@ -37,7 +37,7 @@ export default function ThemeManager() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => photoboothApi.deleteTheme(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['photobooth-themes'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-photobooth-themes'] });
       toast.success('Theme deleted');
     },
     onError: () => toast.error('Cannot delete built-in themes'),
@@ -47,7 +47,7 @@ export default function ThemeManager() {
     return (
       <Card className="card-surface border-0">
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-white/50" />
+          <Loader2 className="h-5 w-5 animate-spin text-white/40" />
         </CardContent>
       </Card>
     );
@@ -65,7 +65,7 @@ export default function ThemeManager() {
         </p>
       </CardHeader>
       <CardContent style={{ padding: '0 2rem 2rem' }}>
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {themes.map((theme: ThemeResponse) => (
             <div
               key={theme.id}
@@ -119,7 +119,7 @@ export default function ThemeManager() {
 
                 <Switch
                   checked={theme.is_enabled}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked: boolean) =>
                     toggleMutation.mutate({ id: theme.id, enabled: checked })
                   }
                 />

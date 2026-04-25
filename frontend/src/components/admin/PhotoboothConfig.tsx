@@ -83,48 +83,53 @@ export default function PhotoboothConfig() {
         {/* Enable toggle */}
         <div className="flex items-center justify-between" style={{ padding: '0.5rem 0' }}>
           <div>
-            <Label className="text-white/80 text-sm">Enable Photobooth</Label>
-            <p className="text-[11px] text-white/25 mt-0.5">Allow users to create photo strips. At least one feature must stay enabled.</p>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Enable Photobooth</Label>
+            <p className="text-xs text-white/25" style={{ marginTop: '0.25rem' }}>
+              Allow users to create photo strips. At least one feature must stay enabled.
+            </p>
           </div>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
         </div>
 
         {/* Capture time limit */}
-        <div className="space-y-1.5">
-          <Label className="text-white/80 text-sm">Capture Time Limit (seconds)</Label>
-          <p className="text-[11px] text-white/25">How long users have to take photos during the capture phase.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Capture Time Limit (seconds)</Label>
+          <p className="text-xs text-white/25">How long users have to take photos during the capture phase.</p>
           <Input
             type="number"
             value={timeLimit}
             onChange={(e) => setTimeLimit(e.target.value)}
-            className="bg-white/5 border-white/10 text-white"
+            className="input-surface text-white placeholder:text-white/20"
+            style={{ padding: '0.75rem 1rem' }}
             min="5"
             max="120"
           />
         </div>
 
         {/* Max/min photos */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-white/80 text-sm">Max Photos</Label>
-            <p className="text-[11px] text-white/25">Maximum photos per session.</p>
+        <div className="grid grid-cols-2 gap-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Max Photos</Label>
+            <p className="text-xs text-white/25">Maximum photos per session.</p>
             <Input
               type="number"
               value={maxPhotos}
               onChange={(e) => setMaxPhotos(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
               min="1"
               max="12"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-white/80 text-sm">Min Photos</Label>
-            <p className="text-[11px] text-white/25">Minimum photos needed to create a strip.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Min Photos</Label>
+            <p className="text-xs text-white/25">Minimum photos needed to create a strip.</p>
             <Input
               type="number"
               value={minPhotos}
               onChange={(e) => setMinPhotos(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
               min="1"
               max="4"
             />
@@ -132,14 +137,15 @@ export default function PhotoboothConfig() {
         </div>
 
         {/* Default layout rows */}
-        <div className="space-y-1.5">
-          <Label className="text-white/80 text-sm">Default Layout Rows</Label>
-          <p className="text-[11px] text-white/25">Default number of photo slots in the strip (1-4).</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Default Layout Rows</Label>
+          <p className="text-xs text-white/25">Default number of photo slots in the strip (1–4).</p>
           <Input
             type="number"
             value={defaultRows}
             onChange={(e) => setDefaultRows(e.target.value)}
-            className="bg-white/5 border-white/10 text-white"
+            className="input-surface text-white placeholder:text-white/20"
+            style={{ padding: '0.75rem 1rem' }}
             min="1"
             max="4"
           />
@@ -148,33 +154,38 @@ export default function PhotoboothConfig() {
         {/* Watermark */}
         <div className="flex items-center justify-between" style={{ padding: '0.5rem 0' }}>
           <div>
-            <Label className="text-white/80 text-sm">Watermark</Label>
-            <p className="text-[11px] text-white/25 mt-0.5">Add a text watermark to the bottom of strips.</p>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Watermark</Label>
+            <p className="text-xs text-white/25" style={{ marginTop: '0.25rem' }}>
+              Add a text watermark to the bottom of generated strips.
+            </p>
           </div>
           <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
         </div>
 
         {watermarkEnabled && (
-          <div className="space-y-1.5">
-            <Label className="text-white/80 text-sm">Watermark Text</Label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Watermark Text</Label>
+            <p className="text-xs text-white/25">Text displayed at the bottom of each photobooth strip.</p>
             <Input
               value={watermarkText}
               onChange={(e) => setWatermarkText(e.target.value)}
-              className="bg-white/5 border-white/10 text-white"
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem' }}
               placeholder="VibePrint OS"
             />
           </div>
         )}
 
         {/* Retention */}
-        <div className="space-y-1.5">
-          <Label className="text-white/80 text-sm">Composite Retention (hours)</Label>
-          <p className="text-[11px] text-white/25">How long to keep photobooth strips for admin viewing. Set to 0 for forever.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Composite Retention (hours)</Label>
+          <p className="text-xs text-white/25">How long to keep photobooth strips for admin viewing. Set to 0 for forever.</p>
           <Input
             type="number"
             value={retentionHours}
             onChange={(e) => setRetentionHours(e.target.value)}
-            className="bg-white/5 border-white/10 text-white"
+            className="input-surface text-white placeholder:text-white/20"
+            style={{ padding: '0.75rem 1rem' }}
             min="0"
           />
         </div>
@@ -183,10 +194,11 @@ export default function PhotoboothConfig() {
         <Button
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="bg-violet-600 hover:bg-violet-700 text-white self-start"
+          className="btn-primary border-0"
+          style={{ alignSelf: 'flex-start', padding: '0.75rem 1.5rem' }}
         >
-          {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Save Photobooth Settings
+          {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+          {saveMutation.isPending ? 'Saving...' : 'Save Configuration'}
         </Button>
       </CardContent>
     </Card>
