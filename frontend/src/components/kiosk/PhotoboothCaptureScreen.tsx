@@ -48,7 +48,7 @@ export default function PhotoboothCaptureScreen() {
       }
     }, 100);
     return () => clearInterval(interval);
-  }, [captureStartedAt, photos.length, finishCapture, timerSeconds]);
+  }, [captureStartedAt, photos.length, finishCapture, timerSeconds, minPhotos]);
 
   // Auto-redirect back to feature select after timeout with no photos
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function PhotoboothCaptureScreen() {
   const handleSnap = useCallback(() => {
     if (isSnapping || photos.length >= maxPhotos || timeLeft <= 0) return;
     snapPhotoboothPhoto();
-  }, [isSnapping, photos.length, timeLeft, snapPhotoboothPhoto]);
+  }, [isSnapping, photos.length, timeLeft, snapPhotoboothPhoto, maxPhotos]);
 
   const handleDone = useCallback(() => {
     if (photos.length >= minPhotos) finishCapture();

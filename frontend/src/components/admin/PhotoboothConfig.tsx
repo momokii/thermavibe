@@ -143,7 +143,10 @@ export default function PhotoboothConfig() {
           <Input
             type="number"
             value={defaultRows}
-            onChange={(e) => setDefaultRows(e.target.value)}
+            onChange={(e) => {
+              const v = Math.min(4, Math.max(1, Number(e.target.value)));
+              setDefaultRows(String(v));
+            }}
             className="input-surface text-white placeholder:text-white/20"
             style={{ padding: '0.75rem 1rem' }}
             min="1"
