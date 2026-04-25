@@ -79,12 +79,12 @@ export default function PhotoboothCaptureScreen() {
           )}
 
           {/* Photo count badge */}
-          <div className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/60 text-white font-display font-bold text-sm backdrop-blur-sm">
+          <div className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/60 text-white font-display font-bold text-sm backdrop-blur-sm">
             {photos.length}/{maxPhotos}
           </div>
 
           {/* Timer badge */}
-          <div className={`absolute top-3 left-3 px-3 py-1.5 rounded-lg backdrop-blur-sm font-display font-bold text-sm ${
+          <div className={`absolute top-4 left-4 px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
             isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/80'
           }`}>
             {Math.ceil(timeLeft)}s
@@ -130,12 +130,12 @@ export default function PhotoboothCaptureScreen() {
         )}
 
         {/* Action buttons — kiosk-sized touch targets */}
-        <div className="flex gap-4 w-full max-w-md px-6">
+        <div className="flex flex-col items-center gap-4 w-full max-w-md px-6">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleSnap}
             disabled={isSnapping || photos.length >= maxPhotos || timeLeft <= 0}
-            className="flex-[2] py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
+            className="w-full py-5 rounded-2xl text-white text-xl font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
           >
             {isSnapping ? 'Snapping...' : 'Snap!'}
           </motion.button>
@@ -146,7 +146,7 @@ export default function PhotoboothCaptureScreen() {
               animate={{ opacity: 1, scale: 1 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleDone}
-              className="flex-1 py-4 rounded-xl text-white/70 text-lg font-display font-semibold transition-all duration-150 btn-secondary"
+              className="w-full py-4 rounded-xl text-white/70 text-lg font-display font-semibold transition-all duration-150 btn-secondary"
             >
               Done ({photos.length})
             </motion.button>

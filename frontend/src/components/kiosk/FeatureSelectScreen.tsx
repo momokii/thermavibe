@@ -30,9 +30,9 @@ export default function FeatureSelectScreen() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-8"
+        className="text-center mb-12"
       >
-        <h1 className="text-4xl font-display font-black text-white mb-2 tracking-tight">
+        <h1 className="text-4xl font-display font-black text-white mb-3 tracking-tight">
           Choose Your Experience
         </h1>
         <p className="text-base text-white/45">What would you like to do?</p>
@@ -60,7 +60,7 @@ export default function FeatureSelectScreen() {
               <h2 className="text-2xl font-display font-bold text-white mb-2">Vibe Check</h2>
               <p className="text-white/55 text-sm leading-relaxed">AI reads your vibe from a photo</p>
             </div>
-            <div className="px-5 py-2 rounded-lg bg-violet-500/20 text-violet-300 text-xs font-medium">
+            <div className="px-6 py-2.5 rounded-lg bg-violet-500/20 text-violet-300 text-sm font-medium">
               1 Photo → AI Reading
             </div>
           </motion.button>
@@ -86,7 +86,7 @@ export default function FeatureSelectScreen() {
               <h2 className="text-2xl font-display font-bold text-white mb-2">Photobooth</h2>
               <p className="text-white/55 text-sm leading-relaxed">Create a photo strip with frames</p>
             </div>
-            <div className="px-5 py-2 rounded-lg bg-pink-500/20 text-pink-300 text-xs font-medium">
+            <div className="px-6 py-2.5 rounded-lg bg-pink-500/20 text-pink-300 text-sm font-medium">
               Multi-Photo → Styled Strip
             </div>
           </motion.button>

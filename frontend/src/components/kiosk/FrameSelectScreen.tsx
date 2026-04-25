@@ -110,7 +110,7 @@ export default function FrameSelectScreen() {
       </div>
 
       {/* Bottom action */}
-      <div className="pb-6 pt-2">
+      <div className="flex justify-center pb-6 pt-2">
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -118,7 +118,7 @@ export default function FrameSelectScreen() {
           whileTap={{ scale: 0.97 }}
           onClick={handleConfirm}
           disabled={selectedThemeId === null || isTransitioning}
-          className="w-full max-w-md mx-auto block py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
+          className="w-full max-w-md py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
         >
           {isTransitioning ? 'Selecting...' : 'Select Frame'}
         </motion.button>

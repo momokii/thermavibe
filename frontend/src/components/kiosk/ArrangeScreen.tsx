@@ -155,14 +155,14 @@ export default function ArrangeScreen() {
       </div>
 
       {/* Bottom actions */}
-      <div className="pb-6 pt-2">
+      <div className="flex justify-center pb-6 pt-2">
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleConfirm}
           disabled={!allSlotsFilled || isArranging}
-          className="w-full max-w-md mx-auto block py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
+          className="w-full max-w-md py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
         >
           {isArranging ? 'Creating Strip...' : 'Create My Strip'}
         </motion.button>
