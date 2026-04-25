@@ -105,7 +105,7 @@ export default function PhotoboothCaptureScreen() {
       </div>
 
       {/* Bottom controls */}
-      <div className="flex-[2] flex flex-col items-center justify-center gap-4 pb-6">
+      <div className="flex-[2] flex flex-col items-center justify-center gap-5 pb-6" style={{ paddingTop: '1.5rem' }}>
         {/* Thumbnail strip of captured photos */}
         {photos.length > 0 && (
           <div className="flex gap-3 justify-center px-4 py-2">
