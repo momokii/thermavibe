@@ -72,7 +72,8 @@ async def update_config(
     db: AsyncSession = Depends(get_db_session),
 ) -> ConfigUpdateResponse:
     """Update configuration values for a category."""
-    values = {k: str(v) for k, v in body.model_dump(exclude_unset=True).items()}
+    raw = body.model_dump(exclude_unset=True)
+    values = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in raw.items()}
     updated = await config_service.update_config(db, category, values)
     all_values = await config_service.get_configs_by_category(db, category)
 
