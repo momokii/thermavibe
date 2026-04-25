@@ -98,6 +98,9 @@ export function usePhotoboothState() {
 
   const shareMutation = useMutation({
     mutationFn: (id: string) => photoboothApi.share(id),
+    onError: (err: Error) => {
+      setError(err.message);
+    },
   });
 
   const retakeMutation = useMutation({
@@ -224,6 +227,8 @@ export function usePhotoboothState() {
     isArranging: arrangeMutation.isPending,
     arrangeError: arrangeMutation.error?.message ?? null,
     isPrinting: printMutation.isPending,
+    isSharing: shareMutation.isPending,
+    shareError: shareMutation.error?.message ?? null,
     shareData: (shareMutation.data as { data: ShareResponse } | undefined)?.data ?? null,
   };
 }

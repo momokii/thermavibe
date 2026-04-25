@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
 import { REVEAL_DURATION_SECONDS } from '@/lib/constants';
@@ -7,9 +8,21 @@ import { REVEAL_DURATION_SECONDS } from '@/lib/constants';
 export default function PhotoboothRevealScreen() {
   const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothCompositeUrl = useKioskStore((s) => s.photoboothCompositeUrl);
-  const { printStrip, getShareUrl, shareData, finishPhotobooth } = usePhotoboothState();
+  const { printStrip, getShareUrl, shareData, shareError, isSharing, finishPhotobooth } = usePhotoboothState();
 
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(REVEAL_DURATION_SECONDS);
+  const isUrgent = timeLeft <= 10;
+
+  // Countdown timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 0.1));
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-print after 1.5s
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,6 +70,15 @@ export default function PhotoboothRevealScreen() {
           paddingBottom: '4rem',
         }}
       >
+        {/* Timer badge */}
+        <div className="flex items-center justify-start w-full max-w-2xl px-2 pb-3">
+          <div className={`px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
+            isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/90'
+          }`}>
+            {Math.ceil(timeLeft)}s
+          </div>
+        </div>
+
         {/* Header */}
         <motion.h2
           initial={{ opacity: 0, y: -15 }}
@@ -85,26 +107,46 @@ export default function PhotoboothRevealScreen() {
           </motion.div>
         )}
 
-        {/* QR code for download */}
-        {qrUrl && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="flex flex-col items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-          >
-            <div className="w-28 h-28 bg-white rounded-lg p-2">
-              <div className="w-full h-full flex items-center justify-center text-black text-xs text-center">
-                Scan to download
+        {/* QR code / Download link */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="flex flex-col items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          {isSharing ? (
+            <p className="text-white/40 text-sm">Generating link...</p>
+          ) : qrUrl ? (
+            <>
+              <div className="bg-white rounded-lg p-3">
+                <QRCodeSVG
+                  value={qrUrl}
+                  size={160}
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                />
               </div>
+              <p className="text-white/35 text-xs">
+                {shareData?.expires_in ? `Link expires in ${Math.floor(shareData.expires_in / 60)} min` : 'Scan to download'}
+              </p>
+            </>
+          ) : shareError ? (
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-white/40 text-sm">Link unavailable</p>
+              <a
+                href={compositeSrc || ''}
+                download="photobooth-strip.jpg"
+                className="text-white/60 text-xs hover:text-white/80 underline"
+              >
+                Tap to download image
+              </a>
             </div>
-            <p className="text-white/35 text-xs">
-              {shareData?.expires_in ? `Link expires in ${Math.floor(shareData.expires_in / 60)} min` : 'Scan to download'}
-            </p>
-          </motion.div>
-        )}
+          ) : (
+            <p className="text-white/40 text-sm">Preparing download...</p>
+          )}
+        </motion.div>
 
         {/* Action buttons — kiosk-sized touch targets */}
         <motion.div

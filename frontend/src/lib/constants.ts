@@ -32,7 +32,7 @@ export const COUNTDOWN_SECONDS = 3;
 export const DEFAULT_CAPTURE_TIME_LIMIT = 60;
 
 /** Reveal screen display duration in seconds before auto-reset. */
-export const REVEAL_DURATION_SECONDS = 15;
+export const REVEAL_DURATION_SECONDS = 60;
 
 /** Processing screen message rotation interval in ms. */
 export const PROCESSING_MESSAGE_INTERVAL_MS = 2500;

@@ -44,7 +44,7 @@ export default function FrameSelectScreen() {
       if (selectedThemeId !== null) {
         selectFrame(selectedThemeId, selectedRows);
       } else if (themes.length > 0) {
-        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+        const randomTheme = themes[Math.floor(Math.random() * themes.length)]!;
         selectFrame(randomTheme.id, selectedRows);
       }
     }
