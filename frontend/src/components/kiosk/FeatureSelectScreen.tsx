@@ -30,7 +30,8 @@ export default function FeatureSelectScreen() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="text-center mb-12"
+        className="text-center"
+        style={{ marginBottom: '3rem' }}
       >
         <h1 className="text-4xl font-display font-black text-white mb-3 tracking-tight">
           Choose Your Experience
@@ -49,8 +50,11 @@ export default function FeatureSelectScreen() {
             whileTap={{ scale: 0.97 }}
             onClick={handleVibeCheck}
             disabled={isTransitioning}
-            className="flex-1 rounded-2xl p-8 flex flex-col items-center justify-center gap-5 min-h-[380px] cursor-pointer"
+            className="flex-1 rounded-2xl flex flex-col items-center justify-center cursor-pointer"
             style={{
+              padding: '3rem 2.5rem',
+              gap: '1.5rem',
+              minHeight: '420px',
               background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(99,102,241,0.08) 100%)',
               border: '2px solid rgba(139,92,246,0.3)',
             }}
@@ -60,7 +64,15 @@ export default function FeatureSelectScreen() {
               <h2 className="text-2xl font-display font-bold text-white mb-2">Vibe Check</h2>
               <p className="text-white/55 text-sm leading-relaxed">AI reads your vibe from a photo</p>
             </div>
-            <div className="px-6 py-2.5 rounded-lg bg-violet-500/20 text-violet-300 text-sm font-medium">
+            <div
+              className="rounded-xl font-medium"
+              style={{
+                padding: '0.75rem 1.75rem',
+                background: 'rgba(139,92,246,0.2)',
+                color: 'rgb(196,181,253)',
+                fontSize: '0.875rem',
+              }}
+            >
               1 Photo → AI Reading
             </div>
           </motion.button>
@@ -75,8 +87,11 @@ export default function FeatureSelectScreen() {
             whileTap={{ scale: 0.97 }}
             onClick={handlePhotobooth}
             disabled={isTransitioning}
-            className="flex-1 rounded-2xl p-8 flex flex-col items-center justify-center gap-5 min-h-[380px] cursor-pointer"
+            className="flex-1 rounded-2xl flex flex-col items-center justify-center cursor-pointer"
             style={{
+              padding: '3rem 2.5rem',
+              gap: '1.5rem',
+              minHeight: '420px',
               background: 'linear-gradient(135deg, rgba(236,72,153,0.15) 0%, rgba(244,114,182,0.08) 100%)',
               border: '2px solid rgba(236,72,153,0.3)',
             }}
@@ -86,7 +101,15 @@ export default function FeatureSelectScreen() {
               <h2 className="text-2xl font-display font-bold text-white mb-2">Photobooth</h2>
               <p className="text-white/55 text-sm leading-relaxed">Create a photo strip with frames</p>
             </div>
-            <div className="px-6 py-2.5 rounded-lg bg-pink-500/20 text-pink-300 text-sm font-medium">
+            <div
+              className="rounded-xl font-medium"
+              style={{
+                padding: '0.75rem 1.75rem',
+                background: 'rgba(236,72,153,0.2)',
+                color: 'rgb(249,168,212)',
+                fontSize: '0.875rem',
+              }}
+            >
               Multi-Photo → Styled Strip
             </div>
           </motion.button>
