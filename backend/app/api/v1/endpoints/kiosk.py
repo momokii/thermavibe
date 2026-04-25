@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session, get_settings
 from app.core.config import Settings
 from app.core.exceptions import SessionNotFoundError
+from app.models.session import SessionType
 from app.schemas.common import SuccessMessage
 from app.schemas.kiosk import (
     CaptureResponse,
@@ -440,8 +441,11 @@ async def photobooth_snap(
         photo_path=photo_path,
     )
 
-    # Calculate time remaining
-    time_limit = settings.photobooth_capture_time_limit_seconds
+    # Calculate time remaining — read from DB config (admin settings) with .env fallback
+    from app.services import config_service
+
+    pb_config = await config_service.get_configs_by_category(db, 'photobooth')
+    time_limit = int(pb_config.get('photobooth_capture_time_limit_seconds', settings.photobooth_capture_time_limit_seconds))
     first_snap_at = existing[0].get('captured_at') if existing else session.created_at.isoformat()
     try:
         from datetime import datetime, timezone
@@ -698,6 +702,12 @@ def _session_to_response(session, settings: Settings) -> SessionResponse:
     """Convert a KioskSession ORM model to a SessionResponse schema."""
     photos_list = _build_photo_urls(session.id, session.photos or [])
 
+    # Use session-type-appropriate time limit
+    if getattr(session, 'session_type', None) == SessionType.PHOTOBOOTH:
+        time_limit = settings.photobooth_capture_time_limit_seconds
+    else:
+        time_limit = settings.kiosk_capture_time_limit_seconds
+
     return SessionResponse(
         id=session.id,
         state=session.state,
@@ -712,5 +722,5 @@ def _session_to_response(session, settings: Settings) -> SessionResponse:
         updated_at=None,
         expires_at=None,
         photos=photos_list,
-        capture_time_limit=settings.kiosk_capture_time_limit_seconds,
+        capture_time_limit=time_limit,
     )

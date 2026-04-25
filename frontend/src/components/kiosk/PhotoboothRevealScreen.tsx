@@ -64,14 +64,15 @@ export default function PhotoboothRevealScreen() {
     >
       {/* Scrollable content */}
       <div
-        className="flex flex-col items-center gap-4"
+        className="flex flex-col items-center gap-3 justify-center"
         style={{
-          paddingTop: 'max(2rem, var(--kiosk-safe-y))',
-          paddingBottom: '4rem',
+          paddingTop: 'max(1.5rem, var(--kiosk-safe-y))',
+          paddingBottom: '6rem',
+          height: '100%',
         }}
       >
         {/* Timer badge */}
-        <div className="flex items-center justify-start w-full max-w-2xl px-2 pb-3">
+        <div className="flex items-center justify-start w-full max-w-3xl px-2 pb-1">
           <div className={`px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
             isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/90'
           }`}>
@@ -89,64 +90,69 @@ export default function PhotoboothRevealScreen() {
           Your Photo Strip!
         </motion.h2>
 
-        {/* Composite image */}
-        {compositeSrc && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="rounded-xl overflow-hidden"
-            style={{ border: '2px solid rgba(255,255,255,0.12)', maxHeight: '50vh' }}
-          >
-            <img
-              src={compositeSrc}
-              alt="Your photobooth strip"
-              className="w-auto h-full object-contain"
-              style={{ maxHeight: '50vh' }}
-            />
-          </motion.div>
-        )}
-
-        {/* QR code / Download link */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="flex flex-col items-center gap-2"
-          onClick={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          {isSharing ? (
-            <p className="text-white/40 text-sm">Generating link...</p>
-          ) : qrUrl ? (
-            <>
-              <div className="bg-white rounded-lg p-3">
-                <QRCodeSVG
-                  value={qrUrl}
-                  size={160}
-                  bgColor="#FFFFFF"
-                  fgColor="#000000"
-                />
-              </div>
-              <p className="text-white/35 text-xs">
-                {shareData?.expires_in ? `Link expires in ${Math.floor(shareData.expires_in / 60)} min` : 'Scan to download'}
-              </p>
-            </>
-          ) : shareError ? (
-            <div className="flex flex-col items-center gap-1">
-              <p className="text-white/40 text-sm">Link unavailable</p>
-              <a
-                href={compositeSrc || ''}
-                download="photobooth-strip.jpg"
-                className="text-white/60 text-xs hover:text-white/80 underline"
-              >
-                Tap to download image
-              </a>
-            </div>
-          ) : (
-            <p className="text-white/40 text-sm">Preparing download...</p>
+        {/* Strip + QR side by side */}
+        <div className="flex items-center justify-start gap-8 w-full max-w-3xl pl-8 pr-6 flex-1 min-h-0">
+          {/* Composite image — left column */}
+          {compositeSrc && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="flex-1 flex items-center justify-center h-full"
+            >
+              <img
+                src={compositeSrc}
+                alt="Your photobooth strip"
+                className="rounded-xl object-contain"
+                style={{
+                  border: '2px solid rgba(255,255,255,0.12)',
+                  maxHeight: '50vh',
+                }}
+              />
+            </motion.div>
           )}
-        </motion.div>
+
+          {/* QR code — right column */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="flex flex-col items-center gap-2 flex-shrink-0"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            {isSharing ? (
+              <p className="text-white/40 text-sm">Generating link...</p>
+            ) : qrUrl ? (
+              <>
+                <div className="bg-white rounded-lg p-3">
+                  <QRCodeSVG
+                    value={qrUrl}
+                    size={140}
+                    bgColor="#FFFFFF"
+                    fgColor="#000000"
+                  />
+                </div>
+                <p className="text-white/35 text-xs">
+                  {shareData?.expires_in ? `Link expires in ${Math.floor(shareData.expires_in / 60)} min` : 'Scan to download'}
+                </p>
+              </>
+            ) : shareError ? (
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-white/40 text-sm">Link unavailable</p>
+                <a
+                  href={compositeSrc || ''}
+                  download="photobooth-strip.jpg"
+                  className="text-white/60 text-xs hover:text-white/80 underline"
+                >
+                  Tap to download image
+                </a>
+              </div>
+            ) : (
+              <p className="text-white/40 text-sm">Preparing download...</p>
+            )}
+          </motion.div>
+        </div>
 
         {/* Action buttons — kiosk-sized touch targets */}
         <motion.div

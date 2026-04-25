@@ -54,7 +54,7 @@ const initialState = {
   isTransitioning: false,
   photos: [] as PhotoEntry[],
   selectedPhotoIndex: 0,
-  timeLimitSeconds: 60,
+  timeLimitSeconds: 0,
   captureStartedAt: null as number | null,
   sessionType: 'vibe_check' as SessionType,
   vibeCheckEnabled: true,

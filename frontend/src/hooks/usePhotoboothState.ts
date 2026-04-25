@@ -135,6 +135,9 @@ export function usePhotoboothState() {
       } satisfies SessionCreateRequest);
       const data = response.data;
       setSession(data.id, data);
+      if (data.capture_time_limit) {
+        useKioskStore.getState().setTimeLimit(data.capture_time_limit);
+      }
       useKioskStore.getState().setSessionType('photobooth');
       setState('capture');
       setTransitioning(false);
