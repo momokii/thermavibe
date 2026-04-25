@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     admin_pin: str = "1234"
     admin_session_ttl_hours: int = 24
 
-    # Photobooth
+    # Photobooth — seed defaults for DB, managed via admin panel at runtime
     photobooth_enabled: bool = True
     photobooth_capture_time_limit_seconds: int = 30
     photobooth_max_photos: int = 8

@@ -584,13 +584,15 @@ async def photobooth_share(
 ) -> ShareResponse:
     """Generate a temporary share URL for the composite image."""
     from app.services.share_service import generate_share_token
+    from app.services import config_service
 
     session = await session_service.get_session(db, session_id)
 
     if not session.composite_image_path:
         raise SessionNotFoundError(str(session_id))
 
-    ttl = settings.photobooth_share_url_ttl_seconds
+    pb_config = await config_service.get_configs_by_category(db, 'photobooth')
+    ttl = int(pb_config.get('photobooth_share_url_ttl_seconds', settings.photobooth_share_url_ttl_seconds))
     token, expires_at = generate_share_token(str(session_id), ttl_seconds=ttl)
 
     share_url = f'/api/v1/kiosk/share/{token}'
