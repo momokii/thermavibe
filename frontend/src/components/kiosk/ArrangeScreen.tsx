@@ -1,17 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
+
+const DEFAULT_TIMER_SECONDS = 30;
 
 export default function ArrangeScreen() {
   const photos = useKioskStore((s) => s.photos);
   const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
   const photoboothPhotoAssignments = useKioskStore((s) => s.photoboothPhotoAssignments);
+  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
   const { arrangePhotos, isArranging, arrangeError } = usePhotoboothState();
 
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<Record<number, number>>(photoboothPhotoAssignments);
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(timeLimitSeconds || DEFAULT_TIMER_SECONDS);
+  const isUrgent = timeLeft <= 10;
 
   const handlePhotoClick = (photoIdx: number) => {
     setSelectedPhoto(photoIdx);
@@ -39,6 +46,29 @@ export default function ArrangeScreen() {
     }
   };
 
+  // Countdown timer
+  const hasAutoAdvanced = useRef(false);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 0.1));
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-advance on timeout
+  useEffect(() => {
+    if (timeLeft <= 0 && !hasAutoAdvanced.current && photos.length > 0) {
+      hasAutoAdvanced.current = true;
+      const finalAssignments = { ...assignments };
+      for (let slot = 0; slot < photoboothLayoutRows; slot++) {
+        if (finalAssignments[slot] === undefined) {
+          finalAssignments[slot] = Math.floor(Math.random() * photos.length);
+        }
+      }
+      arrangePhotos(finalAssignments);
+    }
+  }, [timeLeft, assignments, photoboothLayoutRows, photos, arrangePhotos]);
+
   // Build photo URL from photo entry
   const getPhotoUrl = (photoIdx: number) => {
     const entry = photos[photoIdx];
@@ -57,6 +87,15 @@ export default function ArrangeScreen() {
           paddingBottom: '1rem',
         }}
       >
+        {/* Timer badge */}
+        <div className="flex items-center justify-start w-full px-6 pb-2">
+          <div className={`px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
+            isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/90'
+          }`}>
+            {Math.ceil(timeLeft)}s
+          </div>
+        </div>
+
         <motion.h2
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}

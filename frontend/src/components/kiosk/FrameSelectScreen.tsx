@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useKioskStore } from '@/stores/kioskStore';
@@ -7,13 +7,20 @@ import { photoboothApi } from '@/api/photoboothApi';
 import type { ThemeResponse } from '@/api/types';
 
 const LAYOUT_OPTIONS = [1, 2, 3, 4];
+const DEFAULT_TIMER_SECONDS = 30;
 
 export default function FrameSelectScreen() {
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
+  const timeLimitSeconds = useKioskStore((s) => s.timeLimitSeconds);
   const { selectFrame, isTransitioning } = usePhotoboothState();
 
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null);
   const [selectedRows, setSelectedRows] = useState(photoboothLayoutRows);
+  const [triedWithoutTheme, setTriedWithoutTheme] = useState(false);
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(timeLimitSeconds || DEFAULT_TIMER_SECONDS);
+  const isUrgent = timeLeft <= 10;
 
   // Fetch available themes
   const { data: themes = [] } = useQuery({
@@ -21,9 +28,33 @@ export default function FrameSelectScreen() {
     queryFn: () => photoboothApi.listThemes().then((r: { data: ThemeResponse[] }) => r.data),
   });
 
+  // Countdown timer
+  const hasAutoAdvanced = useRef(false);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 0.1));
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-advance on timeout
+  useEffect(() => {
+    if (timeLeft <= 0 && !hasAutoAdvanced.current) {
+      hasAutoAdvanced.current = true;
+      if (selectedThemeId !== null) {
+        selectFrame(selectedThemeId, selectedRows);
+      } else if (themes.length > 0) {
+        const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+        selectFrame(randomTheme.id, selectedRows);
+      }
+    }
+  }, [timeLeft, selectedThemeId, selectedRows, selectFrame, themes]);
+
   const handleConfirm = () => {
     if (selectedThemeId !== null) {
       selectFrame(selectedThemeId, selectedRows);
+    } else {
+      setTriedWithoutTheme(true);
     }
   };
 
@@ -37,6 +68,15 @@ export default function FrameSelectScreen() {
           paddingBottom: '1.5rem',
         }}
       >
+        {/* Timer badge */}
+        <div className="flex items-center justify-start w-full max-w-2xl px-2 pb-3">
+          <div className={`px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
+            isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/90'
+          }`}>
+            {Math.ceil(timeLeft)}s
+          </div>
+        </div>
+
         <motion.h2
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -110,14 +150,23 @@ export default function FrameSelectScreen() {
       </div>
 
       {/* Bottom action */}
-      <div className="flex justify-center pb-6 pt-2">
+      <div className="flex flex-col items-center gap-3 pb-6 pt-2">
+        {triedWithoutTheme && selectedThemeId === null && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-red-400 text-sm font-medium"
+          >
+            Please select a theme first
+          </motion.p>
+        )}
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           whileTap={{ scale: 0.97 }}
           onClick={handleConfirm}
-          disabled={selectedThemeId === null || isTransitioning}
+          disabled={isTransitioning}
           className="w-full max-w-md py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
         >
           {isTransitioning ? 'Selecting...' : 'Select Frame'}
