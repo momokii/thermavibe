@@ -5,6 +5,7 @@ import { usePhotoboothState } from '@/hooks/usePhotoboothState';
 
 export default function ArrangeScreen() {
   const photos = useKioskStore((s) => s.photos);
+  const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
   const photoboothPhotoAssignments = useKioskStore((s) => s.photoboothPhotoAssignments);
   const { arrangePhotos, isArranging } = usePhotoboothState();
@@ -22,7 +23,6 @@ export default function ArrangeScreen() {
       setAssignments(updated);
       setSelectedPhoto(null);
     } else if (assignments[slotIdx] !== undefined) {
-      // Remove assignment
       const updated = { ...assignments };
       delete updated[slotIdx];
       setAssignments(updated);
@@ -39,85 +39,134 @@ export default function ArrangeScreen() {
     }
   };
 
+  // Build photo URL from photo entry
+  const getPhotoUrl = (photoIdx: number) => {
+    const entry = photos[photoIdx];
+    if (entry?.photo_url) return entry.photo_url;
+    if (sessionId) return `/api/v1/kiosk/session/${sessionId}/photo/${photoIdx}`;
+    return null;
+  };
+
   return (
-    <div className="kiosk-layout items-center justify-center gap-4 relative bg-surface-0 overflow-y-auto py-6">
-      <motion.h2
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-3xl font-display font-bold text-white"
+    <div className="kiosk-layout bg-surface-0 relative overflow-y-auto">
+      {/* Header */}
+      <div
+        className="text-center"
+        style={{
+          paddingTop: 'max(2rem, var(--kiosk-safe-y))',
+          paddingBottom: '1rem',
+        }}
       >
-        Arrange Your Photos
-      </motion.h2>
+        <motion.h2
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-3xl font-display font-black text-white"
+        >
+          Arrange Your Photos
+        </motion.h2>
+        <p className="text-white/40 text-sm mt-1">Tap a photo, then tap a slot to place it</p>
+      </div>
 
-      <p className="text-white/50 text-sm">Tap a photo, then tap a slot to place it</p>
-
-      <div className="flex gap-6 items-start max-w-3xl w-full px-4">
-        {/* Strip preview with slots */}
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-white/40 text-xs mb-1">Your Strip</p>
+      {/* Main content */}
+      <div className="flex-1 flex items-start justify-center gap-8 px-8 pb-4">
+        {/* Strip preview — vertical column of slots */}
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-1">Your Strip</p>
           {Array.from({ length: photoboothLayoutRows }, (_, slotIdx) => {
             const photoIdx = assignments[slotIdx];
             const isFilled = photoIdx !== undefined;
+            const photoUrl = isFilled ? getPhotoUrl(photoIdx) : null;
+
             return (
               <motion.button
                 key={slotIdx}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleSlotClick(slotIdx)}
-                className={`w-32 h-32 rounded-lg border-2 flex items-center justify-center ${
+                className={`w-36 h-36 rounded-xl border-2 flex items-center justify-center overflow-hidden transition-all duration-200 ${
                   isFilled
-                    ? 'border-pink-500/50 bg-pink-500/10'
+                    ? 'border-pink-500/60'
                     : 'border-dashed border-white/20 bg-white/5'
                 }`}
               >
-                {isFilled ? (
-                  <div className="text-center">
-                    <div className="text-2xl mb-1">📷</div>
-                    <span className="text-xs text-white/60">Photo {photoIdx + 1}</span>
-                  </div>
+                {isFilled && photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt={`Photo ${photoIdx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : isFilled ? (
+                  <div className="text-white/50 text-sm font-medium">Photo {photoIdx + 1}</div>
                 ) : (
-                  <span className="text-white/30 text-sm">Slot {slotIdx + 1}</span>
+                  <div className="text-center">
+                    <div className="text-white/20 text-2xl mb-1">+</div>
+                    <span className="text-white/25 text-xs">Slot {slotIdx + 1}</span>
+                  </div>
                 )}
               </motion.button>
             );
           })}
         </div>
 
-        {/* Photo thumbnails */}
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-white/40 text-xs mb-1">Your Photos</p>
-          <div className="grid grid-cols-2 gap-2">
-            {photos.map((_, photoIdx) => (
-              <motion.button
-                key={photoIdx}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handlePhotoClick(photoIdx)}
-                className={`w-20 h-20 rounded-lg border-2 flex items-center justify-center ${
-                  selectedPhoto === photoIdx
-                    ? 'border-pink-500 bg-pink-500/10'
-                    : 'border-white/10 bg-white/5'
-                }`}
-              >
-                <div className="text-center">
-                  <div className="text-lg">📷</div>
-                  <span className="text-[10px] text-white/50">{photoIdx + 1}</span>
-                </div>
-              </motion.button>
-            ))}
+        {/* Photo thumbnails — actual captured photos */}
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-1">Your Photos</p>
+          <div className="grid grid-cols-2 gap-3">
+            {photos.map((_, photoIdx) => {
+              const photoUrl = getPhotoUrl(photoIdx);
+              const isSelected = selectedPhoto === photoIdx;
+              const isUsed = Object.values(assignments).includes(photoIdx);
+
+              return (
+                <motion.button
+                  key={photoIdx}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handlePhotoClick(photoIdx)}
+                  className={`w-28 h-28 rounded-xl border-2 flex items-center justify-center overflow-hidden transition-all duration-200 ${
+                    isSelected
+                      ? 'ring-2 ring-pink-500 ring-offset-2 ring-offset-surface-0 border-pink-500'
+                      : isUsed
+                        ? 'border-white/10 opacity-40'
+                        : 'border-white/15 bg-white/5'
+                  }`}
+                >
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt={`Photo ${photoIdx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white/40 text-sm">Photo {photoIdx + 1}</span>
+                  )}
+                </motion.button>
+              );
+            })}
           </div>
+          {selectedPhoto !== null && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-pink-400 text-xs font-medium"
+            >
+              Now tap a slot to place Photo {selectedPhoto + 1}
+            </motion.p>
+          )}
         </div>
       </div>
 
-      {/* Confirm button */}
-      <motion.button
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={handleConfirm}
-        disabled={!allSlotsFilled || isArranging}
-        className="px-12 py-4 rounded-2xl bg-pink-500 text-white font-display font-bold text-xl disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {isArranging ? 'Creating...' : 'Create My Strip'}
-      </motion.button>
+      {/* Bottom actions */}
+      <div className="pb-6 pt-2">
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleConfirm}
+          disabled={!allSlotsFilled || isArranging}
+          className="w-full max-w-md mx-auto block py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
+        >
+          {isArranging ? 'Creating Strip...' : 'Create My Strip'}
+        </motion.button>
+      </div>
     </div>
   );
 }
