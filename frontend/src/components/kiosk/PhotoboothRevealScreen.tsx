@@ -134,11 +134,17 @@ export default function PhotoboothRevealScreen() {
 
       {/* Fixed bottom hint */}
       <div
-        className="absolute bottom-0 left-0 right-0 py-3 text-center pointer-events-none"
-        style={{ paddingBottom: 'max(0.75rem, var(--kiosk-safe-y-bottom, 0.75rem))' }}
+        className="absolute bottom-0 left-0 right-0 text-center pointer-events-none"
+        style={{
+          padding: '1.5rem 1rem max(1.5rem, var(--kiosk-safe-y-bottom, 1.5rem))',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)',
+        }}
       >
-        <p className="text-sm text-white/25">
-          Your strip is printing... Touch to continue
+        <p className="text-base text-white/70 font-display font-semibold">
+          Your strip is printing...
+        </p>
+        <p className="text-sm text-white/40 mt-1">
+          Tap anywhere to continue
         </p>
       </div>
     </div>

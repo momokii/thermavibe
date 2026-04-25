@@ -47,10 +47,10 @@ export default function FrameSelectScreen() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-start gap-6 px-6 pb-4">
+      <div className="flex-1 flex flex-col items-center justify-start gap-10 px-6 pb-4">
         {/* Theme selection */}
-        <div className="w-full max-w-2xl">
-          <p className="text-white/40 text-xs font-medium uppercase tracking-wider text-center mb-3">
+        <div className="w-full max-w-2xl flex flex-col gap-6">
+          <p className="text-white/40 text-xs font-medium uppercase tracking-wider text-center">
             Select a theme
           </p>
           <div className="flex gap-4 justify-center">
@@ -85,8 +85,8 @@ export default function FrameSelectScreen() {
         </div>
 
         {/* Layout selection */}
-        <div className="w-full max-w-2xl">
-          <p className="text-white/40 text-xs font-medium uppercase tracking-wider text-center mb-3">
+        <div className="w-full max-w-2xl flex flex-col gap-5">
+          <p className="text-white/40 text-xs font-medium uppercase tracking-wider text-center">
             Number of photos
           </p>
           <div className="flex gap-4 justify-center">

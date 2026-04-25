@@ -65,7 +65,20 @@ export default function PhotoboothCaptureScreen() {
   return (
     <div className="kiosk-layout bg-surface-0 relative overflow-hidden">
       {/* Camera feed — top portion */}
-      <div className="flex-[3] flex items-center justify-center relative" style={{ paddingTop: 'var(--kiosk-safe-y)' }}>
+      <div className="flex-[3] flex flex-col items-center justify-center relative" style={{ paddingTop: 'var(--kiosk-safe-y)' }}>
+        {/* Status badges — above camera */}
+        <div className="flex items-center justify-between w-full max-w-lg px-6 pb-4">
+          <div className={`px-5 py-3 rounded-xl backdrop-blur-sm font-display font-bold text-base ${
+            isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/90'
+          }`}>
+            {Math.ceil(timeLeft)}s
+          </div>
+          <div className="px-5 py-3 rounded-xl bg-black/60 text-white font-display font-bold text-base backdrop-blur-sm">
+            {photos.length}/{maxPhotos}
+          </div>
+        </div>
+
+        {/* Camera feed */}
         <div
           className="relative w-full max-w-lg aspect-square rounded-2xl overflow-hidden"
           style={{ border: '2px solid rgba(255,255,255,0.12)' }}
@@ -77,18 +90,6 @@ export default function PhotoboothCaptureScreen() {
               className="w-full h-full object-cover"
             />
           )}
-
-          {/* Photo count badge */}
-          <div className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/60 text-white font-display font-bold text-sm backdrop-blur-sm">
-            {photos.length}/{maxPhotos}
-          </div>
-
-          {/* Timer badge */}
-          <div className={`absolute top-4 left-4 px-4 py-2 rounded-xl backdrop-blur-sm font-display font-bold text-sm ${
-            isUrgent ? 'bg-red-500/80 text-white' : 'bg-black/50 text-white/80'
-          }`}>
-            {Math.ceil(timeLeft)}s
-          </div>
 
           {/* Flash effect */}
           <AnimatePresence>
