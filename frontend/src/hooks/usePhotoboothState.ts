@@ -222,6 +222,7 @@ export function usePhotoboothState() {
     // Mutation states
     isSnapping: snapMutation.isPending,
     isArranging: arrangeMutation.isPending,
+    arrangeError: arrangeMutation.error?.message ?? null,
     isPrinting: printMutation.isPending,
     shareData: (shareMutation.data as { data: ShareResponse } | undefined)?.data ?? null,
   };

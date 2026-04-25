@@ -8,7 +8,7 @@ export default function ArrangeScreen() {
   const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothLayoutRows = useKioskStore((s) => s.photoboothLayoutRows);
   const photoboothPhotoAssignments = useKioskStore((s) => s.photoboothPhotoAssignments);
-  const { arrangePhotos, isArranging } = usePhotoboothState();
+  const { arrangePhotos, isArranging, arrangeError } = usePhotoboothState();
 
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<Record<number, number>>(photoboothPhotoAssignments);
@@ -125,7 +125,7 @@ export default function ArrangeScreen() {
                     isSelected
                       ? 'ring-2 ring-pink-500 ring-offset-2 ring-offset-surface-0 border-pink-500'
                       : isUsed
-                        ? 'border-white/10 opacity-40'
+                        ? 'border-pink-500/30 bg-white/5'
                         : 'border-white/15 bg-white/5'
                   }`}
                 >
@@ -151,11 +151,22 @@ export default function ArrangeScreen() {
               Now tap a slot to place Photo {selectedPhoto + 1}
             </motion.p>
           )}
+          {photos.length < photoboothLayoutRows && (
+            <p className="text-white/30 text-xs text-center">
+              You can reuse any photo to fill all slots
+            </p>
+          )}
         </div>
       </div>
 
       {/* Bottom actions */}
-      <div className="flex justify-center pb-6 pt-2">
+      <div className="flex flex-col items-center gap-3 pb-6 pt-2 px-8">
+        {arrangeError && (
+          <div className="w-full max-w-md text-center">
+            <p className="text-red-400 text-sm font-medium mb-1">Failed to create strip</p>
+            <p className="text-white/30 text-xs">{arrangeError}</p>
+          </div>
+        )}
         <motion.button
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -164,7 +175,7 @@ export default function ArrangeScreen() {
           disabled={!allSlotsFilled || isArranging}
           className="w-full max-w-md py-4 rounded-xl text-white text-lg font-display font-bold disabled:opacity-30 transition-all duration-150 btn-primary"
         >
-          {isArranging ? 'Creating Strip...' : 'Create My Strip'}
+          {isArranging ? 'Creating Strip...' : arrangeError ? 'Try Again' : 'Create My Strip'}
         </motion.button>
       </div>
     </div>

@@ -251,11 +251,11 @@ async def arrange_photos(
                 code='INVALID_PHOTO_INDEX',
             )
 
-    # Store assignments in layout
+    # Store assignments in layout (create new dict so SQLAlchemy detects the change)
     layout['photo_assignments'] = {
         str(k): v for k, v in photo_assignments.items()
     }
-    session.photobooth_layout = layout
+    session.photobooth_layout = dict(layout)
 
     # Record event
     event = session_service._make_event(
@@ -302,6 +302,9 @@ async def generate_composite(
     ordered_paths: list[str] = []
     for slot_idx in range(layout_rows):
         photo_idx = assignments.get(str(slot_idx), slot_idx)
+        # Clamp to last available photo when reusing (safety net)
+        if photo_idx >= len(photos):
+            photo_idx = len(photos) - 1
         entry = photos[photo_idx]
         path = entry.get('photo_path') if isinstance(entry, dict) else str(entry)
         ordered_paths.append(path)

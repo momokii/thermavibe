@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
-import { CAMERA_STREAM_URL, FEATURE_SELECT_STATE } from '@/lib/constants';
+import { CAMERA_STREAM_URL } from '@/lib/constants';
 
 const DEFAULT_TIMER_SECONDS = 30;
 const DEFAULT_MAX_PHOTOS = 8;
