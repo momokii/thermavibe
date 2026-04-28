@@ -400,6 +400,21 @@ export interface FeaturesResponse {
   photobooth_default_layout_rows: number;
 }
 
+// --- Strip Gallery ---
+
+export interface StripGalleryItem {
+  session_id: string;
+  composite_url: string;
+  thumbnail_url: string;
+  created_at: string;
+  theme_name: string | null;
+}
+
+export interface StripGalleryResponse {
+  strips: StripGalleryItem[];
+  total: number;
+}
+
 // --- Theme ---
 
 export interface BackgroundConfig {

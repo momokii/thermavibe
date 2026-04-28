@@ -10,30 +10,27 @@ export default function IdleScreen() {
   const { startSession, isTransitioning, error } = useKioskState();
   const { startPhotoboothSession } = usePhotoboothState();
   const setError = useKioskStore((s) => s.setError);
-  const featuresLoaded = useKioskStore((s) => s.featuresLoaded);
 
-  // Fetch feature flags on first mount
+  // Fetch feature flags on mount — always re-fetch to pick up admin config changes
   useEffect(() => {
-    if (!featuresLoaded) {
-      photoboothApi
-        .getFeatures()
-        .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number } }) => {
-          useKioskStore.getState().setFeatures({
-            vibeCheck: res.data.vibe_check_enabled,
-            photobooth: res.data.photobooth_enabled,
-            maxPhotos: res.data.photobooth_max_photos,
-            minPhotos: res.data.photobooth_min_photos,
-            captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
-            defaultLayoutRows: res.data.photobooth_default_layout_rows,
-          });
-        })
-        .catch(() => {
-          useKioskStore.getState().setFeatures({
-            vibeCheck: true, photobooth: true, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4,
-          });
+    photoboothApi
+      .getFeatures()
+      .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number } }) => {
+        useKioskStore.getState().setFeatures({
+          vibeCheck: res.data.vibe_check_enabled,
+          photobooth: res.data.photobooth_enabled,
+          maxPhotos: res.data.photobooth_max_photos,
+          minPhotos: res.data.photobooth_min_photos,
+          captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
+          defaultLayoutRows: res.data.photobooth_default_layout_rows,
         });
-    }
-  }, [featuresLoaded]);
+      })
+      .catch(() => {
+        useKioskStore.getState().setFeatures({
+          vibeCheck: true, photobooth: true, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4,
+        });
+      });
+  }, []);
 
   // Auto-clear error after 4 seconds
   useEffect(() => {
@@ -43,8 +40,23 @@ export default function IdleScreen() {
     }
   }, [error, setError]);
 
-  const handleTouch = () => {
+  const handleTouch = async () => {
     if (isTransitioning) return;
+
+    // Re-fetch features to pick up latest admin config changes
+    try {
+      const res = await photoboothApi.getFeatures();
+      useKioskStore.getState().setFeatures({
+        vibeCheck: res.data.vibe_check_enabled,
+        photobooth: res.data.photobooth_enabled,
+        maxPhotos: res.data.photobooth_max_photos,
+        minPhotos: res.data.photobooth_min_photos,
+        captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
+        defaultLayoutRows: res.data.photobooth_default_layout_rows,
+      });
+    } catch {
+      // Use cached values if fetch fails
+    }
 
     const { vibeCheckEnabled, photoboothEnabled, setState } = useKioskStore.getState();
 

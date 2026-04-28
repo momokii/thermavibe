@@ -15,6 +15,7 @@ import type {
   PrintStatusResponse,
   CameraListResponse,
   CameraSelectResponse,
+  StripGalleryResponse,
 } from './types';
 
 export const adminApi = {
@@ -53,4 +54,7 @@ export const adminApi = {
 
   listPrinters: () =>
     apiClient.get<{ devices: Array<{ vendor_id: string; product_id: string; description: string }> }>('/printer/devices'),
+
+  getStrips: (params?: { limit?: number; offset?: number }) =>
+    apiClient.get<StripGalleryResponse>('/admin/photobooth/strips', { params }),
 };

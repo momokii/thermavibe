@@ -18,6 +18,8 @@ env/
 node_modules/
 frontend/dist/
 frontend/.vite/
+/package.json
+/package-lock.json
 
 # Environment
 .env

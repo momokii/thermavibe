@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Camera, Loader2 } from 'lucide-react';
 
@@ -17,6 +18,8 @@ export default function PhotoboothConfig() {
   });
 
   const pbConfig = (config?.categories?.photobooth ?? {}) as Record<string, unknown>;
+  const vcConfig = (config?.categories?.vibe_check ?? {}) as Record<string, unknown>;
+  const vibeCheckEnabled = String(vcConfig.vibe_check_enabled ?? 'true') === 'true';
 
   const [enabled, setEnabled] = useState(false);
   const [timeLimit, setTimeLimit] = useState('30');
@@ -26,6 +29,7 @@ export default function PhotoboothConfig() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('VibePrint OS');
   const [retentionHours, setRetentionHours] = useState('168');
+  const [systemPrompt, setSystemPrompt] = useState('You are a photobooth AI assistant.');
 
   useEffect(() => {
     if (pbConfig.photobooth_enabled !== undefined)
@@ -44,6 +48,8 @@ export default function PhotoboothConfig() {
       setWatermarkText(String(pbConfig.photobooth_watermark_text));
     if (pbConfig.photobooth_composite_retention_hours)
       setRetentionHours(String(pbConfig.photobooth_composite_retention_hours));
+    if (pbConfig.photobooth_system_prompt)
+      setSystemPrompt(String(pbConfig.photobooth_system_prompt));
   }, [pbConfig]);
 
   const saveMutation = useMutation({
@@ -52,8 +58,19 @@ export default function PhotoboothConfig() {
       queryClient.invalidateQueries({ queryKey: ['config'] });
       toast.success('Photobooth configuration saved');
     },
-    onError: () => toast.error('Failed to save configuration'),
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? 'Failed to save configuration');
+    },
   });
+
+  const handleToggle = (value: boolean) => {
+    if (!value && !vibeCheckEnabled) {
+      toast.error('At least one feature must stay enabled. Enable Vibe Check first.');
+      return;
+    }
+    setEnabled(value);
+  };
 
   const handleSave = () => {
     saveMutation.mutate({
@@ -65,6 +82,7 @@ export default function PhotoboothConfig() {
       photobooth_watermark_enabled: watermarkEnabled,
       photobooth_watermark_text: watermarkText,
       photobooth_composite_retention_hours: Number(retentionHours),
+      photobooth_system_prompt: systemPrompt,
     });
   };
 
@@ -88,7 +106,7 @@ export default function PhotoboothConfig() {
               Allow users to create photo strips. At least one feature must stay enabled.
             </p>
           </div>
-          <Switch checked={enabled} onCheckedChange={setEnabled} />
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
         </div>
 
         {/* Capture time limit */}
@@ -190,6 +208,21 @@ export default function PhotoboothConfig() {
             className="input-surface text-white placeholder:text-white/20"
             style={{ padding: '0.75rem 1rem' }}
             min="0"
+          />
+        </div>
+
+        {/* AI Prompt (future use) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">AI System Prompt</Label>
+          <p className="text-xs text-white/25">
+            System prompt for photobooth AI features. Reserved for future use — the prompt will be applied when photobooth gets AI-powered features.
+          </p>
+          <Textarea
+            rows={3}
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            className="input-surface text-white placeholder:text-white/20 resize-none"
+            style={{ padding: '0.75rem 1rem' }}
           />
         </div>
 

@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Sparkles, Loader2 } from 'lucide-react';
@@ -24,7 +23,6 @@ export default function AiConfig() {
   const [googleKey, setGoogleKey] = useState(aiConfig.google_api_key as string ?? '');
   const [ollamaUrl, setOllamaUrl] = useState(aiConfig.ollama_base_url as string ?? 'http://localhost:11434');
   const [model, setModel] = useState(aiConfig.model as string ?? '');
-  const [systemPrompt, setSystemPrompt] = useState(aiConfig.system_prompt as string ?? '');
 
   useEffect(() => {
     if (aiConfig.provider) setProvider(aiConfig.provider as string);
@@ -33,7 +31,6 @@ export default function AiConfig() {
     if (aiConfig.google_api_key) setGoogleKey(aiConfig.google_api_key as string);
     if (aiConfig.ollama_base_url) setOllamaUrl(aiConfig.ollama_base_url as string);
     if (aiConfig.model) setModel(aiConfig.model as string);
-    if (aiConfig.system_prompt) setSystemPrompt(aiConfig.system_prompt as string);
   }, [aiConfig]);
 
   const saveMutation = useMutation({
@@ -53,7 +50,6 @@ export default function AiConfig() {
       google_api_key: googleKey,
       ollama_base_url: ollamaUrl,
       model,
-      system_prompt: systemPrompt,
     });
   };
 
@@ -65,7 +61,7 @@ export default function AiConfig() {
           <CardTitle className="font-display text-white">AI Provider</CardTitle>
         </div>
         <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
-          Configure the AI service that analyzes photos and generates vibe readings. The selected provider handles all image analysis.
+          Configure the AI provider, API keys, and model. System prompts are managed on each feature's dedicated page.
         </p>
       </CardHeader>
       <CardContent style={{ display: 'flex', flexDirection: 'column', gap: '2rem', padding: '0 2rem 2rem' }}>
@@ -148,18 +144,6 @@ export default function AiConfig() {
             onChange={(e) => setModel(e.target.value)}
             placeholder="gpt-4o-mini"
             className="input-surface text-white placeholder:text-white/20"
-            style={{ padding: '0.75rem 1rem' }}
-          />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <Label className="text-xs text-white/40 uppercase tracking-wider">System Prompt</Label>
-          <p className="text-xs text-white/25">Instructions that shape how the AI responds. This tells the AI how to interpret photos and what kind of reading to generate.</p>
-          <Textarea
-            rows={4}
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            placeholder="You are a vibe reading AI..."
-            className="input-surface text-white placeholder:text-white/20 resize-none"
             style={{ padding: '0.75rem 1rem' }}
           />
         </div>

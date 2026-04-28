@@ -9,6 +9,8 @@ import AdminConfigPage from '@/pages/AdminConfigPage';
 import AdminHardwarePage from '@/pages/AdminHardwarePage';
 import AdminAnalyticsPage from '@/pages/AdminAnalyticsPage';
 import AdminPhotoboothPage from '@/pages/AdminPhotoboothPage';
+import AdminVibeCheckPage from '@/pages/AdminVibeCheckPage';
+import AdminStripsGalleryPage from '@/pages/AdminStripsGalleryPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +30,9 @@ function App() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="config" element={<AdminConfigPage />} />
             <Route path="hardware" element={<AdminHardwarePage />} />
+            <Route path="vibe-check" element={<AdminVibeCheckPage />} />
             <Route path="photobooth" element={<AdminPhotoboothPage />} />
+            <Route path="strips" element={<AdminStripsGalleryPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
