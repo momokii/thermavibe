@@ -351,7 +351,7 @@ async def list_strips(
     from sqlalchemy import select, func, case
 
     from app.models.session import KioskSession, SessionType
-    from app.models.photobooth import PhotoboothTheme
+    from app.models.photobooth_theme import PhotoboothTheme
 
     base_filter = (
         (KioskSession.session_type == SessionType.PHOTOBOOTH)

@@ -124,13 +124,20 @@ export default function ThemeManager() {
                   </Button>
                 )}
 
-                <Switch
-                  checked={theme.is_enabled}
-                  disabled={theme.is_enabled && enabledCount <= 1}
-                  onCheckedChange={(checked: boolean) =>
-                    toggleMutation.mutate({ id: theme.id, enabled: checked })
-                  }
-                />
+                <div className="relative group">
+                  <Switch
+                    checked={theme.is_enabled}
+                    disabled={theme.is_enabled && enabledCount <= 1}
+                    onCheckedChange={(checked: boolean) =>
+                      toggleMutation.mutate({ id: theme.id, enabled: checked })
+                    }
+                  />
+                  {theme.is_enabled && enabledCount <= 1 && (
+                    <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg bg-black/90 text-white/80 text-[11px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-white/10">
+                      At least one theme must stay active
+                    </span>
+                  )}
+                </div>
 
                 {!theme.is_builtin && (
                   <Button
