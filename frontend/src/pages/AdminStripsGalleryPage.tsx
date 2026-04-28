@@ -5,7 +5,7 @@ import type { StripGalleryItem } from '@/api/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { ImageIcon, X, Loader2 } from 'lucide-react';
+import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PAGE_SIZE = 24;
 
@@ -21,9 +21,12 @@ function formatDate(iso: string): string {
 }
 
 export default function AdminStripsGalleryPage() {
-  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<StripGalleryItem | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+
+  const offset = (page - 1) * PAGE_SIZE;
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['strips', offset],
@@ -35,16 +38,17 @@ export default function AdminStripsGalleryPage() {
 
   const strips = data?.strips ?? [];
   const total = data?.total ?? 0;
-  const hasMore = strips.length < total;
-
-  const loadMore = useCallback(() => {
-    setOffset((prev) => prev + PAGE_SIZE);
-  }, []);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const refresh = useCallback(() => {
-    setOffset(0);
+    setPage(1);
+    setFailedImages(new Set());
     queryClient.invalidateQueries({ queryKey: ['strips'] });
   }, [queryClient]);
+
+  const handleImageError = useCallback((sessionId: string) => {
+    setFailedImages((prev) => new Set(prev).add(sessionId));
+  }, []);
 
   return (
     <div>
@@ -67,7 +71,7 @@ export default function AdminStripsGalleryPage() {
       </div>
 
       {/* Loading */}
-      {isLoading && offset === 0 && (
+      {isLoading && strips.length === 0 && (
         <div className="flex items-center justify-center" style={{ padding: '4rem 0' }}>
           <Loader2 className="h-8 w-8 animate-spin text-white/30" />
         </div>
@@ -99,60 +103,109 @@ export default function AdminStripsGalleryPage() {
               gap: '1rem',
             }}
           >
-            {strips.map((strip) => (
-              <button
-                key={strip.session_id}
-                type="button"
-                onClick={() => setSelected(strip)}
-                className="group rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden transition-all hover:border-white/[0.12] hover:bg-white/[0.04] text-left"
-              >
-                {/* Thumbnail */}
-                <div
-                  className="relative bg-white/[0.03]"
-                  style={{ aspectRatio: '3/4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            {strips.map((strip) => {
+              const isFailed = failedImages.has(strip.session_id);
+              return (
+                <button
+                  key={strip.session_id}
+                  type="button"
+                  onClick={() => !isFailed && setSelected(strip)}
+                  disabled={isFailed}
+                  className="group rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden transition-all hover:border-white/[0.12] hover:bg-white/[0.04] text-left disabled:opacity-40 disabled:cursor-default"
                 >
-                  <img
-                    src={strip.thumbnail_url}
-                    alt={`Strip ${strip.session_id}`}
-                    className="w-full h-full object-contain"
-                    loading="lazy"
-                  />
-                </div>
-                {/* Info */}
-                <div style={{ padding: '0.625rem 0.75rem' }}>
-                  <p className="text-xs text-white/50 truncate">
-                    {formatDate(strip.created_at)}
-                  </p>
-                  {strip.theme_name && (
-                    <p className="text-xs text-white/30 truncate" style={{ marginTop: '0.125rem' }}>
-                      {strip.theme_name}
+                  {/* Thumbnail */}
+                  <div
+                    className="relative bg-white/[0.03]"
+                    style={{ aspectRatio: '3/4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {isFailed ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <ImageIcon className="h-8 w-8 text-white/15" />
+                        <span className="text-[10px] text-white/20">Image expired</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={strip.thumbnail_url}
+                        alt={`Strip ${strip.session_id}`}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                        onError={() => handleImageError(strip.session_id)}
+                      />
+                    )}
+                  </div>
+                  {/* Info */}
+                  <div style={{ padding: '0.625rem 0.75rem' }}>
+                    <p className="text-xs text-white/50 truncate">
+                      {formatDate(strip.created_at)}
                     </p>
-                  )}
-                </div>
-              </button>
-            ))}
+                    {strip.theme_name && (
+                      <p className="text-xs text-white/30 truncate" style={{ marginTop: '0.125rem' }}>
+                        {strip.theme_name}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Load more */}
-          {hasMore && (
-            <div className="flex justify-center" style={{ marginTop: '1.5rem' }}>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div
+              className="flex items-center justify-center gap-4"
+              style={{ marginTop: '2rem' }}
+            >
               <Button
                 variant="outline"
-                onClick={loadMore}
-                disabled={isLoading}
-                className="border-white/10 text-white/60 hover:text-white"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || isLoading}
+                className="border-white/10 text-white/60 hover:text-white gap-1"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Loading...
-                  </>
-                ) : (
-                  `Load More (${total - strips.length} remaining)`
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {generatePageNumbers(page, totalPages).map((p, i) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${i}`} className="px-2 text-white/20 text-sm select-none">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPage(p as number)}
+                      className={`min-w-[2rem] h-8 rounded-md text-sm font-medium transition-colors ${
+                        page === p
+                          ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+                          : 'text-white/40 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ),
                 )}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || isLoading}
+                className="border-white/10 text-white/60 hover:text-white gap-1"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
+
+          {/* Summary */}
+          <p className="text-center text-xs text-white/20 mt-3">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </p>
         </>
       )}
 
@@ -179,6 +232,10 @@ export default function AdminStripsGalleryPage() {
                   src={selected.composite_url}
                   alt="Full strip"
                   className="max-h-full max-w-full object-contain rounded"
+                  onError={() => {
+                    handleImageError(selected.session_id);
+                    setSelected(null);
+                  }}
                 />
               </div>
               {/* Footer info */}
@@ -194,4 +251,19 @@ export default function AdminStripsGalleryPage() {
       </Dialog>
     </div>
   );
+}
+
+/** Generate a windowed page number array with ellipsis. */
+function generatePageNumbers(current: number, total: number): (number | '...')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: (number | '...')[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push('...');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push('...');
+  pages.push(total);
+  return pages;
 }

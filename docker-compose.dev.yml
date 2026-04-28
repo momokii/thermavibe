@@ -41,6 +41,7 @@ services:
     # This lets you edit Python files on the host and see changes without rebuilding.
     volumes:
       - ./backend/app:/app/app
+      - app-composites:/tmp/vibeprint
 
     # Also read .env directly as a fallback. Explicit `environment` vars below
     # take precedence over env_file, so this is just a safety net.
@@ -141,6 +142,10 @@ services:
       - "5433:5432"
     networks:
       - vibeprint-net
+
+volumes:
+  app-composites:
+    name: vibeprint-app-composites
 
 networks:
   vibeprint-net:

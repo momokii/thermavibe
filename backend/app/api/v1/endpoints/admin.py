@@ -342,13 +342,15 @@ async def delete_theme(
 
 @router.get('/photobooth/strips', response_model=StripGalleryResponse)
 async def list_strips(
-    limit: int = 50,
+    limit: int = 24,
     offset: int = 0,
     _admin: dict = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> StripGalleryResponse:
-    """List all photobooth sessions that have a composite image."""
-    from sqlalchemy import select, func, case
+    """List photobooth sessions that have a composite image on disk."""
+    import os
+
+    from sqlalchemy import select, func
 
     from app.models.session import KioskSession, SessionType
     from app.models.photobooth_theme import PhotoboothTheme
@@ -358,16 +360,13 @@ async def list_strips(
         & (KioskSession.composite_image_path.isnot(None))  # type: ignore[union-attr]
     )
 
-    # Total count
-    count_stmt = select(func.count()).select_from(KioskSession).where(base_filter)
-    total = (await db.execute(count_stmt)).scalar() or 0
-
-    # Fetch sessions
+    # Fetch more than needed to account for missing files, then trim.
+    fetch_limit = limit * 3
     stmt = (
         select(KioskSession)
         .where(base_filter)
         .order_by(KioskSession.created_at.desc())
-        .limit(limit)
+        .limit(fetch_limit)
         .offset(offset)
     )
     result = await db.execute(stmt)
@@ -375,7 +374,12 @@ async def list_strips(
 
     strips: list[StripGalleryItem] = []
     for session in sessions:
-        # Look up theme name from layout data
+        if len(strips) >= limit:
+            break
+        # Skip sessions whose composite file no longer exists on disk.
+        if not os.path.exists(session.composite_image_path):
+            continue
+
         theme_name = None
         layout = session.photobooth_layout or {}
         theme_id = layout.get('theme_id')
@@ -392,5 +396,10 @@ async def list_strips(
             created_at=session.created_at,
             theme_name=theme_name,
         ))
+
+    # Count total available strips (files that still exist).
+    count_stmt = select(KioskSession.id, KioskSession.composite_image_path).where(base_filter)
+    count_result = await db.execute(count_stmt)
+    total = sum(1 for row in count_result if os.path.exists(row[1]))
 
     return StripGalleryResponse(strips=strips, total=total)

@@ -11,7 +11,16 @@ import io
 import os
 import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
+
+# Dedicated directory for composite images, persisted via Docker volume.
+_COMPOSITE_DIR = Path(tempfile.gettempdir()) / 'vibeprint'
+
+
+def _ensure_composite_dir() -> Path:
+    _COMPOSITE_DIR.mkdir(parents=True, exist_ok=True)
+    return _COMPOSITE_DIR
 
 import structlog
 from PIL import Image, ImageDraw, ImageFont
@@ -107,14 +116,15 @@ def compose_photobooth_strip(
         )
 
     # Save composite
+    out_dir = _ensure_composite_dir()
     prefix = str(session_id)[:8] if session_id else 'strip'
-    composite_path = os.path.join(tempfile.gettempdir(), f'vibeprint_composite_{prefix}.jpg')
+    composite_path = str(out_dir / f'vibeprint_composite_{prefix}.jpg')
     canvas.save(composite_path, 'JPEG', quality=95)
 
     # Generate thumbnail
     thumb_height = int(THUMBNAIL_WIDTH * canvas_height / STRIP_WIDTH)
     thumbnail = canvas.resize((THUMBNAIL_WIDTH, thumb_height), Image.Resampling.LANCZOS)
-    thumbnail_path = os.path.join(tempfile.gettempdir(), f'vibeprint_thumb_{prefix}.jpg')
+    thumbnail_path = str(out_dir / f'vibeprint_thumb_{prefix}.jpg')
     thumbnail.save(thumbnail_path, 'JPEG', quality=85)
 
     logger.info(
