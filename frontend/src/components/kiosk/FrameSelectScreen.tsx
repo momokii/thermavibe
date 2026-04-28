@@ -29,6 +29,17 @@ export default function FrameSelectScreen() {
 
   // Countdown timer
   const hasAutoAdvanced = useRef(false);
+
+  // Safety: if no themes are available, auto-advance with default theme from backend.
+  useEffect(() => {
+    if (themes.length > 0 && !hasAutoAdvanced.current && selectedThemeId === null) {
+      const defaultTheme = themes.find((t: ThemeResponse) => t.is_default);
+      if (defaultTheme) {
+        setSelectedThemeId(defaultTheme.id);
+      }
+    }
+  }, [themes, selectedThemeId]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 0.1));

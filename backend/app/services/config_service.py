@@ -62,6 +62,11 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'photobooth_watermark_text': {'value': getattr(settings, 'photobooth_watermark_text', 'VibePrint OS'), 'description': 'Watermark text'},
         'photobooth_composite_retention_hours': {'value': str(getattr(settings, 'photobooth_composite_retention_hours', 168)), 'description': 'Composite retention period in hours (0 = forever)'},
         'photobooth_share_url_ttl_seconds': {'value': str(getattr(settings, 'photobooth_share_url_ttl_seconds', 300)), 'description': 'Share URL TTL in seconds'},
+        'photobooth_system_prompt': {'value': 'You are a photobooth AI assistant.', 'description': 'System prompt for photobooth AI features (future use)'},
+    },
+    ConfigCategory.VIBE_CHECK: {
+        'vibe_check_enabled': {'value': 'true', 'description': 'Enable vibe check feature'},
+        'vibe_check_system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for vibe check AI analysis'},
     },
 }
 
@@ -218,3 +223,26 @@ async def get_ai_config(db: AsyncSession) -> dict[str, str]:
         'model': db_values.get('model', settings.ai_model),
         'system_prompt': db_values.get('system_prompt', settings.ai_system_prompt),
     }
+
+
+async def get_vibe_check_prompt(db: AsyncSession) -> str:
+    """Get the vibe check system prompt with fallback chain.
+
+    Resolution order:
+      1. vibe_check.vibe_check_system_prompt (feature-specific)
+      2. ai.system_prompt (global fallback)
+      3. settings.ai_system_prompt (.env default)
+
+    Args:
+        db: Async database session.
+
+    Returns:
+        The system prompt string to use for vibe check analysis.
+    """
+    vc_config = await get_configs_by_category(db, ConfigCategory.VIBE_CHECK)
+    if vc_config.get('vibe_check_system_prompt'):
+        return vc_config['vibe_check_system_prompt']
+
+    # Fallback to global AI prompt
+    ai_config = await get_configs_by_category(db, ConfigCategory.AI)
+    return ai_config.get('system_prompt', settings.ai_system_prompt)

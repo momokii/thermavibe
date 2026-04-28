@@ -576,29 +576,32 @@ CAMERA_RESOLUTION_HEIGHT=720
 CAMERA_MJPEG_QUALITY=85
 ```
 
-#### 3. Pass Camera Device to Docker Container
+#### 3. Camera Device Passthrough (Automatic)
 
-```yaml
-services:
-  app:
-    devices:
-      - /dev/video0:/dev/video0
-```
-
-Ensure the Docker user has permission to access the video device. On Linux, the user must be in the `video` group:
+Camera devices are automatically detected and passed through by the startup script. No manual device mapping is needed in `docker-compose.yml`.
 
 ```bash
-# Check which group owns /dev/video0
-ls -la /dev/video0
-# Typically: crw-rw----+ 1 root video ...
-
-# Add the Docker daemon user or use group mapping
-# In docker-compose.yml:
-services:
-  app:
-    group_add:
-      - video
+# Start development with automatic camera detection
+make dev
+# or
+./scripts/start-docker.sh dev
 ```
+
+The `scripts/start-docker.sh` script automatically:
+- Detects all connected `/dev/video*` devices at startup
+- Creates a temporary compose override with only the devices that exist
+- Passes them to the container without crashing if no camera is present
+- Falls back to mock mode if no cameras are connected
+
+You can verify the camera was detected by checking the startup output:
+
+```
+ Camera:  ✓  Found 2 device(s):
+          • /dev/video0
+          • /dev/video1
+```
+
+> **Note:** The Dockerfile already adds the `vibeprint` user to the `video` group, so no additional group mapping is needed. If you encounter permission issues, ensure the host user is in the `video` group: `sudo usermod -aG video $USER`.
 
 #### 4. Test the Camera
 
@@ -662,13 +665,10 @@ The project `Makefile` provides shortcuts for common operations. All commands ar
 
 | Command | Description |
 |---------|-------------|
-| `make dev` | Start full development environment (postgres + app + frontend dev server) |
-| `make dev-backend` | Start only postgres + app (backend in Docker) |
-| `make dev-frontend` | Start only frontend dev server (assumes backend is already running) |
-| `make stop` | Stop all Docker containers |
-| `make logs` | Tail logs from all running containers |
-| `make logs-backend` | Tail backend logs |
-| `make logs-db` | Tail PostgreSQL logs |
+| `make dev` | Start full dev environment with automatic camera detection |
+| `make prod` | Start production mode with automatic camera detection |
+| `make dev-down` | Stop all containers |
+| `make dev-logs` | Tail development environment logs |
 
 ### Database
 
@@ -703,70 +703,39 @@ The project `Makefile` provides shortcuts for common operations. All commands ar
 
 | Command | Description |
 |---------|-------------|
+| `make prod` | Start production with auto camera detection |
 | `make build` | Build production Docker image |
-| `make deploy` | Deploy production stack (`docker compose up -d`) |
-| `make backup` | Backup PostgreSQL data to `backups/` directory |
-| `make update` | Pull latest image and restart (`docker compose pull && docker compose up -d`) |
+| `./scripts/start-docker.sh down` | Stop all containers |
 
 ### Makefile Example
 
 ```makefile
-.PHONY: dev dev-backend dev-frontend stop logs migrate test lint
+.PHONY: dev prod dev-down test lint migrate
 
-# Development
+# Development (auto-detects cameras)
 dev:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres app
-	cd frontend && npm run dev
+	./scripts/start-docker.sh dev
 
-dev-backend:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres app
+prod:
+	./scripts/start-docker.sh prod
 
-dev-frontend:
-	cd frontend && npm run dev
+dev-down:
+	./scripts/start-docker.sh down
 
-stop:
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
-
-logs:
+dev-logs:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 
 # Database
 migrate:
 	docker compose exec app alembic upgrade head
 
-migrate-create:
-	@read -p "Migration description: " desc; \
-	docker compose exec app alembic revision --autogenerate -m "$$desc"
-
-db-shell:
-	docker compose exec postgres psql -U thermavibe -d thermavibe
-
 # Testing
 test:
 	docker compose exec app python -m pytest tests/ -v
 	cd frontend && npm test
 
-test-backend:
-	docker compose exec app python -m pytest tests/ -v
-
-test-frontend:
-	cd frontend && npm test
-
-test-coverage:
-	docker compose exec app python -m pytest tests/ --cov=app --cov-report=term-missing
-
 # Code Quality
 lint:
 	docker compose exec app ruff check backend/app/
 	cd frontend && npx eslint src/
-
-lint-backend:
-	docker compose exec app ruff check backend/app/
-
-lint-frontend:
-	cd frontend && npx eslint src/
-
-format:
-	docker compose exec app ruff format backend/app/
-	cd frontend && npx prettier --write src/
 ```

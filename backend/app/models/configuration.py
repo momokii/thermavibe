@@ -25,6 +25,7 @@ class ConfigCategory(str, enum.Enum):
     KIOSK = 'kiosk'
     GENERAL = 'general'
     PHOTOBOOTH = 'photobooth'
+    VIBE_CHECK = 'vibe_check'
 
 
 class OperatorConfig(Base):

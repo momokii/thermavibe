@@ -118,10 +118,10 @@ cp .env.example .env
 ### 2. Build and start
 
 ```bash
-docker compose up --build -d
+make prod
 ```
 
-The Dockerfile runs a multi-stage build:
+This uses `scripts/start-docker.sh` which auto-detects connected cameras and passes them to the container. The Dockerfile runs a multi-stage build:
 1. **Stage 1**: Builds frontend static assets with Node 20
 2. **Stage 2**: Copies built assets into Python 3.12 runtime
 
@@ -156,7 +156,7 @@ KIOSK_URL=http://192.168.1.100:8000 bash scripts/start-kiosk.sh
 ### 6. Stop production
 
 ```bash
-docker compose down
+make dev-down
 ```
 
 ---
@@ -266,7 +266,7 @@ cp .env.example .env
 | `ADMIN_SESSION_TTL_HOURS` | `24` | Admin session duration in hours before auto-logout |
 | `PRINTER_VENDOR_ID` | `0x04b8` | USB vendor ID of thermal printer |
 | `PRINTER_PRODUCT_ID` | `0x0e15` | USB product ID of thermal printer |
-| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0) |
+| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (auto-detected at startup, `/dev/video0` = 0) |
 
 See `.env.example` for the complete list with descriptions.
 

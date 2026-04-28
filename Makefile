@@ -4,15 +4,16 @@
 # ---- Development ----
 
 .PHONY: dev
-dev: ## Start the full development environment
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-	@echo "Backend:  http://localhost:8000"
-	@echo "API Docs: http://localhost:8000/docs"
-	@echo "Frontend: cd frontend && npm run dev  (http://localhost:5173)"
+dev: ## Start the full development environment (auto-detects cameras)
+	./scripts/start-docker.sh dev
+
+.PHONY: prod
+prod: ## Start production mode (auto-detects cameras)
+	./scripts/start-docker.sh prod
 
 .PHONY: dev-down
-dev-down: ## Stop the development environment
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+dev-down: ## Stop all containers
+	./scripts/start-docker.sh down
 
 .PHONY: dev-logs
 dev-logs: ## Tail development environment logs

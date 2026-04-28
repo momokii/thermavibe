@@ -27,6 +27,13 @@ services:
       # Use only the backend stage (skip frontend build — you run `npm run dev` separately)
       target: backend-runtime
     container_name: vibeprint-app-dev
+    # Dev mounts host source code — run as root so the container can read
+    # files regardless of host ownership. Production still runs as vibeprint.
+    # Keep video + lp groups for camera and printer hardware access.
+    user: "0:0"
+    group_add:
+      - "44"   # video — for /dev/video* camera access
+      - "7"    # lp — for USB printer access
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

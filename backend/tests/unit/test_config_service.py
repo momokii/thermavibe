@@ -247,14 +247,14 @@ class TestUpdateConfig:
 class TestDefaultConfigs:
     """Verify DEFAULT_CONFIGS structure."""
 
-    def test_has_five_categories(self):
-        """DEFAULT_CONFIGS should have exactly 5 categories."""
+    def test_has_seven_categories(self):
+        """DEFAULT_CONFIGS should have exactly 7 categories."""
         from app.services.config_service import DEFAULT_CONFIGS
 
-        assert len(DEFAULT_CONFIGS) == 5
+        assert len(DEFAULT_CONFIGS) == 7
 
     def test_has_all_expected_categories(self):
-        """DEFAULT_CONFIGS should contain hardware, ai, payment, kiosk, and general."""
+        """DEFAULT_CONFIGS should contain all expected categories."""
         from app.services.config_service import DEFAULT_CONFIGS
 
         expected = {
@@ -263,6 +263,8 @@ class TestDefaultConfigs:
             ConfigCategory.PAYMENT,
             ConfigCategory.KIOSK,
             ConfigCategory.GENERAL,
+            ConfigCategory.PHOTOBOOTH,
+            ConfigCategory.VIBE_CHECK,
         }
         assert set(DEFAULT_CONFIGS.keys()) == expected
 

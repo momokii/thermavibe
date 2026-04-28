@@ -22,8 +22,15 @@ export default function ThemeManager() {
       queryClient.invalidateQueries({ queryKey: ['admin-photobooth-themes'] });
       toast.success('Theme updated');
     },
-    onError: () => toast.error('Failed to update theme'),
+    onError: (err: unknown) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detail = (err as any)?.response?.data?.detail;
+      const msg = detail || 'Failed to update theme';
+      toast.error(msg);
+    },
   });
+
+  const enabledCount = themes.filter((t: ThemeResponse) => t.is_enabled).length;
 
   const defaultMutation = useMutation({
     mutationFn: (id: number) => photoboothApi.setDefaultTheme(id),
@@ -119,6 +126,7 @@ export default function ThemeManager() {
 
                 <Switch
                   checked={theme.is_enabled}
+                  disabled={theme.is_enabled && enabledCount <= 1}
                   onCheckedChange={(checked: boolean) =>
                     toggleMutation.mutate({ id: theme.id, enabled: checked })
                   }

@@ -264,12 +264,12 @@ Use **Docker Compose** for the entire deployment. Two containers are defined: th
 ### Consequences
 
 **Positive:**
-- Docker Compose provides a single `docker compose up -d` command to start the entire stack, lowering the operational barrier for non-technical operators.
+- Docker Compose provides a single command (`make prod` or `./scripts/start-docker.sh prod`) to start the entire stack, with automatic camera device detection, lowering the operational barrier for non-technical operators.
 - Containerization ensures the application runs in a consistent environment regardless of the host system's installed packages.
 - Volume mounts for PostgreSQL data persist across container restarts and image updates.
 - Docker Compose's dependency management (`depends_on` with health checks) ensures the database is ready before the application starts.
-- The `docker compose pull && docker compose up -d` update pattern is simple and safe.
-- USB device passthrough via the `devices` configuration gives the application container direct access to the thermal printer and camera hardware.
+- The `./scripts/start-docker.sh prod` update pattern is simple and safe — camera devices are auto-detected at startup.
+- USB device passthrough via the `devices` configuration gives the application container direct access to the thermal printer and camera hardware (auto-detected by the startup script).
 
 **Negative:**
 - Docker Compose does not provide built-in zero-downtime deployments; updating the application container causes a brief interruption.

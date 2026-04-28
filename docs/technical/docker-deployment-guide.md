@@ -122,6 +122,8 @@ services:
     devices:
       - ${PRINTER_USB_DEVICE:-/dev/bus/usb/001/004}:${PRINTER_USB_DEVICE:-/dev/bus/usb/001/004}
       - ${CAMERA_VIDEO_DEVICE:-/dev/video0}:${CAMERA_VIDEO_DEVICE:-/dev/video0}
+      # NOTE: Camera devices are auto-detected by scripts/start-docker.sh
+      # Use ./scripts/start-docker.sh prod or make prod instead of raw docker compose up
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -252,7 +254,7 @@ Create a `.env` file in the project root. The following table describes every va
 |----------|----------|---------|---------------------|
 | `CAMERA_ENABLED` | No | `true` | Set to `false` to disable camera (uses test images) |
 | `CAMERA_DEVICE_INDEX` | No | `0` | V4L2 device index (`/dev/video0` = index 0) |
-| `CAMERA_VIDEO_DEVICE` | No | `/dev/video0` | Video device path in Docker |
+| `CAMERA_VIDEO_DEVICE` | No | (auto-detected) | Video device path in Docker. Auto-detected by `scripts/start-docker.sh` — manual setting usually not needed |
 | `CAMERA_RESOLUTION_WIDTH` | No | `1280` | Capture resolution width in pixels |
 | `CAMERA_RESOLUTION_HEIGHT` | No | `720` | Capture resolution height in pixels |
 | `CAMERA_MJPEG_QUALITY` | No | `85` | JPEG compression quality (1-100) |
@@ -332,35 +334,44 @@ ls -la /dev/thermavibe-camera*
 
 ### Step 3: Configure Docker Device Passthrough
 
-Update the `.env` file to use the stable symlinks:
+Update the `.env` file to use the stable symlink for the printer:
 
 ```bash
 PRINTER_USB_DEVICE=/dev/thermavibe-printer
-CAMERA_VIDEO_DEVICE=/dev/thermavibe-camera0
 ```
 
-The `docker-compose.yml` references these variables in the `devices` section:
+Camera devices are automatically detected by the startup script. No `CAMERA_VIDEO_DEVICE` configuration is needed — the script scans all `/dev/video*` devices and passes through only the ones that exist.
+
+Start the application with the dynamic script:
+
+```bash
+./scripts/start-docker.sh prod
+# or
+make prod
+```
+
+The `docker-compose.yml` references the printer device in the `devices` section, while camera devices are added by the auto-generated `.docker-compose.devices.yml` override:
 
 ```yaml
 services:
   app:
     devices:
       - ${PRINTER_USB_DEVICE}:${PRINTER_USB_DEVICE}
-      - ${CAMERA_VIDEO_DEVICE}:${CAMERA_VIDEO_DEVICE}
+      # Camera devices auto-detected by scripts/start-docker.sh
 ```
 
 ### Step 4: Verify Device Access Inside Container
 
-After starting the container, verify that the devices are accessible:
+After starting the container with `./scripts/start-docker.sh prod`, verify that the devices are accessible:
 
 ```bash
 # Check printer device
 docker compose exec app ls -la /dev/thermavibe-printer
 # Expected: crw-rw-rw- ... /dev/thermavibe-printer
 
-# Check camera device
-docker compose exec app ls -la /dev/thermavibe-camera0
-# Expected: crw-rw-rw- ... /dev/thermavibe-camera0
+# Check camera devices (auto-detected)
+docker compose exec app ls -la /dev/video*
+# Expected: crw-rw---- ... /dev/video0, etc.
 
 # Test USB device enumeration inside container
 docker compose exec app python -c "
@@ -373,7 +384,7 @@ for d in devices:
 
 ### Alternative: Video Group Mapping
 
-If the `devices` approach does not work for the camera, add the Docker container to the `video` group:
+The Dockerfile already adds the `vibeprint` user to the `video` group. The startup script automatically adds cgroup rules for camera access. If you still encounter permission issues and are running `docker compose up` directly (without the startup script), you can add the container to the `video` group:
 
 ```yaml
 services:
@@ -382,8 +393,10 @@ services:
       - video
     devices:
       - ${PRINTER_USB_DEVICE}:${PRINTER_USB_DEVICE}
-    # Camera is accessible via /dev/video0 with video group permissions
+      # Camera devices auto-detected by scripts/start-docker.sh
 ```
+
+However, the recommended approach is to use `./scripts/start-docker.sh prod` which handles all device detection automatically.
 
 ---
 
@@ -495,7 +508,7 @@ Create a systemd service to manage Docker Compose:
 ```bash
 sudo tee /etc/systemd/system/vibeprint-app.service << 'EOF'
 [Unit]
-Description=VibePrint OS Application (Docker Compose)
+Description=VibePrint OS Application (Docker Compose with auto camera detection)
 After=docker.service
 Requires=docker.service
 
@@ -503,9 +516,9 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/thermavibe
-ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.yml down
-ExecReload=/usr/bin/docker compose -f docker-compose.yml restart
+ExecStart=/opt/thermavibe/scripts/start-docker.sh prod
+ExecStop=/opt/thermavibe/scripts/start-docker.sh down
+ExecReload=/usr/bin/docker compose restart
 
 [Install]
 WantedBy=multi-user.target
@@ -582,8 +595,8 @@ Before deploying VibePrint OS to a production kiosk machine, complete the follow
 ### Camera
 
 - [ ] Connect camera via USB and verify it appears in `lsusb` and `/dev/video*`
-- [ ] Set `CAMERA_DEVICE_INDEX` in `.env`
-- [ ] Verify device passthrough into Docker container
+- [ ] Set `CAMERA_DEVICE_INDEX` in `.env` (for application-level camera selection, default: 0)
+- [ ] Start with `./scripts/start-docker.sh prod` — verify cameras are listed in startup output
 - [ ] Test MJPEG stream at `http://localhost:8000/api/v1/camera/stream`
 - [ ] Test photo capture via `POST /api/v1/admin/hardware/camera/test`
 - [ ] Verify image quality and resolution at configured settings
@@ -630,8 +643,8 @@ git pull origin main
 # 2. Rebuild the Docker image with the latest code
 docker compose build
 
-# 3. Restart containers with the new image
-docker compose up -d
+# 3. Restart containers with the startup script (auto-detects cameras)
+./scripts/start-docker.sh prod
 
 # 4. Run any pending database migrations
 docker compose exec app alembic upgrade head
@@ -665,7 +678,7 @@ git checkout <previous-commit-hash>
 
 # Rebuild and restart
 docker compose build
-docker compose up -d
+./scripts/start-docker.sh prod
 
 # If database migrations need to be rolled back
 docker compose exec app alembic downgrade -1
@@ -689,7 +702,7 @@ echo "Rebuilding Docker image..."
 docker compose build --no-cache app
 
 echo "Restarting application..."
-docker compose up -d
+./scripts/start-docker.sh prod
 
 echo "Running migrations..."
 sleep 10  # Wait for app to start
@@ -890,8 +903,9 @@ ffmpeg -f video4linux2 -i /dev/video0 -frames 1 /tmp/test_capture.jpg
 # If this fails, the camera or driver has an issue
 
 # 4. Check device inside the container
-docker compose exec app ls -la /dev/video0
-# If missing: device passthrough is not configured
+docker compose exec app ls -la /dev/video*
+# If missing: ensure you started with ./scripts/start-docker.sh or make prod
+# The startup script automatically detects and passes all /dev/video* devices
 
 # 5. Check OpenCV access inside container
 docker compose exec app python -c "
@@ -919,9 +933,9 @@ if cap.isOpened():
    - As a temporary fix: `sudo chmod 666 /dev/video0`
 
 3. **Camera works on host but not in container:**
-   - Verify `devices` mapping includes the camera device
-   - Add `group_add: ["video"]` to docker-compose.yml
-   - Restart container: `docker compose restart app`
+   - Ensure you started with `./scripts/start-docker.sh prod` or `make prod` (not plain `docker compose up`)
+   - The startup script automatically detects and passes all camera devices
+   - If issues persist, verify the `vibeprint` user has `video` group access: `docker compose exec app id`
 
 4. **MJPEG stream not working:**
    - Some cameras do not support MJPEG format natively; OpenCV may need to decode YUYV frames and re-encode to JPEG, which is slower
@@ -1081,7 +1095,7 @@ docker network inspect vibeprint-net
 **Solutions:**
 
 1. **PostgreSQL container not running:**
-   - Start containers: `docker compose up -d`
+   - Start containers: `./scripts/start-docker.sh prod`
    - Check for volume corruption: `docker volume inspect vibeprint-postgres-data`
    - If corrupted, restore from backup (see [Backup](#7-backup))
 
@@ -1116,7 +1130,7 @@ docker compose restart
 docker compose restart app
 
 # Rebuild and restart
-docker compose up -d --build
+./scripts/start-docker.sh prod
 
 # Check container resource usage
 docker stats

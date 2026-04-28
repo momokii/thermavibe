@@ -514,7 +514,7 @@ This pattern allows services to be easily mocked in tests by providing alternati
 |  |                                                           |   |
 |  |  USB Device Passthrough:                                  |   |
 |  |    - /dev/bus/usb/XXX/YYY -> thermal printer              |   |
-|  |    - /dev/video0 -> USB camera                            |   |
+|  |    - /dev/video* (auto-detected) -> USB cameras           |   |
 |  |                                                           |   |
 |  |  Environment:                                             |   |
 |  |    - DATABASE_URL=postgresql+asyncpg://...               |   |
@@ -572,30 +572,38 @@ Host Machine:
 
 ### USB Device Passthrough
 
-USB devices are passed through to the `app` container using Docker Compose's `devices` configuration:
+USB devices are passed through to the `app` container using Docker Compose's `devices` configuration. Camera devices are automatically detected by the startup script:
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml (base — no hardcoded camera devices)
 services:
   app:
     devices:
       # Thermal printer (identified by USB device path)
       - /dev/bus/usb/001/004:/dev/bus/usb/001/004
-      # Camera (video device)
-      - /dev/video0:/dev/video0
+      # Camera devices are added dynamically by scripts/start-docker.sh
+
+# The startup script generates .docker-compose.devices.yml with detected devices:
+services:
+  app:
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/video0:/dev/video0    # Auto-detected
+      - /dev/video1:/dev/video1    # Additional cameras if present
+    device_cgroup_rules:
+      - 'c 81:* rwm'               # Video devices (for hot-plug)
+      - 'c 189:* rwm'              # USB devices
 ```
 
-The specific USB device paths are determined by the host system's USB bus topology and may change when devices are unplugged and reconnected. For production deployments, udev rules should be used to create stable symlinks:
+Use `./scripts/start-docker.sh prod` or `make prod` to start — the script scans `/dev/video*` at startup and only maps devices that actually exist, avoiding the "no such file or directory" error that occurs with hardcoded paths after a device reconnection or reboot.
+
+For the printer, udev rules create stable symlinks:
 
 ```
 # /etc/udev/rules.d/99-thermavibe.rules
 # Thermal printer (Epson TM-T20X)
 SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", ATTR{idProduct}=="0202", SYMLINK+="thermavibe-printer"
-# Camera
-SUBSYSTEM=="video4linux", ATTR{name}=="*camera*", SYMLINK+="thermavibe-camera"
 ```
-
-With stable symlinks, the Docker Compose configuration references `/dev/thermavibe-printer` and `/dev/thermavibe-camera` instead of volatile bus paths.
 
 ### Host Processes
 

@@ -49,3 +49,4 @@ Thumbs.db
 
 # Alembic (keep versions/ tracked)
 alembic/versions/*.pyc
+.docker-compose.devices.yml

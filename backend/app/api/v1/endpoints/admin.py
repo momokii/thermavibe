@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin, get_db_session
@@ -24,6 +24,8 @@ from app.schemas.photobooth import (
     ThemeCreateRequest,
     ThemeResponse,
     ThemeUpdateRequest,
+    StripGalleryResponse,
+    StripGalleryItem,
 )
 from app.schemas.print import PrintTestResponse
 from app.services import analytics_service, config_service
@@ -74,6 +76,24 @@ async def update_config(
     """Update configuration values for a category."""
     raw = body.model_dump(exclude_unset=True)
     values = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in raw.items()}
+
+    # Guard: at least one kiosk feature must remain enabled
+    feature_keys = {
+        'vibe_check': 'vibe_check_enabled',
+        'photobooth': 'photobooth_enabled',
+    }
+    if category in feature_keys:
+        disabling = values.get(feature_keys[category], '').lower() in ('false', '0')
+        if disabling:
+            other_cat = 'photobooth' if category == 'vibe_check' else 'vibe_check'
+            other_config = await config_service.get_configs_by_category(db, other_cat)
+            other_enabled = other_config.get(feature_keys[other_cat], 'true').lower() == 'true'
+            if not other_enabled:
+                raise HTTPException(
+                    status_code=422,
+                    detail='At least one feature (Vibe Check or Photobooth) must stay enabled.',
+                )
+
     updated = await config_service.update_config(db, category, values)
     all_values = await config_service.get_configs_by_category(db, category)
 
@@ -254,7 +274,12 @@ async def toggle_theme(
 
     enabled = body.get('enabled', True)
 
-    theme = await theme_service.toggle_theme(db=db, theme_id=theme_id, enabled=enabled)
+    try:
+        theme = await theme_service.toggle_theme(db=db, theme_id=theme_id, enabled=enabled)
+    except ValueError as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return ThemeResponse(
         id=theme.id,
@@ -308,3 +333,64 @@ async def delete_theme(
     from app.services import theme_service
 
     await theme_service.delete_theme(db=db, theme_id=theme_id)
+
+
+# ---------------------------------------------------------------------------
+# Strip gallery
+# ---------------------------------------------------------------------------
+
+
+@router.get('/photobooth/strips', response_model=StripGalleryResponse)
+async def list_strips(
+    limit: int = 50,
+    offset: int = 0,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> StripGalleryResponse:
+    """List all photobooth sessions that have a composite image."""
+    from sqlalchemy import select, func, case
+
+    from app.models.session import KioskSession, SessionType
+    from app.models.photobooth import PhotoboothTheme
+
+    base_filter = (
+        (KioskSession.session_type == SessionType.PHOTOBOOTH)
+        & (KioskSession.composite_image_path.isnot(None))  # type: ignore[union-attr]
+    )
+
+    # Total count
+    count_stmt = select(func.count()).select_from(KioskSession).where(base_filter)
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # Fetch sessions
+    stmt = (
+        select(KioskSession)
+        .where(base_filter)
+        .order_by(KioskSession.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
+    sessions = result.scalars().all()
+
+    strips: list[StripGalleryItem] = []
+    for session in sessions:
+        # Look up theme name from layout data
+        theme_name = None
+        layout = session.photobooth_layout or {}
+        theme_id = layout.get('theme_id')
+        if theme_id:
+            theme_stmt = select(PhotoboothTheme.display_name).where(PhotoboothTheme.id == theme_id)
+            theme_row = (await db.execute(theme_stmt)).scalar_one_or_none()
+            if theme_row:
+                theme_name = theme_row
+
+        strips.append(StripGalleryItem(
+            session_id=session.id,
+            composite_url=f'/api/v1/kiosk/session/{session.id}/photobooth/composite',
+            thumbnail_url=f'/api/v1/kiosk/session/{session.id}/photobooth/thumbnail',
+            created_at=session.created_at,
+            theme_name=theme_name,
+        ))
+
+    return StripGalleryResponse(strips=strips, total=total)

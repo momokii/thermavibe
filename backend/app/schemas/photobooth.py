@@ -191,3 +191,25 @@ class ThemeUpdateRequest(BaseModel):
     display_name: str | None = None
     config: ThemeConfig | None = None
     sort_order: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Admin strip gallery schemas
+# ---------------------------------------------------------------------------
+
+
+class StripGalleryItem(BaseModel):
+    """A single photobooth strip in the gallery."""
+
+    session_id: UUID
+    composite_url: str = Field(description='URL to full composite image')
+    thumbnail_url: str = Field(description='URL to thumbnail image')
+    created_at: datetime
+    theme_name: str | None = None
+
+
+class StripGalleryResponse(BaseModel):
+    """Paginated strip gallery response."""
+
+    strips: list[StripGalleryItem]
+    total: int

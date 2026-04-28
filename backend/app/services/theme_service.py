@@ -126,6 +126,17 @@ BUILTIN_THEMES: list[dict] = [
 # ---------------------------------------------------------------------------
 
 
+async def _count_enabled(db: AsyncSession) -> int:
+    """Return the number of currently enabled themes."""
+    from sqlalchemy import func
+
+    stmt = select(func.count()).select_from(PhotoboothTheme).where(
+        PhotoboothTheme.is_enabled == True,  # noqa: E712
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one()
+
+
 async def list_themes(
     db: AsyncSession,
     enabled_only: bool = True,
@@ -278,6 +289,9 @@ async def toggle_theme(
 ) -> PhotoboothTheme:
     """Enable or disable a theme.
 
+    Prevents disabling the last enabled theme to ensure the kiosk always
+    has at least one frame to show.
+
     Args:
         db: Async database session.
         theme_id: Theme ID.
@@ -285,7 +299,15 @@ async def toggle_theme(
 
     Returns:
         Updated PhotoboothTheme.
+
+    Raises:
+        ValueError: If attempting to disable the last enabled theme.
     """
+    if not enabled:
+        enabled_count = await _count_enabled(db)
+        if enabled_count <= 1:
+            raise ValueError('Cannot disable the last enabled theme — at least one must remain active.')
+
     theme = await get_theme(db, theme_id)
     theme.is_enabled = enabled
     await db.commit()

@@ -106,11 +106,13 @@ make shell-db
 make build
 # Or: docker compose build
 
-# Start production environment
-docker compose up -d
+# Start production environment (auto-detects cameras)
+make prod
+# Or: ./scripts/start-docker.sh prod
 
 # Stop all containers
-docker compose down
+make dev-down
+# Or: ./scripts/start-docker.sh down
 
 # Shell into backend container
 make shell-backend
@@ -138,13 +140,16 @@ make help
 ### Commands per Environment
 ```bash
 # Development (production base + dev overrides)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+make dev
+# Or: ./scripts/start-docker.sh dev
 
 # Production
-docker compose up -d
+make prod
+# Or: ./scripts/start-docker.sh prod
 
 # Using Makefile (preferred)
 make dev        # development
+make prod       # production (auto-detects cameras)
 make build      # production build
 ```
 
@@ -157,7 +162,7 @@ make build      # production build
 
 ### Known Gotchas
 - Dev environment exposes PostgreSQL on port **5433** (not 5432) to avoid conflicts with local PostgreSQL
-- USB device passthrough requires `/dev/bus/usb` and `/dev/video0` to exist on the host
+- USB device passthrough: `/dev/bus/usb` must exist; camera devices are auto-detected from `/dev/video*` by the startup script
 - The Dockerfile uses a multi-stage build (Node 20 for frontend build, Python 3.12 for runtime)
 
 ---

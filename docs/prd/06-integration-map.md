@@ -789,7 +789,7 @@ The system targets standard UVC (USB Video Class) webcams, which are supported n
 
 ### 4.2 Device Detection and Enumeration
 
-On Linux, video devices appear as `/dev/video0`, `/dev/video1`, etc. The system enumerates available devices using OpenCV:
+On Linux, video devices appear as `/dev/video0`, `/dev/video1`, etc. The startup script (`scripts/start-docker.sh`) auto-detects all available devices and passes them to the Docker container. The application enumerates available devices using OpenCV:
 
 ```python
 import cv2
@@ -809,10 +809,12 @@ for index in range(10):  # Check up to 10 devices
 **Docker configuration:** The container needs access to the video device:
 
 ```yaml
+# Camera devices are auto-detected by scripts/start-docker.sh
+# which generates a compose override with all detected /dev/video* devices
 services:
   backend:
     devices:
-      - /dev/video0:/dev/video0
+      - /dev/video0:/dev/video0  # auto-detected at startup
 ```
 
 ### 4.3 MJPEG Streaming for Live Preview
@@ -881,7 +883,7 @@ All camera configuration is stored in the `operator_configs` table:
 
 | Config Key                | Description                                         |
 |---------------------------|-----------------------------------------------------|
-| `camera.device_path`      | V4L2 device path (default: "/dev/video0")           |
+| `camera.device_path`      | V4L2 device path (auto-detected from `/dev/video*` at startup) |
 | `camera.resolution_width` | Capture resolution width in pixels (default: 1280)  |
 | `camera.resolution_height`| Capture resolution height in pixels (default: 720)  |
 | `camera.mjpeg`            | Use MJPEG streaming for preview (default: true)      |

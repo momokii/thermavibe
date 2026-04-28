@@ -343,7 +343,7 @@ For a 30-day month (43,200 minutes):
 
 **Requirement:** The system must be deployable exclusively via Docker Compose. No bare-metal installation, manual Python environment setup, or system service configuration is required or supported.
 
-**Measurement:** A fresh provisioned machine with only Docker and Docker Compose installed must be able to run the complete system by executing `docker compose up -d` after cloning the repository and copying the `.env` file.
+**Measurement:** A fresh provisioned machine with only Docker and Docker Compose installed must be able to run the complete system by executing `make prod` (or `./scripts/start-docker.sh prod`) after cloning the repository and copying the `.env` file. Camera devices are auto-detected at startup.
 
 **Implementation Requirements:**
 - The repository includes a `docker-compose.yml` file that defines all services (backend, frontend, database).

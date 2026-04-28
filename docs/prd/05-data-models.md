@@ -249,7 +249,7 @@ The following configuration keys are used by the system. These are seeded during
 | `printer.product_id`              | `hardware` | string   | `0x0000`                   | USB Product ID of the thermal printer (hex, with 0x prefix)                |
 | `printer.paper_width`             | `hardware` | enum     | `58mm`                     | Paper width: `58mm` (384px) or `80mm` (576px)                              |
 | `printer.dpi`                     | `hardware` | integer  | `203`                      | Printer resolution in dots per inch                                         |
-| `camera.device_path`              | `hardware` | string   | `/dev/video0`              | V4L2 device path for the webcam                                            |
+| `camera.device_path`              | `hardware` | string   | auto-detected              | V4L2 device path (auto-detected from available `/dev/video*` devices)      |
 | `camera.resolution_width`         | `hardware` | integer  | `1280`                     | Capture resolution width in pixels                                          |
 | `camera.resolution_height`        | `hardware` | integer  | `720`                      | Capture resolution height in pixels                                         |
 | `camera.mjpeg`                    | `hardware` | boolean  | `true`                     | Whether to use MJPEG streaming for live preview (lower CPU usage)           |

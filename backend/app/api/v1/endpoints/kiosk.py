@@ -171,12 +171,14 @@ async def select_photo(
     with open(photo_path, 'rb') as f:
         photo_bytes = f.read()
 
-    # Run AI analysis
+    # Run AI analysis with feature-specific prompt
     ai_config = await config_service.get_ai_config(db)
+    vibe_prompt = await config_service.get_vibe_check_prompt(db)
     try:
         ai_result = await analyze_image(
             image_bytes=photo_bytes,
             session_id=session_id,
+            prompt=vibe_prompt,
             ai_config=ai_config,
         )
         log.info(
@@ -316,12 +318,14 @@ async def capture_photo(
         photo_path=photo_path,
     )
 
-    # AI analysis
+    # AI analysis with feature-specific prompt
     ai_config = await config_service.get_ai_config(db)
+    vibe_prompt = await config_service.get_vibe_check_prompt(db)
     try:
         ai_result = await analyze_image(
             image_bytes=photo_bytes,
             session_id=session_id,
+            prompt=vibe_prompt,
             ai_config=ai_config,
         )
         log.info(
@@ -544,6 +548,47 @@ async def get_photobooth_composite(
     )
 
 
+@router.get('/session/{session_id}/photobooth/thumbnail')
+async def get_photobooth_thumbnail(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Serve a thumbnail of the photobooth composite.
+
+    Tries the pre-generated thumbnail first, falls back to resizing
+    the full composite on the fly.
+    """
+    from PIL import Image
+
+    session = await session_service.get_session(db, session_id)
+
+    if not session.composite_image_path:
+        raise SessionNotFoundError(str(session_id))
+
+    if not os.path.exists(session.composite_image_path):
+        raise SessionNotFoundError(str(session_id))
+
+    # Try pre-generated thumbnail
+    composite_dir = os.path.dirname(session.composite_image_path)
+    composite_name = os.path.basename(session.composite_image_path)
+    thumb_name = composite_name.replace('vibeprint_composite_', 'vibeprint_thumb_')
+    thumb_path = os.path.join(composite_dir, thumb_name)
+
+    if os.path.exists(thumb_path):
+        return FileResponse(thumb_path, media_type='image/jpeg')
+
+    # Generate thumbnail on the fly
+    img = Image.open(session.composite_image_path)
+    thumb_height = 300
+    ratio = thumb_height / img.height
+    thumb_width = int(img.width * ratio)
+    thumb = img.resize((thumb_width, thumb_height), Image.Resampling.LANCZOS)
+
+    thumb.save(thumb_path, 'JPEG', quality=85)
+
+    return FileResponse(thumb_path, media_type='image/jpeg')
+
+
 @router.post('/session/{session_id}/photobooth/print', response_model=SuccessMessage)
 async def photobooth_print(
     session_id: UUID,
@@ -648,9 +693,11 @@ async def get_features(
     capture_time_limit = int(photobooth_config.get('photobooth_capture_time_limit_seconds', '30'))
     default_layout_rows = int(photobooth_config.get('photobooth_default_layout_rows', '4'))
 
-    # Vibe check is always enabled (at least one feature must be on)
+    vc_config = await config_service.get_configs_by_category(db, 'vibe_check')
+    vibe_check_enabled = vc_config.get('vibe_check_enabled', 'true').lower() == 'true'
+
     return FeaturesResponse(
-        vibe_check_enabled=True,
+        vibe_check_enabled=vibe_check_enabled,
         photobooth_enabled=photobooth_enabled,
         photobooth_max_photos=max_photos,
         photobooth_min_photos=min_photos,
