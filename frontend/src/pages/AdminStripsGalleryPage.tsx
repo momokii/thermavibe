@@ -5,7 +5,7 @@ import type { StripGalleryItem, VibeCheckResultItem } from '@/api/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download } from 'lucide-react';
+import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download, Copy } from 'lucide-react';
 
 const PAGE_SIZE = 24;
 
@@ -364,15 +364,30 @@ export default function AdminStripsGalleryPage() {
                         <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
                       )}
                     </div>
-                    <a
-                      href={selectedResult.photo_url}
-                      download
-                      className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                      style={{ padding: '0.5rem 1rem' }}
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedResult.analysis_text) {
+                            navigator.clipboard.writeText(selectedResult.analysis_text);
+                          }
+                        }}
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                        style={{ padding: '0.5rem 1rem' }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                      <a
+                        href={selectedResult.photo_url}
+                        download
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                        style={{ padding: '0.5rem 1rem' }}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
