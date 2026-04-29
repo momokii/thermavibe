@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Sparkles, Loader2 } from 'lucide-react';
 
@@ -68,18 +67,32 @@ export default function AiConfig() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <Label className="text-xs text-white/40 uppercase tracking-wider">Provider</Label>
           <p className="text-xs text-white/25">The AI engine used for photo analysis. Each provider has different models and pricing.</p>
-          <Select value={provider} onValueChange={setProvider}>
-            <SelectTrigger className="input-surface text-white" style={{ padding: '0.75rem 1rem', height: 'auto' }}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mock">Mock (Testing)</SelectItem>
-              <SelectItem value="openai">OpenAI</SelectItem>
-              <SelectItem value="anthropic">Anthropic</SelectItem>
-              <SelectItem value="google">Google Gemini</SelectItem>
-              <SelectItem value="ollama">Ollama (Local)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div
+            className="flex flex-wrap gap-1 rounded-lg bg-white/[0.03] border border-white/[0.06]"
+            style={{ padding: '0.25rem', width: 'fit-content' }}
+          >
+            {([
+              ['mock', 'Mock'],
+              ['openai', 'OpenAI'],
+              ['anthropic', 'Anthropic'],
+              ['google', 'Gemini'],
+              ['ollama', 'Ollama'],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setProvider(value)}
+                className={`rounded-md text-sm font-medium transition-colors ${
+                  provider === value
+                    ? 'bg-white/[0.08] text-violet-400'
+                    : 'text-white/40 hover:text-white/60'
+                }`}
+                style={{ padding: '0.5rem 1.25rem' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         {provider === 'openai' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
