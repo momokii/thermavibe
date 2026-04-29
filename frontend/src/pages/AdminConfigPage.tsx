@@ -1,8 +1,12 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from 'react';
 import AiConfig from '@/components/admin/AiConfig';
 import PaymentConfig from '@/components/admin/PaymentConfig';
 
+type ConfigTab = 'ai' | 'payment';
+
 export default function AdminConfigPage() {
+  const [tab, setTab] = useState<ConfigTab>('ai');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
@@ -11,20 +15,39 @@ export default function AdminConfigPage() {
           Manage AI provider and payment settings.
         </p>
       </div>
-      <Tabs defaultValue="ai">
-        <TabsList>
-          <TabsTrigger value="ai">AI Provider</TabsTrigger>
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-        </TabsList>
-        <div style={{ marginTop: '2rem' }}>
-          <TabsContent value="ai" style={{ marginTop: 0 }}>
-            <AiConfig />
-          </TabsContent>
-          <TabsContent value="payment" style={{ marginTop: 0 }}>
-            <PaymentConfig />
-          </TabsContent>
-        </div>
-      </Tabs>
+      <div
+        className="flex gap-1 rounded-lg bg-white/[0.03] border border-white/[0.06]"
+        style={{ padding: '0.25rem', width: 'fit-content' }}
+      >
+        <button
+          type="button"
+          onClick={() => setTab('ai')}
+          className={`rounded-md text-sm font-medium transition-colors ${
+            tab === 'ai'
+              ? 'bg-white/[0.08] text-violet-400'
+              : 'text-white/40 hover:text-white/60'
+          }`}
+          style={{ padding: '0.5rem 1.25rem' }}
+        >
+          AI Provider
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('payment')}
+          className={`rounded-md text-sm font-medium transition-colors ${
+            tab === 'payment'
+              ? 'bg-white/[0.08] text-violet-400'
+              : 'text-white/40 hover:text-white/60'
+          }`}
+          style={{ padding: '0.5rem 1.25rem' }}
+        >
+          Payment
+        </button>
+      </div>
+      <div>
+        {tab === 'ai' && <AiConfig />}
+        {tab === 'payment' && <PaymentConfig />}
+      </div>
     </div>
   );
 }
