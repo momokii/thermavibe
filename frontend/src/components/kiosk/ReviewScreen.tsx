@@ -117,7 +117,7 @@ export default function ReviewScreen() {
         )}
 
         {/* Action buttons — kiosk-sized touch targets */}
-        <div className="flex gap-6">
+        <div className="flex flex-row gap-4 justify-center items-center w-full px-8">
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={retake}
@@ -132,7 +132,7 @@ export default function ReviewScreen() {
             whileTap={{ scale: 0.97 }}
             onClick={confirmSelection}
             disabled={isTransitioning || photos.length === 0}
-            className="flex-[2] py-4 rounded-xl text-white text-lg font-display font-bold
+            className="flex-1 py-4 rounded-xl text-white text-lg font-display font-bold
                        disabled:opacity-30 transition-all duration-150 btn-primary"
           >
             {isTransitioning ? 'Analyzing...' : 'Analyze My Vibe'}

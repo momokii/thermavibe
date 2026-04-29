@@ -199,16 +199,26 @@ export default function PhotoboothConfig() {
 
         {/* Retention */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <Label className="text-xs text-white/40 uppercase tracking-wider">Composite Retention (hours)</Label>
-          <p className="text-xs text-white/25">How long to keep photobooth strips for admin viewing. Set to 0 for forever.</p>
-          <Input
-            type="number"
-            value={retentionHours}
-            onChange={(e) => setRetentionHours(e.target.value)}
-            className="input-surface text-white placeholder:text-white/20"
-            style={{ padding: '0.75rem 1rem' }}
-            min="0"
-          />
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Strip Retention</Label>
+          <p className="text-xs text-white/25">
+            How long to keep photobooth strips in the gallery. After this time, old strips will be automatically
+            deleted. The system checks and cleans up based on this period. Set to 0 to keep forever.
+          </p>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={0}
+              max={8760}
+              value={retentionHours}
+              onChange={(e) => setRetentionHours(e.target.value)}
+              className="input-surface text-white w-24"
+              style={{ padding: '0.5rem 0.75rem' }}
+            />
+            <span className="text-xs text-white/40">hours</span>
+            <span className="text-xs text-white/25">
+              ({Number(retentionHours) > 0 ? `${(Number(retentionHours) / 24).toFixed(1)} days` : 'Forever'})
+            </span>
+          </div>
         </div>
 
         {/* AI Prompt (future use) */}

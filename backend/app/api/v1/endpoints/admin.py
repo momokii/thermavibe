@@ -26,6 +26,8 @@ from app.schemas.photobooth import (
     ThemeUpdateRequest,
     StripGalleryResponse,
     StripGalleryItem,
+    VibeCheckResultsResponse,
+    VibeCheckResultItem,
 )
 from app.schemas.print import PrintTestResponse
 from app.services import analytics_service, config_service
@@ -403,3 +405,59 @@ async def list_strips(
     total = sum(1 for row in count_result if os.path.exists(row[1]))
 
     return StripGalleryResponse(strips=strips, total=total)
+
+
+@router.get('/vibe-check/results', response_model=VibeCheckResultsResponse)
+async def list_vibe_check_results(
+    limit: int = 24,
+    offset: int = 0,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> VibeCheckResultsResponse:
+    """List completed vibe check sessions with AI analysis results."""
+    import os
+
+    from sqlalchemy import select
+
+    from app.models.session import KioskSession, SessionType
+
+    base_filter = (
+        (KioskSession.session_type == SessionType.VIBE_CHECK)
+        & (KioskSession.photo_path.isnot(None))  # type: ignore[union-attr]
+        & (KioskSession.ai_response_text.isnot(None))  # type: ignore[union-attr]
+    )
+
+    # Over-fetch to account for missing files, then trim.
+    fetch_limit = limit * 3
+    stmt = (
+        select(KioskSession)
+        .where(base_filter)
+        .order_by(KioskSession.created_at.desc())
+        .limit(fetch_limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
+    sessions = result.scalars().all()
+
+    results: list[VibeCheckResultItem] = []
+    for session in sessions:
+        if len(results) >= limit:
+            break
+        if not os.path.exists(session.photo_path):
+            continue
+
+        results.append(VibeCheckResultItem(
+            session_id=session.id,
+            photo_url=f'/api/v1/kiosk/session/{session.id}/photo',
+            thumbnail_url=f'/api/v1/kiosk/session/{session.id}/photo/thumb',
+            created_at=session.created_at,
+            analysis_text=session.ai_response_text,
+            analysis_provider=session.ai_provider_used,
+        ))
+
+    # Count total with existing files.
+    count_stmt = select(KioskSession.id, KioskSession.photo_path).where(base_filter)
+    count_result = await db.execute(count_stmt)
+    total = sum(1 for row in count_result if os.path.exists(row[1]))
+
+    return VibeCheckResultsResponse(results=results, total=total)

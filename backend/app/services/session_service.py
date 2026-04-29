@@ -18,6 +18,7 @@ Valid transitions:
 
 from __future__ import annotations
 
+import tempfile
 import uuid
 from datetime import datetime, timezone
 
@@ -606,26 +607,50 @@ async def _clear_session_data(db: AsyncSession, session: KioskSession) -> None:
     """
     import os
 
-    # Delete all photo files from disk
+    # Delete individual capture photos from disk.
+    # For vibe_check: preserve the selected photo (photo_path) — skip it in the array.
     if session.photos:
         for entry in session.photos:
             path = entry.get('photo_path') if isinstance(entry, dict) else None
-            if path and os.path.exists(path):
+            if not path or not os.path.exists(path):
+                continue
+            # Don't delete the selected vibe check photo (same file as photo_path)
+            if session.session_type == SessionType.VIBE_CHECK and path == session.photo_path:
+                continue
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    # For non-vibe-check sessions, delete photo_path as well
+    if session.session_type != SessionType.VIBE_CHECK:
+        if session.photo_path and os.path.exists(session.photo_path):
+            try:
+                os.remove(session.photo_path)
+            except OSError:
+                pass
+        session.photo_path = None
+    else:
+        # Move vibe check photo into persistent volume so it survives container restart
+        if session.photo_path and os.path.exists(session.photo_path):
+            from pathlib import Path
+            persistent_dir = Path(tempfile.gettempdir()) / 'vibeprint'
+            persistent_dir.mkdir(parents=True, exist_ok=True)
+            src = Path(session.photo_path)
+            if src.parent != persistent_dir:
+                dst = persistent_dir / src.name
                 try:
-                    os.remove(path)
+                    import shutil
+                    shutil.move(str(src), str(dst))
+                    session.photo_path = str(dst)
                 except OSError:
                     pass
-    if session.photo_path and os.path.exists(session.photo_path):
-        try:
-            os.remove(session.photo_path)
-        except OSError:
-            pass
 
-    session.photo_path = None
     session.photos = []
     session.cleared_at = datetime.now(timezone.utc)
-    # Note: composite_image_path is preserved for photobooth sessions
-    # so admin can view results. Cleanup is handled by retention policy.
+    # Note: composite_image_path is preserved for photobooth sessions and
+    # photo_path is preserved for vibe_check sessions so admin can view results.
+    # Cleanup is handled by the retention policy background task.
 
 
 def _make_event(

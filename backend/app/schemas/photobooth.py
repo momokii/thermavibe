@@ -213,3 +213,26 @@ class StripGalleryResponse(BaseModel):
 
     strips: list[StripGalleryItem]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Admin vibe check results schemas
+# ---------------------------------------------------------------------------
+
+
+class VibeCheckResultItem(BaseModel):
+    """A single vibe check result in the gallery."""
+
+    session_id: UUID
+    photo_url: str = Field(description='URL to the captured photo')
+    thumbnail_url: str = Field(description='URL to photo thumbnail')
+    created_at: datetime
+    analysis_text: str | None = Field(default=None, description='AI vibe reading')
+    analysis_provider: str | None = Field(default=None, description='AI provider used')
+
+
+class VibeCheckResultsResponse(BaseModel):
+    """Paginated vibe check results response."""
+
+    results: list[VibeCheckResultItem]
+    total: int

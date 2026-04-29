@@ -415,6 +415,22 @@ export interface StripGalleryResponse {
   total: number;
 }
 
+// --- Vibe Check Results ---
+
+export interface VibeCheckResultItem {
+  session_id: string;
+  photo_url: string;
+  thumbnail_url: string;
+  created_at: string;
+  analysis_text: string | null;
+  analysis_provider: string | null;
+}
+
+export interface VibeCheckResultsResponse {
+  results: VibeCheckResultItem[];
+  total: number;
+}
+
 // --- Theme ---
 
 export interface BackgroundConfig {

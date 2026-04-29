@@ -16,6 +16,7 @@ import type {
   CameraListResponse,
   CameraSelectResponse,
   StripGalleryResponse,
+  VibeCheckResultsResponse,
 } from './types';
 
 export const adminApi = {
@@ -57,4 +58,7 @@ export const adminApi = {
 
   getStrips: (params?: { limit?: number; offset?: number }) =>
     apiClient.get<StripGalleryResponse>('/admin/photobooth/strips', { params }),
+
+  getVibeCheckResults: (params?: { limit?: number; offset?: number }) =>
+    apiClient.get<VibeCheckResultsResponse>('/admin/vibe-check/results', { params }),
 };

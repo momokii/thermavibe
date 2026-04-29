@@ -251,6 +251,45 @@ async def get_session_photo(
     )
 
 
+@router.get('/session/{session_id}/photo/thumb')
+async def get_session_photo_thumbnail(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Serve a thumbnail of the session's captured photo.
+
+    Generates a 300px-height thumbnail on the fly and caches it
+    alongside the original.
+    """
+    from PIL import Image
+
+    session = await session_service.get_session(db, session_id)
+
+    if not session.photo_path:
+        raise SessionNotFoundError(str(session_id))
+
+    if not os.path.exists(session.photo_path):
+        raise SessionNotFoundError(str(session_id))
+
+    photo_dir = os.path.dirname(session.photo_path)
+    photo_name = os.path.basename(session.photo_path)
+    thumb_name = photo_name.replace('vibeprint_', 'vibeprint_thumb_')
+    thumb_path = os.path.join(photo_dir, thumb_name)
+
+    if os.path.exists(thumb_path):
+        return FileResponse(thumb_path, media_type='image/jpeg')
+
+    img = Image.open(session.photo_path)
+    thumb_height = 300
+    ratio = thumb_height / img.height
+    thumb_width = int(img.width * ratio)
+    thumb = img.resize((thumb_width, thumb_height), Image.Resampling.LANCZOS)
+
+    thumb.save(thumb_path, 'JPEG', quality=85)
+
+    return FileResponse(thumb_path, media_type='image/jpeg')
+
+
 @router.get('/session/{session_id}/photo/{photo_index}')
 async def get_session_gallery_photo(
     session_id: UUID,

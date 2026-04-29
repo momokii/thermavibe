@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Sparkles, Loader2 } from 'lucide-react';
 
@@ -24,12 +25,15 @@ export default function VibeCheckConfig() {
 
   const [enabled, setEnabled] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_PROMPT);
+  const [retentionHours, setRetentionHours] = useState(168);
 
   useEffect(() => {
     if (vcConfig.vibe_check_enabled !== undefined)
       setEnabled(String(vcConfig.vibe_check_enabled) === 'true');
     if (vcConfig.vibe_check_system_prompt)
       setSystemPrompt(String(vcConfig.vibe_check_system_prompt));
+    if (vcConfig.vibe_check_retention_hours !== undefined)
+      setRetentionHours(Number(vcConfig.vibe_check_retention_hours));
   }, [vcConfig]);
 
   const saveMutation = useMutation({
@@ -56,8 +60,11 @@ export default function VibeCheckConfig() {
     saveMutation.mutate({
       vibe_check_enabled: enabled,
       vibe_check_system_prompt: systemPrompt,
+      vibe_check_retention_hours: retentionHours,
     });
   };
+
+  const retentionDays = retentionHours > 0 ? (retentionHours / 24).toFixed(1) : 'Forever';
 
   return (
     <Card className="card-surface border-0">
@@ -100,6 +107,28 @@ export default function VibeCheckConfig() {
           <p className="text-xs text-white/20">
             {systemPrompt.length} characters
           </p>
+        </div>
+
+        {/* Retention policy */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <Label className="text-xs text-white/40 uppercase tracking-wider">Result Retention</Label>
+          <p className="text-xs text-white/25">
+            How long to keep vibe check photos and AI readings in the gallery. After this time, old results will be automatically
+            deleted. The system checks and cleans up based on this period. Set to 0 to keep forever.
+          </p>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={0}
+              max={8760}
+              value={retentionHours}
+              onChange={(e) => setRetentionHours(Math.max(0, parseInt(e.target.value) || 0))}
+              className="input-surface text-white w-24"
+              style={{ padding: '0.5rem 0.75rem' }}
+            />
+            <span className="text-xs text-white/40">hours</span>
+            <span className="text-xs text-white/25">({retentionDays})</span>
+          </div>
         </div>
 
         {/* Save */}

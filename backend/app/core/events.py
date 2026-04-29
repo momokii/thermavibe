@@ -6,6 +6,7 @@ startup and shutdown events.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -85,9 +86,39 @@ async def lifespan(app: FastAPI):
 
     logger.info('application_started', health_checks=checks)
 
+    # Start background retention cleanup task
+    retention_task: asyncio.Task | None = None
+    try:
+        from app.core.database import async_session_maker
+        from app.services.retention_service import purge_expired_sessions, retention_cleanup_loop
+
+        # Run once immediately to clean up files that expired while down
+        try:
+            async with async_session_maker() as db:
+                startup_result = await purge_expired_sessions(db)
+                if startup_result['photobooth_purged'] or startup_result['vibe_check_purged']:
+                    logger.info('retention_startup_purge', **startup_result)
+        except Exception as exc:
+            logger.warning('retention_startup_purge_failed', error=str(exc))
+
+        # Start periodic cleanup loop
+        retention_task = asyncio.create_task(
+            retention_cleanup_loop(async_session_maker),
+            name='retention_cleanup',
+        )
+    except Exception as exc:
+        logger.warning('retention_task_start_failed', error=str(exc))
+
     yield  # Application runs here
 
     # --- Shutdown ---
+    if retention_task and not retention_task.done():
+        retention_task.cancel()
+        try:
+            await retention_task
+        except asyncio.CancelledError:
+            pass
+
     logger.info('application_stopping')
     logger.info('application_stopped')
 

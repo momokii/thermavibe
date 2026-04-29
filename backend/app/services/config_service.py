@@ -67,6 +67,7 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
     ConfigCategory.VIBE_CHECK: {
         'vibe_check_enabled': {'value': 'true', 'description': 'Enable vibe check feature'},
         'vibe_check_system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for vibe check AI analysis'},
+        'vibe_check_retention_hours': {'value': '168', 'description': 'Vibe check result retention period in hours (0 = forever)'},
     },
 }
 

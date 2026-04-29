@@ -12,7 +12,7 @@ const navItems = [
   { label: 'Hardware', path: '/admin/hardware', icon: HardDrive },
   { label: 'Vibe Check', path: '/admin/vibe-check', icon: Sparkles },
   { label: 'Photobooth', path: '/admin/photobooth', icon: Camera },
-  { label: 'Strip Gallery', path: '/admin/strips', icon: ImageIcon },
+  { label: 'Gallery', path: '/admin/strips', icon: ImageIcon },
   { label: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
 ];
 
