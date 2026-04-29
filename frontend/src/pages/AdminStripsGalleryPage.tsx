@@ -5,7 +5,7 @@ import type { StripGalleryItem, VibeCheckResultItem } from '@/api/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles } from 'lucide-react';
+import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download } from 'lucide-react';
 
 const PAGE_SIZE = 24;
 
@@ -260,7 +260,7 @@ export default function AdminStripsGalleryPage() {
 
       {/* Summary */}
       {((tab === 'photobooth' && strips.length > 0) || (tab === 'vibe_check' && results.length > 0)) && (
-        <p className="text-center text-xs text-white/20 mt-3">
+        <p className="text-center text-xs text-white/20" style={{ marginTop: '1.5rem' }}>
           Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
         </p>
       )}
@@ -294,10 +294,20 @@ export default function AdminStripsGalleryPage() {
                 />
               </div>
               <div className="flex items-center justify-between" style={{ padding: '0.75rem 1.5rem' }}>
-                <p className="text-sm text-white/60">{formatDate(selectedStrip.created_at)}</p>
-                {selectedStrip.theme_name && (
-                  <p className="text-sm text-white/40">{selectedStrip.theme_name}</p>
-                )}
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-white/60">{formatDate(selectedStrip.created_at)}</p>
+                  {selectedStrip.theme_name && (
+                    <p className="text-sm text-white/40">{selectedStrip.theme_name}</p>
+                  )}
+                </div>
+                <a
+                  href={selectedStrip.composite_url}
+                  download
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </a>
               </div>
             </div>
           )}
@@ -347,10 +357,20 @@ export default function AdminStripsGalleryPage() {
                     <p className="text-sm text-white/30 italic">No analysis available</p>
                   )}
                   <div className="mt-auto pt-4 flex items-center justify-between">
-                    <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
-                    {selectedResult.analysis_provider && (
-                      <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
+                      {selectedResult.analysis_provider && (
+                        <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
+                      )}
+                    </div>
+                    <a
+                      href={selectedResult.photo_url}
+                      download
+                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </a>
                   </div>
                 </div>
               </div>
