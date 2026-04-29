@@ -14,6 +14,7 @@ from app.schemas.admin import (
     ConfigAllResponse,
     ConfigUpdateRequest,
     ConfigUpdateResponse,
+    FeatureBreakdownResponse,
     HardwareStatusResponse,
     LoginRequest,
     LoginResponse,
@@ -137,6 +138,21 @@ async def revenue_analytics(
         start_date=start_date,
         end_date=end_date,
         group_by=group_by,
+    )
+
+
+@router.get('/analytics/features', response_model=FeatureBreakdownResponse)
+async def feature_breakdown(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> FeatureBreakdownResponse:
+    """Get per-feature analytics breakdown (vibe_check vs photobooth)."""
+    return await analytics_service.get_feature_breakdown(
+        db=db,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

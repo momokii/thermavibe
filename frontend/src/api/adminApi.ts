@@ -10,6 +10,7 @@ import type {
   ConfigUpdateResponse,
   SessionAnalyticsResponse,
   RevenueAnalyticsResponse,
+  FeatureBreakdownResponse,
   HardwareStatusResponse,
   PrintTestResponse,
   PrintStatusResponse,
@@ -34,6 +35,9 @@ export const adminApi = {
 
   getRevenueAnalytics: (params?: { start_date?: string; end_date?: string; group_by?: string }) =>
     apiClient.get<RevenueAnalyticsResponse>('/admin/analytics/revenue', { params }),
+
+  getFeatureBreakdown: (params?: { start_date?: string; end_date?: string }) =>
+    apiClient.get<FeatureBreakdownResponse>('/admin/analytics/features', { params }),
 
   getHardwareStatus: () =>
     apiClient.get<HardwareStatusResponse>('/admin/hardware/status'),

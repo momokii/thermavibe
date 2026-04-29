@@ -287,6 +287,22 @@ export interface RevenueAnalyticsResponse {
   by_provider: Record<string, ProviderRevenueStats>;
 }
 
+// --- Feature Breakdown ---
+
+export interface FeatureBreakdownItem {
+  feature: string;
+  total_sessions: number;
+  completed_sessions: number;
+  abandoned_sessions: number;
+  completion_rate: number;
+  avg_duration_seconds: number;
+  revenue: number;
+}
+
+export interface FeatureBreakdownResponse {
+  features: FeatureBreakdownItem[];
+}
+
 // --- Admin Hardware ---
 
 export interface CameraDeviceInfo {

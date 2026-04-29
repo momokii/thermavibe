@@ -125,6 +125,24 @@ class RevenueAnalyticsResponse(BaseModel):
     by_provider: dict[str, ProviderRevenueStats] = Field(default_factory=dict)
 
 
+class FeatureBreakdownItem(BaseModel):
+    """Per-feature analytics breakdown."""
+
+    feature: str = Field(description='Feature name: vibe_check or photobooth')
+    total_sessions: int
+    completed_sessions: int
+    abandoned_sessions: int
+    completion_rate: float
+    avg_duration_seconds: float
+    revenue: int
+
+
+class FeatureBreakdownResponse(BaseModel):
+    """Response for GET /api/v1/admin/analytics/features."""
+
+    features: list[FeatureBreakdownItem]
+
+
 # --- Hardware ---
 
 class CameraDeviceInfo(BaseModel):

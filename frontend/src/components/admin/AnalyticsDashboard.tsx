@@ -16,7 +16,16 @@ const STATE_LABELS: Record<string, string> = {
   review: 'Review',
   processing: 'Processing',
   reveal: 'Reveal',
+  frame_select: 'Frame Select',
+  arrange: 'Arrange',
+  compositing: 'Compositing',
+  photobooth_reveal: 'Photobooth Reveal',
   reset: 'Reset',
+};
+
+const FEATURE_LABELS: Record<string, string> = {
+  vibe_check: 'Vibe Check',
+  photobooth: 'Photobooth',
 };
 
 const MAX_TABLE_ROWS = 14;
@@ -74,6 +83,11 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const { data: revenue, isLoading: revenueLoading } = useQuery({
     queryKey: ['analytics-revenue', params],
     queryFn: () => adminApi.getRevenueAnalytics(params).then((r) => r.data),
+  });
+
+  const { data: features } = useQuery({
+    queryKey: ['analytics-features', params],
+    queryFn: () => adminApi.getFeatureBreakdown(params).then((r) => r.data),
   });
 
   if (sessionsLoading || revenueLoading) {
@@ -154,6 +168,49 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           </Card>
         ))}
       </div>
+
+      {/* Feature Breakdown */}
+      {features && features.features.length > 0 && (
+        <Card className="card-surface border-0">
+          <div style={{ padding: '1.25rem 1.5rem' }}>
+            <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Feature Breakdown</h3>
+            <p className="text-xs text-white/25" style={{ marginBottom: '1.25rem' }}>
+              Performance comparison between Vibe Check and Photobooth sessions.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              {features.features.map((f) => (
+                <div
+                  key={f.feature}
+                  className="rounded-lg border border-white/[0.06] bg-white/[0.02]"
+                  style={{ padding: '1rem 1.25rem' }}
+                >
+                  <p className="text-sm font-medium text-white/70" style={{ marginBottom: '0.75rem' }}>
+                    {FEATURE_LABELS[f.feature] ?? f.feature}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div>
+                      <p className="text-xs text-white/30">Sessions</p>
+                      <p className="text-lg font-display font-bold text-white tabular-nums">{f.total_sessions}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/30">Completion</p>
+                      <p className="text-lg font-display font-bold text-white">{formatPercent(f.completion_rate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/30">Avg Duration</p>
+                      <p className="text-sm font-display font-semibold text-white/80">{formatDuration(f.avg_duration_seconds)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/30">Revenue</p>
+                      <p className="text-sm font-display font-semibold text-white/80">{formatIDR(f.revenue)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {mode === 'full' && (
         <>

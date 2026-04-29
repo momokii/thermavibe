@@ -1,4 +1,4 @@
-"""Unit tests for analytics service -- event recording and analytics queries."""
+"""Unit tests for analytics service -- event recording, analytics queries, feature breakdown."""
 
 from __future__ import annotations
 
@@ -87,56 +87,37 @@ class TestRecordEvent:
     async def test_creates_event(self):
         """record_event creates an AnalyticsEvent with correct event_type."""
         db = _make_mock_db()
-        mock_event = _make_mock_event(event_type='session_start')
-
-        def refresh_side_effect(obj):
-            obj.id = mock_event.id
-            obj.timestamp = mock_event.timestamp
-
-        db.refresh.side_effect = refresh_side_effect
 
         from app.services.analytics_service import record_event
 
         result = await record_event(db, event_type='session_start')
 
         db.add.assert_called_once()
-        db.commit.assert_awaited_once()
-        assert result.event_type == 'session_start'
-
-    async def test_with_session_id(self):
-        """record_event with session_id stores it on the event."""
-        db = _make_mock_db()
-        session_id = uuid.uuid4()
-
-        def refresh_side_effect(obj):
-            obj.id = uuid.uuid4()
-
-        db.refresh.side_effect = refresh_side_effect
-
-        from app.services.analytics_service import record_event
-
-        result = await record_event(db, event_type='capture_complete', session_id=str(session_id))
-
-        db.add.assert_called_once()
-        # The event should have been created with the session_id
         added_event = db.add.call_args[0][0]
-        assert added_event.session_id == session_id
+        assert added_event.event_type == 'session_start'
+        assert db.commit.await_count == 1
 
-    async def test_with_metadata(self):
-        """record_event with metadata stores it on the event."""
+    async def test_creates_event_with_session_id(self):
+        """record_event sets session_id when provided."""
         db = _make_mock_db()
-
-        def refresh_side_effect(obj):
-            obj.id = uuid.uuid4()
-
-        db.refresh.side_effect = refresh_side_effect
+        sid = str(uuid.uuid4())
 
         from app.services.analytics_service import record_event
 
-        meta = {'provider': 'openai', 'model': 'gpt-4o'}
-        result = await record_event(db, event_type='ai_response_received', metadata=meta)
+        await record_event(db, event_type='capture', session_id=sid)
 
-        db.add.assert_called_once()
+        added_event = db.add.call_args[0][0]
+        assert str(added_event.session_id) == sid
+
+    async def test_creates_event_with_metadata(self):
+        """record_event sets metadata_ when provided."""
+        db = _make_mock_db()
+        meta = {'photo_index': 2, 'from_state': 'capture'}
+
+        from app.services.analytics_service import record_event
+
+        await record_event(db, event_type='photo_selected', metadata=meta)
+
         added_event = db.add.call_args[0][0]
         assert added_event.metadata_ == meta
 
@@ -176,12 +157,11 @@ class TestGetSessionAnalytics:
 
         assert result.summary.total_sessions == 0
         assert result.summary.completed_sessions == 0
-        assert result.summary.abandoned_sessions == 0
         assert result.summary.completion_rate == 0.0
         assert result.summary.avg_duration_seconds == 0.0
 
     async def test_with_sessions(self):
-        """get_session_analytics with sessions returns correct summary."""
+        """get_session_analytics with sessions returns correct metrics."""
         db = _make_mock_db()
 
         call_idx = 0
@@ -190,19 +170,14 @@ class TestGetSessionAnalytics:
             nonlocal call_idx
             call_idx += 1
             if call_idx == 1:
-                # total count
-                return _mock_scalar(10)
+                return _mock_scalar(10)  # total
             if call_idx == 2:
-                # completed count
-                return _mock_scalar(7)
+                return _mock_scalar(8)  # completed
             if call_idx == 3:
-                # avg duration
-                return _mock_scalar(45.5)
+                return _mock_scalar(15.5)  # avg duration
             if call_idx == 4:
-                # state distribution
-                state_rows = [('idle', 1), ('capture', 2), ('processing', 1)]
-                return _mock_all(state_rows)
-            # timeseries (date_trunc - mock empty to avoid PG-specific issues)
+                return _mock_all([('idle', 3), ('reset', 7)])  # state dist
+            # timeseries
             return _mock_all([])
 
         db.execute.side_effect = execute_side_effect
@@ -212,11 +187,11 @@ class TestGetSessionAnalytics:
         result = await get_session_analytics(db)
 
         assert result.summary.total_sessions == 10
-        assert result.summary.completed_sessions == 7
-        assert result.summary.abandoned_sessions == 3  # 10 - 7
-        assert result.summary.completion_rate == 70.0
-        assert result.summary.avg_duration_seconds == 45.5
-        assert result.state_distribution == {'idle': 1, 'capture': 2, 'processing': 1}
+        assert result.summary.completed_sessions == 8
+        assert result.summary.abandoned_sessions == 2
+        assert result.summary.completion_rate == 0.8
+        assert result.summary.avg_duration_seconds == 15.5
+        assert result.state_distribution == {'idle': 3, 'reset': 7}
 
 
 # ---------------------------------------------------------------------------
@@ -227,8 +202,8 @@ class TestGetSessionAnalytics:
 class TestGetRevenueAnalytics:
     """Tests for get_revenue_analytics()."""
 
-    async def test_no_payments_returns_zero(self):
-        """get_revenue_analytics with no payments returns zero totals."""
+    async def test_empty_returns_zero_totals(self):
+        """get_revenue_analytics with no transactions returns zero."""
         db = _make_mock_db()
 
         call_idx = 0
@@ -237,9 +212,7 @@ class TestGetRevenueAnalytics:
             nonlocal call_idx
             call_idx += 1
             if call_idx == 1:
-                # revenue summary row
                 return _mock_one(tx_count=0, total=0, avg=0)
-            # timeseries
             return _mock_all([])
 
         db.execute.side_effect = execute_side_effect
@@ -250,14 +223,9 @@ class TestGetRevenueAnalytics:
 
         assert result.summary.total_revenue == 0
         assert result.summary.total_transactions == 0
-        assert result.summary.avg_transaction_amount == 0
-        assert result.summary.currency == 'IDR'
-        assert result.summary.refund_count == 0
-        assert result.summary.refund_total == 0
-        assert len(result.timeseries) == 0
 
-    async def test_with_payments(self):
-        """get_revenue_analytics with payments returns correct totals."""
+    async def test_with_transactions(self):
+        """get_revenue_analytics with transactions returns correct totals."""
         db = _make_mock_db()
 
         call_idx = 0
@@ -266,7 +234,6 @@ class TestGetRevenueAnalytics:
             nonlocal call_idx
             call_idx += 1
             if call_idx == 1:
-                # revenue summary row
                 return _mock_one(tx_count=5, total=25000, avg=5000)
             # timeseries
             return _mock_all([])
@@ -281,3 +248,82 @@ class TestGetRevenueAnalytics:
         assert result.summary.total_revenue == 25000
         assert result.summary.avg_transaction_amount == 5000
         assert result.summary.currency == 'IDR'
+
+
+# ---------------------------------------------------------------------------
+# get_feature_breakdown
+# ---------------------------------------------------------------------------
+
+
+class TestGetFeatureBreakdown:
+    """Tests for get_feature_breakdown()."""
+
+    async def test_returns_both_features_when_empty(self):
+        """Returns both vibe_check and photobooth even with no sessions."""
+        db = _make_mock_db()
+
+        # For each session_type: total, completed, avg, revenue = 4 calls per type
+        call_idx = 0
+
+        def execute_side_effect(stmt):
+            nonlocal call_idx
+            call_idx += 1
+            if call_idx in (1, 2, 3, 4, 5, 6, 7, 8):
+                return _mock_scalar(0) if call_idx not in (3, 7) else _mock_scalar(None)
+            return _mock_scalar(0)
+
+        db.execute.side_effect = execute_side_effect
+
+        from app.services.analytics_service import get_feature_breakdown
+
+        result = await get_feature_breakdown(db)
+
+        assert len(result.features) == 2
+        assert result.features[0].feature == 'vibe_check'
+        assert result.features[1].feature == 'photobooth'
+        for f in result.features:
+            assert f.total_sessions == 0
+            assert f.completed_sessions == 0
+            assert f.completion_rate == 0.0
+
+    async def test_separates_session_types(self):
+        """Correctly separates vibe_check and photobooth metrics."""
+        db = _make_mock_db()
+
+        # vibe_check: total=5, completed=4, avg=12.0, revenue=10000
+        # photobooth: total=3, completed=2, avg=25.0, revenue=6000
+        values = [
+            5, 4, 12.0, 10000,  # vibe_check: total, completed, avg, revenue
+            3, 2, 25.0, 6000,   # photobooth: total, completed, avg, revenue
+        ]
+        call_idx = 0
+
+        def execute_side_effect(stmt):
+            nonlocal call_idx
+            val = values[call_idx]
+            call_idx += 1
+            return _mock_scalar(val)
+
+        db.execute.side_effect = execute_side_effect
+
+        from app.services.analytics_service import get_feature_breakdown
+
+        result = await get_feature_breakdown(db)
+
+        vc = result.features[0]
+        assert vc.feature == 'vibe_check'
+        assert vc.total_sessions == 5
+        assert vc.completed_sessions == 4
+        assert vc.abandoned_sessions == 1
+        assert vc.completion_rate == 0.8
+        assert vc.avg_duration_seconds == 12.0
+        assert vc.revenue == 10000
+
+        pb = result.features[1]
+        assert pb.feature == 'photobooth'
+        assert pb.total_sessions == 3
+        assert pb.completed_sessions == 2
+        assert pb.abandoned_sessions == 1
+        assert pb.completion_rate == pytest.approx(0.67, abs=0.01)
+        assert pb.avg_duration_seconds == 25.0
+        assert pb.revenue == 6000

@@ -14,8 +14,10 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analytics import AnalyticsEvent
-from app.models.session import KioskSession, PaymentStatus
+from app.models.session import KioskSession, PaymentStatus, SessionType
 from app.schemas.admin import (
+    FeatureBreakdownItem,
+    FeatureBreakdownResponse,
     ProviderRevenueStats,
     RevenueAnalyticsResponse,
     RevenueAnalyticsSummary,
@@ -244,3 +246,72 @@ async def record_event(
     await db.commit()
     await db.refresh(event)
     return event
+
+
+async def get_feature_breakdown(
+    db: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> FeatureBreakdownResponse:
+    """Get per-feature analytics breakdown (vibe_check vs photobooth).
+
+    Returns completion rate, average duration, and revenue for each feature,
+    allowing the admin to compare feature performance.
+    """
+    now = datetime.now(timezone.utc)
+    if start_date is None:
+        start_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_date = start_date.replace(day=max(1, now.day - 30))
+    if end_date is None:
+        end_date = now
+
+    features: list[FeatureBreakdownItem] = []
+
+    for session_type in (SessionType.VIBE_CHECK, SessionType.PHOTOBOOTH):
+        base = (
+            KioskSession.session_type == session_type,
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+
+        # Total + completed counts
+        total_stmt = select(func.count()).select_from(KioskSession).where(*base)
+        total = (await db.execute(total_stmt)).scalar() or 0
+
+        completed_stmt = select(func.count()).select_from(KioskSession).where(
+            *base,
+            KioskSession.completed_at.isnot(None),
+        )
+        completed = (await db.execute(completed_stmt)).scalar() or 0
+
+        abandoned = total - completed
+        completion_rate = (completed / total) if total > 0 else 0.0
+
+        # Average duration
+        avg_stmt = select(
+            func.avg(
+                func.extract('epoch', KioskSession.completed_at - KioskSession.created_at),
+            ),
+        ).where(*base, KioskSession.completed_at.isnot(None))
+        avg_duration = float((await db.execute(avg_stmt)).scalar() or 0)
+
+        # Revenue
+        rev_stmt = select(
+            func.coalesce(func.sum(KioskSession.payment_amount), 0),
+        ).where(
+            *base,
+            KioskSession.payment_status == PaymentStatus.CONFIRMED,
+        )
+        revenue = int((await db.execute(rev_stmt)).scalar() or 0)
+
+        features.append(FeatureBreakdownItem(
+            feature=session_type.value,
+            total_sessions=total,
+            completed_sessions=completed,
+            abandoned_sessions=abandoned,
+            completion_rate=round(completion_rate, 2),
+            avg_duration_seconds=round(avg_duration, 2),
+            revenue=revenue,
+        ))
+
+    return FeatureBreakdownResponse(features=features)
