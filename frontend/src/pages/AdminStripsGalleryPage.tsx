@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 24;
 
@@ -332,12 +333,13 @@ export default function AdminStripsGalleryPage() {
                 {/* Photo */}
                 <div
                   className="bg-black/20 flex items-center justify-center md:w-1/2"
-                  style={{ maxHeight: '60vh', padding: '1.5rem' }}
+                  style={{ padding: '1.5rem' }}
                 >
                   <img
                     src={selectedResult.photo_url}
                     alt="Vibe check photo"
                     className="max-h-full max-w-full object-contain rounded"
+                    style={{ maxHeight: '60vh' }}
                     onError={() => {
                       handleImageError(selectedResult.session_id);
                       setSelectedResult(null);
@@ -346,47 +348,53 @@ export default function AdminStripsGalleryPage() {
                 </div>
                 {/* AI analysis */}
                 <div className="md:w-1/2 flex flex-col" style={{ padding: '1.5rem' }}>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2" style={{ marginBottom: '1rem' }}>
                     <Sparkles className="h-4 w-4 text-violet-400" />
                     <span className="text-sm font-medium text-white/70">AI Vibe Reading</span>
                   </div>
-                  {selectedResult.analysis_text ? (
-                    <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap">
-                      {selectedResult.analysis_text}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-white/30 italic">No analysis available</p>
-                  )}
-                  <div className="mt-auto pt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
-                      {selectedResult.analysis_provider && (
-                        <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectedResult.analysis_text) {
-                            navigator.clipboard.writeText(selectedResult.analysis_text);
-                          }
-                        }}
-                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                        style={{ padding: '0.5rem 1rem' }}
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy
-                      </button>
-                      <a
-                        href={selectedResult.photo_url}
-                        download
-                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                        style={{ padding: '0.5rem 1rem' }}
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </a>
+                  <div className="flex-1 overflow-y-auto" style={{ marginBottom: '1.5rem' }}>
+                    {selectedResult.analysis_text ? (
+                      <p className="text-sm text-white/60 leading-relaxed whitespace-pre-wrap">
+                        {selectedResult.analysis_text}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-white/30 italic">No analysis available</p>
+                    )}
+                  </div>
+                  {/* Footer with separator */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
+                        {selectedResult.analysis_provider && (
+                          <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedResult.analysis_text) {
+                              navigator.clipboard.writeText(selectedResult.analysis_text);
+                              toast.success('Vibe reading copied to clipboard');
+                            }
+                          }}
+                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                          style={{ padding: '0.5rem 1rem' }}
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copy
+                        </button>
+                        <a
+                          href={selectedResult.photo_url}
+                          download
+                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                          style={{ padding: '0.5rem 1rem' }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Download
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
