@@ -303,9 +303,10 @@ export default function AdminStripsGalleryPage() {
                 <a
                   href={selectedStrip.composite_url}
                   download
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                  className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                  style={{ padding: '0.5rem 1rem' }}
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-4 w-4" />
                   Download
                 </a>
               </div>
@@ -366,9 +367,10 @@ export default function AdminStripsGalleryPage() {
                     <a
                       href={selectedResult.photo_url}
                       download
-                      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                      className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                      style={{ padding: '0.5rem 1rem' }}
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      <Download className="h-4 w-4" />
                       Download
                     </a>
                   </div>
