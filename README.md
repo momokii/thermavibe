@@ -22,11 +22,13 @@ VibePrint OS turns a basic computer, a USB webcam, and a thermal receipt printer
 
 ## Features
 
-- **Kiosk flow**: Idle → Payment (optional) → Capture → AI Processing → Reveal → Print → Reset
-- **5 AI providers** with automatic fallback chain (OpenAI → Anthropic → Google → Ollama → Mock)
+- **Dual features**: Vibe Check (single photo + AI reading) and Photobooth (multi-photo strip with themes)
+- **5 AI providers** with automatic fallback chain (OpenAI, Anthropic, Google, Ollama, Mock)
 - **3 payment providers** (Midtrans, Xendit, Mock) — toggle-able, default OFF
-- **Admin dashboard**: PIN-protected, real-time analytics, config management, hardware testing
-- **Privacy-first**: photos and data are cleared after each session
+- **Admin dashboard**: PIN-protected, real-time analytics, feature breakdown (Vibe Check vs Photobooth), config management, hardware testing, photo/strips gallery
+- **Gallery**: Admin can browse, view, and download Vibe Check results and Photobooth strips with pagination
+- **Retention enforcement**: Configurable per-feature retention periods with automatic background cleanup
+- **Privacy-first**: photos retained only for the configured retention period, then automatically purged
 - **Hardware-agnostic**: any UVC webcam + any ESC/POS thermal printer
 
 ---
@@ -320,7 +322,7 @@ thermavibe/
 │   │   ├── models/          # SQLAlchemy ORM models (5 tables)
 │   │   ├── payment/         # Payment provider adapters (Midtrans, Xendit, Mock)
 │   │   ├── schemas/         # Pydantic request/response schemas (9 modules)
-│   │   ├── services/        # Business logic (7 services)
+│   │   ├── services/        # Business logic (9 services)
 │   │   └── utils/           # Utilities (dithering, ESC/POS, image processing, validators)
 │   ├── alembic/             # Database migrations
 │   ├── tests/               # Unit + integration tests (249 tests)

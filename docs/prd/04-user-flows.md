@@ -1,9 +1,9 @@
 # User Flows
 
 > **Document ID:** PRD-04
-> **Version:** 1.0
+> **Version:** 1.1
 > **Status:** Approved
-> **Last Updated:** 2026-04-04
+> **Last Updated:** 2026-04-29
 
 This document describes all primary user flows for VibePrint OS, including the end-user kiosk interaction, operator setup, and error recovery paths. Each flow includes ASCII sequence diagrams, timing constraints, timeout behavior, and error handling.
 
@@ -12,9 +12,10 @@ This document describes all primary user flows for VibePrint OS, including the e
 ## Table of Contents
 
 1. [End-User Kiosk Flow](#1-end-user-kiosk-flow)
-2. [Operator Setup Flow](#2-operator-setup-flow)
-3. [Payment Failure Flow](#3-payment-failure-flow)
-4. [AI Failure Flow](#4-ai-failure-flow)
+2. [Photobooth Flow](#2-photobooth-flow)
+3. [Operator Setup Flow](#3-operator-setup-flow)
+4. [Payment Failure Flow](#4-payment-failure-flow)
+5. [AI Failure Flow](#5-ai-failure-flow)
 
 ---
 
@@ -24,7 +25,7 @@ The end-user flow describes the complete journey from a person approaching the k
 
 ### 1.1 State Overview
 
-The kiosk operates as a finite state machine with six distinct states. Only specific transitions are valid between states.
+The kiosk operates as a finite state machine supporting two features: Vibe Check and Photobooth. After the payment step (if enabled), users choose a feature (or are directed automatically if only one is enabled).
 
 ```
                     +-------+
@@ -40,6 +41,18 @@ The kiosk operates as a finite state machine with six distinct states. Only spec
                 |       | Payment confirmed                        |
                 |       | (or payment disabled)                    |
                 |       v                                          |
+                |   +---+--------+                                 |
+                |   | FEATURE    |  (skipped if only one enabled) |
+                |   | SELECT     |                                 |
+                |   +---+--------+                                 |
+                |       |                                          |
+                |    +--+--+                                       |
+                |    |     |                                       |
+                |    v     v                                       |
+                |  Vibe   Photobooth                               |
+                |  Check  Flow (see Section 2)                     |
+                |    |                                             |
+                |    v                                             |
                 |   +---+-------+                                  |
                 |   | CAPTURE   |                                  |
                 |   +---+-------+                                  |
@@ -47,7 +60,7 @@ The kiosk operates as a finite state machine with six distinct states. Only spec
                 |       | Photo captured                           |
                 |       v                                          |
                 |   +---+----------+                               |
-                |   | PROCESSING  |                               |
+                |   | PROCESSING  |                                |
                 |   +---+----------+                               |
                 |       |                                          |
                 |       | AI response received                     |
@@ -65,8 +78,9 @@ The kiosk operates as a finite state machine with six distinct states. Only spec
                         |                                          |
                         +------------------------------------------+
 
-    * If payment is disabled: IDLE -> CAPTURE -> PROCESSING -> REVEAL/PRINT -> RESET -> IDLE
-    * If payment is enabled: IDLE -> PAYMENT -> CAPTURE -> PROCESSING -> REVEAL/PRINT -> RESET -> IDLE
+    * If payment is disabled: IDLE -> FEATURE_SELECT -> CAPTURE -> PROCESSING -> REVEAL -> RESET -> IDLE
+    * If payment is enabled: IDLE -> PAYMENT -> FEATURE_SELECT -> CAPTURE -> PROCESSING -> REVEAL -> RESET -> IDLE
+    * If only one feature is enabled: FEATURE_SELECT is skipped, goes directly to CAPTURE
 ```
 
 ### 1.2 State Timing and Timeout Values
@@ -357,7 +371,130 @@ The Reset state handles cleanup of all session data and prepares the kiosk for t
 
 ---
 
-## 2. Operator Setup Flow
+## 2. Photobooth Flow
+
+The photobooth flow extends the base kiosk flow with multi-photo capture, theme selection, photo arrangement, and composite strip generation.
+
+### 2.1 Photobooth State Timing
+
+| State              | Timeout  | Timeout Behavior                                        |
+|--------------------|----------|---------------------------------------------------------|
+| FEATURE_SELECT     | 30s      | Auto-select first enabled feature                       |
+| CAPTURE (per photo)| 30s      | Use last captured photo or skip                         |
+| REVIEW             | 60s      | Proceed with current photos                             |
+| FRAME_SELECT       | 30s      | Auto-select default theme                               |
+| ARRANGE            | 60s      | Use automatic arrangement                               |
+| COMPOSITING        | 15s      | Retry once, then error state                            |
+| PHOTOBOOTH_REVEAL  | 30s      | Auto-advance to RESET                                   |
+
+### 2.2 Photobooth Sequence Diagram
+
+```
+User               KioskScreen          BackendAPI           Camera          Printer
+ |                     |                     |                   |               |
+ | [Feature selection  |                     |                   |               |
+ |  screen shows]      |                     |                   |               |
+ |                     |                     |                   |               |
+ |====================>|                     |                   |               |
+ | Taps "Photobooth"   |                     |                   |               |
+ |                     |                     |                   |               |
+ |                     |-- POST /session --->|                   |               |
+ |                     |   session_type=     |                   |               |
+ |                     |   photobooth        |                   |               |
+ |                     |                     |                   |               |
+ |                     |<-- session_id ------|                   |               |
+ |                     |   state=capture     |                   |               |
+ |                     |                     |                   |               |
+ |                     | CAPTURE STATE       |                   |               |
+ |                     | (repeat for each    |                   |               |
+ |                     |  photo up to max)   |                   |               |
+ |                     |                     |                   |               |
+ |                     |-- GET /camera ----->|                   |               |
+ |                     |   stream            |                   |               |
+ |                     |<-- MJPEG stream ----|<-- frames --------|               |
+ |                     |                     |                   |               |
+ |                     | [3-2-1 countdown]   |                   |               |
+ |                     |                     |                   |               |
+ |                     |-- POST /snap ------->|                   |               |
+ |                     |                     |-- capture_frame ->|               |
+ |                     |                     |<-- JPEG bytes ----|               |
+ |                     |<-- photo_url -------|                   |               |
+ |                     |                     |                   |               |
+ |                     | [Repeat for each    |                   |               |
+ |                     |  photo. Shows       |                   |               |
+ |                     |  progress "2/8"]    |                   |               |
+ |                     |                     |                   |               |
+ |                     | REVIEW STATE        |                   |               |
+ |                     | [Shows grid of      |                   |               |
+ |                     |  captured photos]   |                   |               |
+ |                     | [Retake] [Done]     |                   |               |
+ |                     |                     |                   |               |
+ |====================>|                     |                   |               |
+ | Taps "Done"         |                     |                   |               |
+ |                     |                     |                   |               |
+ |                     | FRAME SELECT STATE  |                   |               |
+ |                     | [Theme grid with    |                   |               |
+ |                     |  preview images]    |                   |               |
+ |                     | [Layout rows:       |                   |               |
+ |                     |  1-2-3-4 toggle]    |                   |               |
+ |                     |                     |                   |               |
+ |====================>|                     |                   |               |
+ | Selects theme       |                     |                   |               |
+ |                     |-- POST /frame ------>|                  |               |
+ |                     |   theme_id=X        |                   |               |
+ |                     |   layout_rows=4     |                   |               |
+ |                     |<-- state=arrange ---|                   |               |
+ |                     |                     |                   |               |
+ |                     | ARRANGE STATE       |                   |               |
+ |                     | [Drag & drop photos |                   |               |
+ |                     |  into strip layout] |                   |               |
+ |                     |                     |                   |               |
+ |====================>|                     |                   |               |
+ | Confirms layout     |                     |                   |               |
+ |                     |-- POST /arrange ---->|                  |               |
+ |                     |   photo_assignments |                   |               |
+ |                     |                     |                   |               |
+ |                     | COMPOSITING STATE   |                   |               |
+ |                     | [Loading animation: |                   |               |
+ |                     |  "Creating your     |                   |               |
+ |                     |   strip..."]        |                   |               |
+ |                     |                     |                   |               |
+ |                     |                     | [Generate composite|              |
+ |                     |                     |  image from photos |              |
+ |                     |                     |  + theme config]   |              |
+ |                     |                     |                   |               |
+ |                     |<-- composite_url ---|                   |               |
+ |                     |   state=            |                   |               |
+ |                     |   photobooth_reveal |                   |               |
+ |                     |                     |                   |               |
+ |                     | PHOTOBOOTH REVEAL   |                   |               |
+ |                     | [Shows final strip  |                   |               |
+ |                     |  with theme applied]|                   |               |
+ |                     | [Print] [Share]     |                   |               |
+ |                     |                     |                   |               |
+ |====================>|                     |                   |               |
+ | Taps "Print"        |                     |                   |               |
+ |                     |-- POST /print ------>|                  |               |
+ |                     |                     |-- ESC/POS print ->|-------------->|
+ |                     |                     |   composite strip |  [Receipt    |
+ |                     |                     |                   |   prints]    |
+ |                     |                     |<-- print_ok ------|<-------------|
+ |                     |                     |                   |               |
+ |                     | RESET STATE         |                   |               |
+ |                     |                     | [Move composite   |               |
+ |                     |                     |  to persistent    |               |
+ |                     |                     |  volume for       |               |
+ |                     |                     |  gallery]         |               |
+ |                     |<-- state=idle ------|                   |               |
+ |                     |                     |                   |               |
+ |                     | [Returns to         |                   |               |
+ |                     |  attract loop]      |                   |               |
+ |                     |                     |                   |               |
+```
+
+---
+
+## 3. Operator Setup Flow
 
 The operator setup flow describes the first-time configuration experience for a kiosk operator. This includes hardware connection, software startup, AI configuration, payment setup, testing, and going live.
 
@@ -573,7 +710,7 @@ Operator              KioskScreen           BackendAPI          AdminDashboard  
   |                      |                     |                     |                  |             |            |             |
 ```
 
-### 2.3 Admin PIN Access Method
+### 3.3 Admin PIN Access Method
 
 The admin dashboard is accessible through two methods:
 
@@ -591,7 +728,7 @@ The admin dashboard is accessible through two methods:
 - The admin dashboard at this URL is a full web application optimized for laptop/tablet use
 - It provides the same configuration options as the on-screen setup wizard, plus analytics and session history
 
-### 2.4 Returning to Admin After Initial Setup
+### 3.4 Returning to Admin After Initial Setup
 
 After the initial setup is complete, the operator can return to the admin dashboard at any time by:
 1. Using the hidden gesture from the idle screen
@@ -600,11 +737,11 @@ After the initial setup is complete, the operator can return to the admin dashbo
 
 ---
 
-## 3. Payment Failure Flow
+## 4. Payment Failure Flow
 
 The payment failure flow handles scenarios where the user does not complete payment within the allowed time, or where the payment system encounters an error. The design ensures that users are never charged without receiving a product, and that sessions are cleanly terminated.
 
-### 3.1 Payment Failure Scenarios
+### 4.1 Payment Failure Scenarios
 
 | Scenario                     | Detection Method               | User Impact                    |
 |------------------------------|--------------------------------|--------------------------------|
@@ -614,7 +751,7 @@ The payment failure flow handles scenarios where the user does not complete paym
 | Payment gateway down         | Health check failure           | "Service unavailable" message  |
 | Duplicate payment detected   | Idempotency key check         | Original session proceeds      |
 
-### 3.2 Payment Failure Sequence Diagram
+### 4.2 Payment Failure Sequence Diagram
 
 ```
 User               KioskScreen          BackendAPI           PaymentGW         Database
@@ -668,7 +805,7 @@ User               KioskScreen          BackendAPI           PaymentGW         D
  |                     |                     |                   |               |
 ```
 
-### 3.3 Payment Declined Flow (User Scans But Payment Fails)
+### 4.3 Payment Declined Flow (User Scans But Payment Fails)
 
 ```
 User               KioskScreen          BackendAPI           PaymentGW         Database
@@ -741,7 +878,7 @@ User               KioskScreen          BackendAPI           PaymentGW         D
  |                     |  resumes]           |                   |               |
 ```
 
-### 3.4 Refund and Compensation Logic
+### 4.4 Refund and Compensation Logic
 
 **No refund needed:** Since payment is collected via QRIS (user-initiated push payment), if the payment fails or the QR code expires before the user pays, no money has been collected. There is nothing to refund.
 
@@ -756,11 +893,11 @@ User               KioskScreen          BackendAPI           PaymentGW         D
 
 ---
 
-## 4. AI Failure Flow
+## 5. AI Failure Flow
 
 The AI failure flow handles scenarios where the configured AI provider is unavailable, returns an error, or times out. The system is designed to ensure that the user always receives a physical product, even if the AI component fails. This is a critical reliability requirement because the user may have already paid.
 
-### 4.1 AI Failure Scenarios
+### 5.1 AI Failure Scenarios
 
 | Scenario                  | Detection Method              | User Impact                         |
 |---------------------------|-------------------------------|-------------------------------------|
@@ -773,7 +910,7 @@ The AI failure flow handles scenarios where the configured AI provider is unavai
 | Response too short/long   | Content validation            | Fallback template used               |
 | All providers exhausted   | Cascading failure             | Fallback template used (last resort) |
 
-### 4.2 AI Failure Sequence Diagram
+### 5.2 AI Failure Sequence Diagram
 
 ```
 User               KioskScreen          BackendAPI           AIProvider         Database        Printer
@@ -909,7 +1046,7 @@ User               KioskScreen          BackendAPI           AIProvider         
  |                     |                     |                   |                  |               |
 ```
 
-### 4.3 Fallback Template System
+### 5.3 Fallback Template System
 
 The fallback template system is a critical component that ensures the kiosk always delivers a physical product to the user, regardless of AI provider status.
 
@@ -935,7 +1072,7 @@ The fallback template system is a critical component that ensures the kiosk alwa
 - The `ai_provider_used` field in the database is set to `'fallback'` instead of the provider name
 - This allows operators to track fallback frequency and identify AI reliability issues
 
-### 4.4 Cascading Provider Fallback (Optional Enhancement)
+### 5.4 Cascading Provider Fallback (Optional Enhancement)
 
 If multiple AI providers are configured, the system can attempt them in order before falling back to the local template pool:
 
@@ -957,7 +1094,7 @@ Each provider attempt has a shorter timeout than the previous to prevent excessi
 
 The total maximum wait is 55 seconds, which is within the Processing state timeout of 45 seconds when using a single provider (the cascading behavior extends the effective timeout).
 
-### 4.5 Operator Notification on AI Failure
+### 5.5 Operator Notification on AI Failure
 
 When the AI system falls back to a template, the operator is notified through the admin dashboard:
 - A warning indicator appears on the admin dashboard
@@ -971,22 +1108,31 @@ When the AI system falls back to a template, the operator is notified through th
 
 The following table defines all valid state transitions and the triggers that cause them:
 
-| From State   | To State     | Trigger                              | Condition            |
-|-------------|--------------|--------------------------------------|----------------------|
-| IDLE        | PAYMENT      | User touches screen                  | Payment enabled      |
-| IDLE        | CAPTURE      | User touches screen                  | Payment disabled     |
-| PAYMENT     | CAPTURE      | Payment confirmed (webhook/poll)     | Payment succeeded    |
-| PAYMENT     | IDLE         | Payment timeout (120s)               | No payment received  |
-| PAYMENT     | IDLE         | User cancels                        | User taps "Back"     |
-| PAYMENT     | PAYMENT      | Payment declined, retry requested   | User taps "Try Again"|
-| CAPTURE     | PROCESSING   | Photo captured successfully           | JPEG saved to disk   |
-| CAPTURE     | IDLE         | Camera error                        | Hardware failure     |
-| CAPTURE     | IDLE         | Capture timeout (30s)               | No photo taken       |
-| PROCESSING  | REVEAL/PRINT | AI response received                  | Valid text response  |
-| PROCESSING  | REVEAL/PRINT | AI timeout / fallback template used   | Fallback activated   |
-| REVEAL/PRINT| RESET        | Print complete + 15s display timeout | Normal flow          |
-| REVEAL/PRINT| RESET        | User taps to proceed                 | Early exit           |
-| REVEAL/PRINT| RESET        | Print failed but display shown       | Graceful degradation |
-| RESET       | IDLE         | Cleanup complete (or 5s timeout)     | Always               |
+| From State        | To State          | Trigger                              | Condition            |
+|-------------------|-------------------|--------------------------------------|----------------------|
+| IDLE              | PAYMENT           | User touches screen                  | Payment enabled      |
+| IDLE              | FEATURE_SELECT    | User touches screen                  | Payment disabled, both features enabled |
+| IDLE              | CAPTURE           | User touches screen                  | Payment disabled, single feature |
+| PAYMENT           | FEATURE_SELECT    | Payment confirmed (webhook/poll)     | Both features enabled |
+| PAYMENT           | CAPTURE           | Payment confirmed (webhook/poll)     | Single feature       |
+| PAYMENT           | IDLE              | Payment timeout (120s)               | No payment received  |
+| PAYMENT           | IDLE              | User cancels                         | User taps "Back"     |
+| FEATURE_SELECT    | CAPTURE           | User selects Vibe Check or Photobooth| User choice          |
+| CAPTURE           | PROCESSING        | Photo captured (Vibe Check)          | JPEG saved           |
+| CAPTURE           | CAPTURE           | Photo captured (Photobooth, more needed) | More photos needed |
+| CAPTURE           | REVIEW            | Photo captured (Photobooth, min met) | Min photos reached   |
+| CAPTURE           | IDLE              | Camera error                         | Hardware failure     |
+| REVIEW            | CAPTURE           | User taps "Retake"                   | Retake last photo    |
+| REVIEW            | FRAME_SELECT      | User taps "Done"                     | Photos confirmed     |
+| FRAME_SELECT      | ARRANGE           | Theme selected                       | Theme + layout chosen|
+| ARRANGE           | COMPOSITING       | User confirms arrangement            | Ready to generate    |
+| COMPOSITING       | PHOTOBOOTH_REVEAL | Composite generated                  | Strip image ready    |
+| PROCESSING        | REVEAL            | AI response received                 | Valid text response  |
+| PROCESSING        | REVEAL            | AI timeout / fallback template used  | Fallback activated   |
+| REVEAL            | RESET             | Print complete + 15s display timeout | Normal flow          |
+| REVEAL            | RESET             | User taps to proceed                 | Early exit           |
+| PHOTOBOOTH_REVEAL | RESET             | Print/Share complete + timeout       | Normal flow          |
+| PHOTOBOOTH_REVEAL | RESET             | User taps to proceed                 | Early exit           |
+| RESET             | IDLE              | Cleanup complete (or 5s timeout)     | Always               |
 
 Invalid transitions (e.g., IDLE directly to PROCESSING) are rejected by the state machine and logged as potential bugs.

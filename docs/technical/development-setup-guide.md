@@ -200,6 +200,24 @@ Photobooth settings are managed through the **Admin Dashboard** (`/admin`), not 
 
 The `.env` values are only used as seed defaults when the database is first initialized. After that, all photobooth configuration is read from the database at runtime.
 
+#### Vibe Check Configuration
+
+Vibe Check settings are also managed through the **Admin Dashboard** (`/admin`).
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Vibe Check | Toggle the Vibe Check feature on/off | Enabled |
+| Result Retention | Hours to keep vibe check results for admin gallery | 168h (7 days) |
+
+#### Retention and Cleanup
+
+The system automatically manages file retention for both features:
+
+- **Retention periods** are configured per-feature in the admin dashboard (in hours). A value of 0 means keep forever.
+- **Background cleanup** starts on app boot and runs periodically, purging expired files.
+- **Cleanup interval** is auto-derived from the shorter of the two retention periods — no separate cleanup schedule to configure.
+- **Photo preservation**: After session completion, result files (vibe check photos and photobooth composites) are moved to a persistent Docker volume (`/tmp/vibeprint/`) so they survive container restarts and are available in the admin gallery.
+
 ---
 
 ## 3. Start Database

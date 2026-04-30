@@ -955,6 +955,55 @@ A JSON object where keys are configuration field names and values are the new va
 
 ---
 
+### `GET /api/v1/admin/analytics/features`
+
+Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth session performance. Returns total sessions, completion rate, average duration, and revenue for each feature independently.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string (ISO 8601 date) | No | 7 days ago | Start of date range |
+| `end_date` | string (ISO 8601 date) | No | Today | End of date range |
+
+**Response (200 OK):**
+
+```json
+{
+  "features": [
+    {
+      "feature": "vibe_check",
+      "total_sessions": 120,
+      "completed_sessions": 105,
+      "abandoned_sessions": 15,
+      "completion_rate": 0.875,
+      "avg_duration_seconds": 45.2,
+      "revenue": 1050000
+    },
+    {
+      "feature": "photobooth",
+      "total_sessions": 85,
+      "completed_sessions": 72,
+      "abandoned_sessions": 13,
+      "completion_rate": 0.847,
+      "avg_duration_seconds": 95.8,
+      "revenue": 720000
+    }
+  ]
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid date format or date range |
+
+---
+
 ### `GET /api/v1/admin/analytics/sessions`
 
 Retrieve session analytics including session counts, state distribution, and average session durations.
@@ -987,12 +1036,17 @@ GET /api/v1/admin/analytics/sessions?start_date=2025-06-01&end_date=2025-06-15&g
     "avg_duration_seconds": 85.3
   },
   "state_distribution": {
-    "IDLE": 0,
-    "PAYMENT": 5,
-    "CAPTURE": 12,
-    "PROCESSING": 8,
-    "REVEAL": 7,
-    "RESET": 0
+    "idle": 0,
+    "payment": 5,
+    "capture": 12,
+    "review": 3,
+    "processing": 8,
+    "reveal": 7,
+    "frame_select": 2,
+    "arrange": 1,
+    "compositing": 1,
+    "photobooth_reveal": 4,
+    "reset": 0
   },
   "timeseries": [
     {
@@ -1239,3 +1293,102 @@ Switch the active USB printer at runtime. Tears down any existing printer connec
 ```
 
 **Response (200 OK):** Returns `PrintStatusResponse` (same as `GET /printer/status`).
+
+---
+
+### `GET /api/v1/admin/photobooth/strips`
+
+List photobooth sessions that have a composite strip image available for viewing. Returns paginated results with thumbnail URLs.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `limit` | integer | No | 24 | Items per page (max 100) |
+| `offset` | integer | No | 0 | Number of items to skip |
+
+**Response (200 OK):**
+
+```json
+{
+  "strips": [
+    {
+      "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "composite_url": "/api/v1/kiosk/session/{session_id}/photobooth/composite",
+      "thumbnail_url": "/api/v1/kiosk/session/{session_id}/photobooth/thumbnail",
+      "created_at": "2025-06-15T10:30:00Z",
+      "theme_name": "Classic Dark"
+    }
+  ],
+  "total": 150
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+
+---
+
+### `GET /api/v1/admin/vibe-check/results`
+
+List completed vibe check sessions with AI analysis results. Returns paginated results with photo and analysis text.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `limit` | integer | No | 24 | Items per page (max 100) |
+| `offset` | integer | No | 0 | Number of items to skip |
+
+**Response (200 OK):**
+
+```json
+{
+  "results": [
+    {
+      "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "photo_url": "/api/v1/kiosk/session/{session_id}/photo",
+      "thumbnail_url": "/api/v1/kiosk/session/{session_id}/photo/thumb",
+      "created_at": "2025-06-15T10:30:00Z",
+      "analysis_text": "Your energy today radiates confidence and warmth...",
+      "analysis_provider": "openai"
+    }
+  ],
+  "total": 200
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+
+---
+
+### `GET /api/v1/kiosk/session/{session_id}/photo/thumb`
+
+Retrieve a thumbnail (300px width) of a vibe check session photo. Generated on first request and cached alongside the original image.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or photo not found |

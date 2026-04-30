@@ -578,6 +578,146 @@ The payment module handles QRIS payment integration through supported providers 
 
 ## Module 7: Failsafe and Error Recovery (FR-FAILSAFE)
 
+---
+
+## Module 8: Photobooth Feature (FR-PHOTOBOOTH)
+
+The photobooth feature allows users to capture multiple photos, select a theme, arrange photos, and produce a composite strip image that can be printed or shared digitally.
+
+### FR-PHOTOBOOTH-001: Multi-Photo Capture
+
+**Description:** Users capture multiple photos in sequence with a countdown timer for each shot.
+
+**Acceptance Criteria:**
+- The user can capture between 2 and 8 photos per session (configurable by operator).
+- A countdown timer (default: 30 seconds, configurable) is shown for each capture.
+- After each capture, the user sees a brief preview before the next shot begins.
+- The user can retake the most recent photo during the review step.
+- The minimum number of photos must be reached before the "Done" button appears.
+
+**Priority:** P0
+
+---
+
+### FR-PHOTOBOOTH-002: Frame/Theme Selection
+
+**Description:** After capturing photos, the user selects a frame theme and layout configuration.
+
+**Acceptance Criteria:**
+- The system provides built-in themes (Classic Dark, Minimal, Vibrant) and supports custom themes created by the operator.
+- Each theme defines background, photo slot styling, decorations, font, and watermark settings.
+- The user can select the number of layout rows (1-4, default from operator config).
+- Theme preview is shown during selection.
+- Themes can be enabled/disabled by the operator. At least one theme must remain enabled.
+
+**Priority:** P0
+
+---
+
+### FR-PHOTOBOOTH-003: Photo Arrangement
+
+**Description:** After theme selection, the user arranges their photos into the strip layout.
+
+**Acceptance Criteria:**
+- The user can drag-and-drop photos into their preferred positions.
+- Photos automatically snap to the nearest available slot.
+- The arrangement screen shows a live preview of the final strip.
+
+**Priority:** P1
+
+---
+
+### FR-PHOTOBOOTH-004: Composite Strip Generation
+
+**Description:** The system generates a composite strip image from the arranged photos and selected theme.
+
+**Acceptance Criteria:**
+- The composite image is rendered server-side using the theme configuration.
+- Generated composites are stored in a persistent Docker volume for admin gallery access.
+- Thumbnail versions (300px width) are generated for gallery browsing.
+- The composite is available for printing and digital sharing (QR code).
+
+**Priority:** P0
+
+---
+
+### FR-PHOTOBOOTH-005: Retention and Cleanup
+
+**Description:** Photobooth composites are retained for a configurable period for admin viewing, then automatically purged.
+
+**Acceptance Criteria:**
+- Retention period is configurable in hours via the admin dashboard (default: 168 hours / 7 days).
+- A value of 0 means keep forever (no automatic cleanup).
+- The background retention service automatically purges expired composites and thumbnails.
+- The cleanup interval is auto-derived from the shorter of Vibe Check and Photobooth retention periods.
+
+**Priority:** P1
+
+---
+
+## Module 9: Admin Gallery (FR-GALLERY)
+
+The admin gallery allows operators to browse, view, and download session results (Vibe Check readings and Photobooth strips).
+
+### FR-GALLERY-001: Photobooth Strips Gallery
+
+**Description:** Operators can browse all photobooth sessions that produced composite strip images.
+
+**Acceptance Criteria:**
+- Strips are displayed as a paginated grid with thumbnails.
+- Clicking a strip opens a lightbox view with download capability.
+- Each strip shows the creation date and theme name.
+- Pagination uses offset-based loading with "Showing X-Y of Z" summary.
+
+**Priority:** P1
+
+---
+
+### FR-GALLERY-002: Vibe Check Results Gallery
+
+**Description:** Operators can browse all completed Vibe Check sessions with their AI analysis results.
+
+**Acceptance Criteria:**
+- Results are displayed as a paginated grid with photo thumbnails.
+- Clicking a result opens a lightbox view showing the photo alongside the AI reading text.
+- A "Copy" button copies the vibe reading text to clipboard with toast feedback.
+- A "Download" button downloads the photo.
+- Each result shows the creation date and AI provider used.
+
+**Priority:** P1
+
+---
+
+## Module 10: Analytics Feature Breakdown (FR-FEATURE-ANALYTICS)
+
+### FR-FEATURE-ANALYTICS-001: Per-Feature Metrics
+
+**Description:** The analytics dashboard shows performance metrics for each feature (Vibe Check vs Photobooth) independently.
+
+**Acceptance Criteria:**
+- A Feature Breakdown card shows side-by-side comparison of both features.
+- Metrics per feature include: total sessions, completion rate, average duration, revenue.
+- The breakdown is visible on both the main dashboard (summary) and the full analytics page.
+- State distribution includes labels for all states including photobooth-specific ones (Frame Select, Arrange, Compositing, Photobooth Reveal).
+
+**Priority:** P1
+
+---
+
+## Module 11: Feature Selection and Toggle (FR-FEATURE-SELECT)
+
+### FR-FEATURE-SELECT-001: Feature Toggle
+
+**Description:** Operators can enable or disable each feature (Vibe Check, Photobooth) independently through the admin dashboard.
+
+**Acceptance Criteria:**
+- Each feature has a toggle switch in its respective configuration section.
+- At least one feature must remain enabled at all times — the system prevents disabling both.
+- When only one feature is enabled, the kiosk skips the feature selection screen and goes directly to that feature.
+- When both are enabled, the kiosk shows a feature selection screen after payment (or on start if payment is disabled).
+
+**Priority:** P0
+
 The failsafe module ensures that the kiosk can recover gracefully from errors, connectivity issues, and unexpected conditions without manual intervention. It is critical for unattended operation.
 
 ### FR-FAILSAFE-001: Connectivity Monitoring

@@ -1,9 +1,9 @@
 # Data Models
 
 > **Document ID:** PRD-05
-> **Version:** 1.0
+> **Version:** 1.1
 > **Status:** Approved
-> **Last Updated:** 2026-04-04
+> **Last Updated:** 2026-04-29
 
 This document defines the data entities, field-level specifications, constraints, indexes, and relationships for the VibePrint OS persistence layer. All data is stored in PostgreSQL 15+ and managed via SQLAlchemy ORM with Alembic migrations.
 
@@ -77,10 +77,13 @@ The `KioskSession` entity represents a single user interaction cycle with the ki
 | Field                | PostgreSQL Type    | Constraints                          | Description                                                                                     |
 |----------------------|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
 | `id`                 | `UUID`             | PRIMARY KEY, DEFAULT `gen_random_uuid()` | Unique identifier for the session. Generated server-side on creation.                          |
-| `state`              | `VARCHAR(32)`      | NOT NULL, DEFAULT `'idle'`, CHECK constraint | Current state in the state machine. One of: `idle`, `payment`, `capture`, `processing`, `reveal`, `reset`. |
+| `state`              | `VARCHAR(32)`      | NOT NULL, DEFAULT `'idle'`, CHECK constraint | Current state in the state machine. One of: `idle`, `payment`, `capture`, `review`, `processing`, `reveal`, `frame_select`, `arrange`, `compositing`, `photobooth_reveal`, `feature_select`, `reset`. |
+| `session_type`       | `VARCHAR(32)`      | NULL                                 | Feature type: `vibe_check` or `photobooth`. Set at session creation based on feature selection. |
 | `photo_path`         | `VARCHAR(512)`     | NULL                                 | Filesystem path to the captured JPEG photo. Set during CAPTURE state. Cleared during RESET.    |
 | `ai_response_text`   | `TEXT`             | NULL                                 | The AI-generated vibe reading text. Set during PROCESSING state.                                |
 | `ai_provider_used`   | `VARCHAR(64)`      | NULL                                 | Identifier of the AI provider that generated the response. Values: `openai`, `anthropic`, `google`, `ollama`, `fallback`, `mock`. |
+| `composite_image_path` | `VARCHAR(512)`   | NULL                                 | Filesystem path to the photobooth composite strip image. Set during COMPOSITING state.          |
+| `photobooth_layout`  | `JSONB`            | NULL                                 | Photobooth layout configuration including theme_id, theme_name, layout_rows, and photo_assignments. |
 | `payment_status`     | `VARCHAR(32)`      | NULL                                 | Current payment status. NULL if payment is disabled. Values: `pending`, `confirmed`, `expired`, `denied`, `refunded`. |
 | `payment_provider`   | `VARCHAR(64)`      | NULL                                 | Payment gateway used. Values: `midtrans`, `xendit`, `mock`, NULL.                              |
 | `payment_amount`     | `INTEGER`          | NULL                                 | Payment amount in the smallest currency unit (Indonesian Rupiah, no decimals). E.g., 10000 = Rp10,000. |
@@ -97,7 +100,9 @@ CONSTRAINT pk_kiosk_sessions PRIMARY KEY (id),
 
 -- State must be one of the valid state machine values
 CONSTRAINT chk_kiosk_sessions_state CHECK (
-    state IN ('idle', 'payment', 'capture', 'processing', 'reveal', 'reset')
+    state IN ('idle', 'payment', 'capture', 'review', 'processing', 'reveal',
+              'frame_select', 'arrange', 'compositing', 'photobooth_reveal',
+              'feature_select', 'reset')
 ),
 
 -- Payment status must be a valid value when not null
@@ -210,7 +215,7 @@ CONSTRAINT uq_operator_configs_key UNIQUE (key),
 
 -- Category must be a known value
 CONSTRAINT chk_operator_configs_category CHECK (
-    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general')
+    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general', 'vibe_check', 'photobooth')
 )
 ```
 
@@ -259,6 +264,16 @@ The following configuration keys are used by the system. These are seeded during
 | `kiosk.idle_timeout_seconds`      | `kiosk`    | integer  | `0`                        | Idle timeout in seconds (0 = no timeout, runs attract loop indefinitely)    |
 | `kiosk.capture_countdown_seconds` | `kiosk`    | integer  | `3`                        | Countdown duration before photo capture                                     |
 | `general.version`                 | `general`  | string   | *(auto-set on startup)*    | Current software version                                                   |
+| `vibe_check.vibe_check_enabled`   | `vibe_check` | boolean | `true`                     | Whether the Vibe Check feature is available on the kiosk                    |
+| `vibe_check.vibe_check_retention_hours` | `vibe_check` | integer | `168`               | Hours to retain vibe check results for admin gallery (0 = forever)         |
+| `photobooth.photobooth_enabled`   | `photobooth` | boolean | `true`                     | Whether the Photobooth feature is available on the kiosk                    |
+| `photobooth.photobooth_max_photos` | `photobooth` | integer | `8`                        | Maximum photos per photobooth session                                       |
+| `photobooth.photobooth_min_photos` | `photobooth` | integer | `2`                        | Minimum photos before "Done" button appears                                 |
+| `photobooth.photobooth_capture_time_limit_seconds` | `photobooth` | integer | `30`           | Capture timer duration in seconds                                           |
+| `photobooth.photobooth_default_layout_rows` | `photobooth` | integer | `4`                 | Default photo slots in strip (1-4)                                          |
+| `photobooth.photobooth_watermark_enabled` | `photobooth` | boolean | `false`                  | Add text watermark to photobooth strips                                     |
+| `photobooth.photobooth_watermark_text` | `photobooth` | string | `VibePrint OS`             | Text shown on watermark                                                     |
+| `photobooth.composite_retention_hours` | `photobooth` | integer | `168`                  | Hours to retain photobooth composites for admin gallery (0 = forever)      |
 
 ### 3.6 SQLAlchemy Model (Reference)
 
@@ -506,9 +521,8 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 
 | Data Type          | Storage Location    | Retention Period          | Deletion Method                          |
 |--------------------|---------------------|--------------------------|------------------------------------------|
-| Captured photo     | `/tmp/sessions/{session_id}/` | Until session completes (RESET state) | Files deleted from disk during RESET state |
-| Dithered bitmap    | `/tmp/sessions/{session_id}/` | Until session completes   | Files deleted from disk during RESET state |
-| AI response text   | PostgreSQL `kiosk_sessions.ai_response_text` | 30 days after session creation | Automated cleanup job runs daily, deletes sessions older than 30 days |
+| Vibe check photo   | `/tmp/vibeprint/` (Docker volume) | Configurable via `vibe_check_retention_hours` (default: 168h / 7 days) | Retention service background task purges expired files |
+| Photobooth composite | `/tmp/vibeprint/` (Docker volume) | Configurable via `composite_retention_hours` (default: 168h / 7 days) | Retention service background task purges expired files |
 | Session metadata   | PostgreSQL `kiosk_sessions` | 30 days after session creation | Automated cleanup job runs daily |
 | Analytics events   | PostgreSQL `analytics_events` | 90 days after event creation | Automated cleanup job runs daily |
 | Payment records    | PostgreSQL `kiosk_sessions` (payment fields) | 90 days after session creation | Required for reconciliation; retained longer than session data |
@@ -517,11 +531,13 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 
 ### 6.3 Photo Handling
 
-1. **Capture:** Photo is saved to a temporary directory on the local filesystem (`/tmp/sessions/{session_id}/photo.jpg`). This directory is created with restrictive permissions (owner-read-write only: `chmod 700`).
-2. **Processing:** The photo is read from disk, converted to base64, and sent to the AI provider. The AI provider's own privacy policy governs what happens to the image on their servers.
-3. **Printing:** The photo is dithered and sent to the thermal printer as ESC/POS commands. The dithered bitmap is also stored temporarily in `/tmp/sessions/{session_id}/dithered.bmp`.
-4. **Cleanup:** During the RESET state, the entire `/tmp/sessions/{session_id}/` directory is recursively deleted. This includes the original photo, any intermediate files, and the dithered bitmap.
-5. **Database reference:** The `photo_path` field in the `kiosk_sessions` table records where the photo was stored, but after cleanup, the file no longer exists. The path itself is retained in the database for audit purposes until the session record is purged.
+1. **Capture:** Photo is saved to a temporary directory on the local filesystem. Vibe check photos are saved to `/tmp/` with a `vibeprint_` prefix. Photobooth photos are saved to `/tmp/` with a `vibeprint_snap_` prefix.
+2. **Processing (Vibe Check):** The photo is read from disk, converted to base64, and sent to the AI provider. The AI provider's own privacy policy governs what happens to the image on their servers.
+3. **Compositing (Photobooth):** Individual capture photos are assembled into a strip composite image with the selected theme applied.
+4. **Printing:** The photo/composite is dithered and sent to the thermal printer as ESC/POS commands.
+5. **Preservation:** After session completion, result files are moved to the persistent volume `/tmp/vibeprint/` so they survive container restarts and are available in the admin gallery.
+6. **Retention:** The retention service background task runs periodically, purging files older than the configured retention period for each feature. The cleanup interval is auto-derived from the shorter of the two retention periods.
+7. **Database reference:** The `photo_path` and `composite_image_path` fields record where files are stored for gallery access.
 
 ### 6.4 AI Provider Data Transmission
 
@@ -537,22 +553,23 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 - Sessions are anonymous; no personally identifiable information (PII) is collected beyond the photo itself
 - The AI prompt is designed to analyze the photo for "vibe reading" purposes only and is not configured to extract or store identifying information
 
-### 6.6 Automated Cleanup Job
+### 6.6 Automated Retention Cleanup
 
-A background task runs daily to purge expired data:
+A background task (`retention_service`) starts on application boot and runs periodically to purge expired data:
 
 ```
-1. Delete all kiosk_sessions where created_at < NOW() - 30 days
-   (cascading delete removes associated analytics_events and print_jobs)
-
-2. Delete all analytics_events where timestamp < NOW() - 90 days
-   (catches any orphaned events from already-deleted sessions)
-
-3. Delete any residual files in /tmp/sessions/ where directory mtime < NOW() - 1 hour
-   (catches cleanup failures from crashed or interrupted sessions)
+1. On startup, run purge_expired_sessions() immediately
+2. Derive cleanup interval from min(vibe_check_retention_hours, composite_retention_hours)
+   - If either retention is 0 (keep forever), use the non-zero value
+   - If both are 0, no periodic cleanup runs
+3. On each cycle:
+   a. Find sessions older than their respective retention periods
+   b. Delete associated image files (photos, composites, thumbnails) from /tmp/vibeprint/
+   c. Clear file path references in the database
+4. Session metadata (timestamps, analytics) is retained per the 30-day database cleanup schedule
 ```
 
-The retention periods (30 days, 90 days) are configurable via OperatorConfig keys `general.session_retention_days` and `general.analytics_retention_days`.
+Retention periods are configurable via the admin dashboard under each feature's configuration section. The system auto-derives the cleanup interval to ensure neither feature's files are retained longer than configured.
 
 ### 6.7 Compliance Considerations
 

@@ -113,7 +113,7 @@ The following diagram shows all major components of VibePrint OS and their conne
 | **Payment Gateway** | Midtrans / Xendit | Processes QRIS payments via QR code generation and webhook callbacks |
 | **Thermal Printer** | USB / ESC/POS | Prints receipts with AI results and optional photo thumbnail |
 | **USB Camera** | V4L2 / OpenCV | Captures photos and provides live MJPEG preview stream |
-| **Admin Dashboard** | React 19 (same app, /admin route) | Operator interface for configuration, monitoring, and hardware testing |
+| **Admin Dashboard** | React 19 (same app, /admin route) | Operator interface for configuration, monitoring, analytics, gallery, and hardware testing |
 
 ### Communication Protocols
 
@@ -239,17 +239,21 @@ Each step has defined error handling:
 
 ## 3. Kiosk State Machine
 
-The kiosk follows a 6-state flow managed by the Zustand store on the frontend, with state transitions validated by the backend.
+The kiosk supports two features: **Vibe Check** (single photo + AI reading) and **Photobooth** (multi-photo strip with themes). After the payment step (if enabled), users choose a feature. Each feature has its own state flow, but both share common states for idle, payment, and reset.
 
-### Primary Flow (Happy Path)
+### Feature Selection
+
+After payment confirmation (or when payment is disabled), the kiosk enters a feature selection screen. If only one feature is enabled, it is selected automatically. The admin can ensure at least one feature remains enabled — the system prevents disabling both.
+
+### Vibe Check Flow
 
 ```
-+-------+    payment     +----------+    countdown    +---------+
-|       |    enabled &   |          |    complete &   |         |
++-------+    payment     +----------+    feature     +---------+
+|       |    enabled &   |          |    select      |         |
 | IDLE  |--------------> | PAYMENT  | -------------> | CAPTURE |
-|       |    user taps   |          |    payment      |         |
-|       |    "Start"     |          |    confirmed    |         |
-+---+---+                +----+-----+                 +----+----+
+|       |    user taps   |          |    vibe_check  |         |
+|       |    "Start"     |          |                |         |
++---+---+                +----+-----+                +----+----+
     |                          |                           |
     |  payment disabled        |  timeout (15 min)          |  capture
     |  or user skips           |  (auto-cancel)            |  success
@@ -259,56 +263,118 @@ The kiosk follows a 6-state flow managed by the Zustand store on the frontend, w
     |                      +----------+                    |
     +--------------------- |          | <------------------+
                            | PROCESS  |  AI response
-      error/fallback       | ING      |  received
-      (show text only)     |          |
+                           | ING      |  received
                            +----+-----+
                                 |
                                 |  analysis complete
-                                |  (text + optional image)
                                 v
                            +----------+
-                           |          |
                            | REVEAL   |
-                           |          |
-                           |  - Show  |
-                           |    result|
-                           |  - Print |
-                           |    btn   |
-                           |  - Share |
-                           |    btn   |
+                           | - Show   |
+                           |   result |
+                           | - Print  |
+                           |   btn    |
                            +----+-----+
                                 |
-                     print btn  |  timer (30s auto-reset)
-                     pressed    |
                                 v
                            +----------+
-                           |          |
                            | RESET    |
-                           |          |
-                           |  - Clear |
-                           |    session|
-                           |  - Free  |
-                           |    resources
+                           | - Clear  |
+                           |   session|
                            +----+-----+
                                 |
-                                |  cleanup complete
                                 v
                            [return to IDLE]
+```
+
+### Photobooth Flow
+
+```
++-------+    payment     +----------+    feature     +---------+
+|       |    enabled &   |          |    select      |         |
+| IDLE  |--------------> | PAYMENT  | -------------> | CAPTURE |
+|       |    user taps   |          |    photobooth  |  (multi |
+|       |    "Start"     |          |                |  photos)|
++---+---+                +----+-----+                +----+----+
+    |                                                      |
+    |  payment disabled                                    |  capture
+    |  (auto-select if                                     |  complete
+    |   only photobooth)                                   v
+    |                                                 +----------+
+    +----------------------------------------------- | REVIEW   |
+                                                     | - Browse |
+                                                     |   photos |
+                                                     | - Retake |
+                                                     |   or Done|
+                                                     +----+-----+
+                                                          |
+                                                          | user done
+                                                          v
+                                                     +------------+
+                                                     | FRAME      |
+                                                     | SELECT     |
+                                                     | - Choose   |
+                                                     |   theme    |
+                                                     | - Layout   |
+                                                     |   rows     |
+                                                     +-----+------+
+                                                           |
+                                                           v
+                                                     +----------+
+                                                     | ARRANGE  |
+                                                     | - Drag & |
+                                                     |   drop   |
+                                                     |   photos |
+                                                     +----+-----+
+                                                          |
+                                                          v
+                                                     +------------+
+                                                     | COMPOSITING|
+                                                     | - Generate |
+                                                     |   strip    |
+                                                     +-----+------+
+                                                           |
+                                                           v
+                                                     +----------+
+                                                     | PHOTOBOOTH|
+                                                     | REVEAL    |
+                                                     | - Show    |
+                                                     |   strip   |
+                                                     | - Print   |
+                                                     | - Share   |
+                                                     +----+-----+
+                                                          |
+                                                          v
+                                                     +----------+
+                                                     | RESET    |
+                                                     +----+-----+
+                                                          |
+                                                          v
+                                                     [return to IDLE]
 ```
 
 ### Complete State Transition Table
 
 | Current State | Event | Next State | Action |
 |--------------|-------|------------|--------|
-| IDLE | User taps "Start" (payment disabled) | CAPTURE | Start camera preview, begin countdown |
+| IDLE | User taps "Start" (payment disabled) | FEATURE_SELECT or CAPTURE | Show feature selection or go directly if only one enabled |
 | IDLE | User taps "Start" (payment enabled) | PAYMENT | Generate QRIS QR code, display to user |
-| PAYMENT | Payment confirmed (webhook) | CAPTURE | Stop QR display, start camera preview, begin countdown |
+| PAYMENT | Payment confirmed (webhook) | FEATURE_SELECT or CAPTURE | Stop QR display, show feature selection or start capture |
 | PAYMENT | Payment timeout (15 min) | IDLE | Clear payment session, show "Session expired" |
 | PAYMENT | User cancels | IDLE | Clear payment session |
+| FEATURE_SELECT | User selects Vibe Check | CAPTURE | Start camera preview, begin countdown |
+| FEATURE_SELECT | User selects Photobooth | CAPTURE | Start camera preview, begin countdown |
 | CAPTURE | Countdown reaches 0 | CAPTURE | Capture frame from camera |
-| CAPTURE | Capture successful | PROCESSING | Send image to AI provider, show loading animation |
+| CAPTURE | Capture successful (Vibe Check) | PROCESSING | Send image to AI provider, show loading animation |
+| CAPTURE | Capture successful (Photobooth, more photos needed) | CAPTURE | Store photo, continue capture cycle |
+| CAPTURE | Capture successful (Photobooth, min photos met) | REVIEW | Show captured photos for review |
 | CAPTURE | Capture fails (3 retries) | IDLE | Show error message, "Please try again" |
 | CAPTURE | Camera not available | IDLE | Show error message, log hardware fault |
+| REVIEW | User taps "Retake" | CAPTURE | Delete last photo, restart capture |
+| REVIEW | User taps "Done" | FRAME_SELECT | Proceed to theme selection |
+| FRAME_SELECT | User selects theme | ARRANGE | Apply theme, show photo arrangement |
+| ARRANGE | User confirms arrangement | COMPOSITING | Generate composite strip image |
+| COMPOSITING | Composite generated | PHOTOBOOTH_REVEAL | Display final strip |
 | PROCESSING | AI response received | REVEAL | Display result text, enable print/share buttons |
 | PROCESSING | AI timeout (30s total) | REVEAL | Show "Analysis took too long" with fallback text |
 | PROCESSING | AI provider error | REVEAL | Show "Analysis unavailable" with fallback text |
@@ -317,6 +383,9 @@ The kiosk follows a 6-state flow managed by the Zustand store on the frontend, w
 | REVEAL | Print fails | REVEAL | Show "Print error" message, offer retry |
 | REVEAL | User taps "Skip" / "Done" | RESET | Skip printing, go to reset |
 | REVEAL | Inactivity timer (30s) | RESET | Auto-advance to reset |
+| PHOTOBOOTH_REVEAL | User taps "Print" | RESET | Send strip to printer |
+| PHOTOBOOTH_REVEAL | User taps "Share" | RESET | Generate share QR code |
+| PHOTOBOOTH_REVEAL | Inactivity timer (30s) | RESET | Auto-advance to reset |
 | RESET | Cleanup complete | IDLE | Clear session data, release camera, return to welcome screen |
 | RESET | Cleanup fails | IDLE | Force clear (log error), return to welcome screen |
 | * (any) | Admin unlocks | ADMIN | Switch to admin dashboard route |
@@ -364,7 +433,9 @@ The backend follows a strict layered architecture to separate concerns and maint
 |  - payment_service.py   (payment creation, verification, status) |
 |  - print_service.py     (print job assembly, printer management) |
 |  - config_service.py    (configuration CRUD, validation)         |
-|  - analytics_service.py (session aggregation, revenue reports)   |
+|  - analytics_service.py (session aggregation, revenue reports, feature breakdown) |
+|  - retention_service.py (automated cleanup of expired files and sessions) |
+|  - theme_service.py     (photobooth theme CRUD, enable/disable)  |
 +--------------------------------+---------------------------------+
                                  |
                                  | Direct instantiation / DI
@@ -403,7 +474,8 @@ The backend follows a strict layered architecture to separate concerns and maint
 | `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
 | `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. | python-escpos, USB device |
 | `ConfigService` | Read/write configuration categories, validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
-| `AnalyticsService` | Aggregate session data, calculate revenue totals, generate time-series reports. | PostgreSQL (Session, Payment models) |
+| `AnalyticsService` | Aggregate session data, calculate revenue totals, generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment models) |
+| `RetentionService` | Purge expired session files and data based on configurable retention periods. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
 
 ### Orchestration Flow: Complete Kiosk Session
 
@@ -622,5 +694,6 @@ The following processes run on the host machine outside of Docker:
 |--------|-----------|---------------|---------|
 | `postgres_data` | Docker managed | `/var/lib/postgresql/data` | Persistent database storage |
 | `printer_data` | Docker managed | `/tmp/printer` | Temporary print job files (auto-cleaned) |
+| `vibeprint_data` | Docker managed | `/tmp/vibeprint` | Persistent image storage (vibe check photos, photobooth composites, thumbnails) |
 | Backend source (dev) | `./backend` | `/app` | Development hot reload |
 | Frontend build (prod) | Built into image | `/app/static` | Production static files |
