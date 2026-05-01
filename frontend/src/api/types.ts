@@ -8,6 +8,7 @@
 export type KioskState =
   | 'idle'
   | 'payment'
+  | 'access_code'
   | 'capture'
   | 'review'
   | 'processing'
@@ -45,6 +46,7 @@ export interface SelectRequest {
 
 export interface SessionCreateRequest {
   payment_enabled: boolean;
+  access_code_mode?: boolean;
   session_type?: SessionType;
 }
 
@@ -414,6 +416,7 @@ export interface FeaturesResponse {
   photobooth_min_photos: number;
   photobooth_capture_time_limit_seconds: number;
   photobooth_default_layout_rows: number;
+  access_code_mode_enabled: boolean;
 }
 
 // --- Strip Gallery ---
@@ -511,4 +514,47 @@ export interface ThemeUpdateRequest {
   display_name?: string;
   config?: ThemeConfig;
   sort_order?: number;
+}
+
+// --- Access Codes ---
+
+export interface AccessCodeResponse {
+  id: number;
+  code: string;
+  code_type: 'vibe_check' | 'photobooth' | 'universal';
+  max_uses: number;
+  use_count: number;
+  status: 'active' | 'used' | 'expired' | 'revoked';
+  expires_at: string | null;
+  notes: string | null;
+  created_at: string;
+  created_by: string;
+}
+
+export interface AccessCodeListResponse {
+  codes: AccessCodeResponse[];
+  total: number;
+}
+
+export interface AccessCodeCreateRequest {
+  code_type: 'vibe_check' | 'photobooth' | 'universal';
+  count: number;
+  max_uses: number;
+  expires_at: string | null;
+  notes: string | null;
+}
+
+export interface AccessCodeValidateRequest {
+  code: string;
+  session_type: 'vibe_check' | 'photobooth';
+}
+
+export interface AccessCodeValidateResponse {
+  valid: boolean;
+  message: string;
+  access_code_id: number | null;
+}
+
+export interface RedeemCodeRequest {
+  code: string;
 }

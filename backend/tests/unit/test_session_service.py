@@ -464,11 +464,15 @@ class TestValidTransitionsMap:
     """Verify the transition map structure."""
 
     def test_all_states_have_entries(self):
-        """Every KioskState value should have an entry in VALID_TRANSITIONS."""
-        from app.services.session_service import VALID_TRANSITIONS
+        """Every KioskState value should have an entry in at least one transition map."""
+        from app.services.session_service import (
+            PHOTOBOOTH_TRANSITIONS,
+            VIBE_CHECK_TRANSITIONS,
+        )
 
+        all_states = set(VIBE_CHECK_TRANSITIONS.keys()) | set(PHOTOBOOTH_TRANSITIONS.keys())
         for state in KioskState:
-            assert state.value in VALID_TRANSITIONS, f'{state.value} missing from VALID_TRANSITIONS'
+            assert state.value in all_states, f'{state.value} missing from all transition maps'
 
     def test_reset_transitions_to_idle(self):
         """RESET state should be able to transition to IDLE."""

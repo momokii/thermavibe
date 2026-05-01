@@ -7,7 +7,7 @@ import time
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,11 @@ from app.schemas.photobooth import (
     FrameSelectRequest,
     PhotoboothSnapResponse,
     ShareResponse,
+)
+from app.schemas.access_code import (
+    AccessCodeValidateRequest,
+    AccessCodeValidateResponse,
+    RedeemCodeRequest,
 )
 from app.schemas.print import PrintJobRequest
 from app.services import session_service
@@ -59,6 +64,13 @@ async def create_session(
         payment_enabled=body.payment_enabled or settings.payment_enabled,
         session_type=body.session_type,
     )
+
+    # Auto-transition from IDLE based on routing mode
+    if body.payment_enabled or settings.payment_enabled:
+        session = await session_service.start_session(db, session.id, payment_enabled=True)
+    elif body.access_code_mode:
+        session = await session_service.start_session(db, session.id, access_code_mode=True)
+
     return _session_to_response(session, settings)
 
 
@@ -715,6 +727,74 @@ async def serve_shared_composite(
 
 
 # ---------------------------------------------------------------------------
+# Access code flow (public, no auth)
+# ---------------------------------------------------------------------------
+
+
+@router.post('/validate-access-code', response_model=AccessCodeValidateResponse)
+async def validate_access_code(
+    body: AccessCodeValidateRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> AccessCodeValidateResponse:
+    """Validate an access code without redeeming it.
+
+    Returns whether the code is valid, a human-readable message,
+    and the access_code_id for subsequent redemption.
+    """
+    from app.services import access_code_service
+
+    result = await access_code_service.validate_code(
+        db=db,
+        code=body.code,
+        session_type=body.session_type,
+    )
+    return AccessCodeValidateResponse(**result)
+
+
+@router.post('/session/{session_id}/redeem-code', response_model=SessionResponse)
+async def redeem_access_code(
+    session_id: UUID,
+    body: RedeemCodeRequest,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
+    """Validate, redeem, and attach an access code to a session.
+
+    Transitions session from ACCESS_CODE → CAPTURE on success.
+    """
+    from app.services import access_code_service
+
+    session = await session_service.get_session(db, session_id)
+
+    if session.state != 'access_code':
+        raise HTTPException(
+            status_code=409,
+            detail=f'Session must be in access_code state, current state: {session.state}',
+        )
+
+    # Determine session type for type-checking
+    session_type = getattr(session, 'session_type', 'vibe_check') or 'vibe_check'
+
+    validation = await access_code_service.validate_code(
+        db=db,
+        code=body.code,
+        session_type=session_type,
+    )
+
+    if not validation['valid']:
+        raise HTTPException(status_code=400, detail=validation['message'])
+
+    # Redeem the code (increments use_count)
+    await access_code_service.redeem_code(db=db, code_id=validation['access_code_id'])
+
+    # Attach code to session and transition to CAPTURE
+    session.access_code_id = validation['access_code_id']
+    session = await session_service.transition_state(db, session_id, session_service.KioskState.CAPTURE)
+
+    return _session_to_response(session, settings)
+
+
+# ---------------------------------------------------------------------------
 # Feature flags (public, no auth)
 # ---------------------------------------------------------------------------
 
@@ -735,6 +815,9 @@ async def get_features(
     vc_config = await config_service.get_configs_by_category(db, 'vibe_check')
     vibe_check_enabled = vc_config.get('vibe_check_enabled', 'true').lower() == 'true'
 
+    ac_config = await config_service.get_configs_by_category(db, 'access_code')
+    access_code_mode_enabled = ac_config.get('access_code_mode_enabled', 'false').lower() == 'true'
+
     return FeaturesResponse(
         vibe_check_enabled=vibe_check_enabled,
         photobooth_enabled=photobooth_enabled,
@@ -742,6 +825,7 @@ async def get_features(
         photobooth_min_photos=min_photos,
         photobooth_capture_time_limit_seconds=capture_time_limit,
         photobooth_default_layout_rows=default_layout_rows,
+        access_code_mode_enabled=access_code_mode_enabled,
     )
 
 

@@ -129,14 +129,20 @@ export function usePhotoboothState() {
   const startPhotoboothSession = useCallback(async () => {
     setTransitioning(true);
     try {
+      const accessCodeMode = useKioskStore.getState().accessCodeModeEnabled;
       const response = await kioskApi.createSession({
         payment_enabled: false,
+        access_code_mode: accessCodeMode,
         session_type: 'photobooth',
       } satisfies SessionCreateRequest);
       const data = response.data;
-      setSession(data.id, data);
       useKioskStore.getState().setSessionType('photobooth');
-      setState('capture');
+      setSession(data.id, data);
+      if (accessCodeMode) {
+        setState('access_code');
+      } else {
+        setState('capture');
+      }
       setTransitioning(false);
     } catch (err) {
       setError((err as Error).message);

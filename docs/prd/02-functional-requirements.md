@@ -718,6 +718,79 @@ The admin gallery allows operators to browse, view, and download session results
 
 **Priority:** P0
 
+---
+
+## Module 12: Access Code System (FR-ACCESS-CODE)
+
+The access code system provides a payment alternative for event-hosted kiosks. When enabled, users enter pre-generated codes instead of paying per session. Access code mode and payment mode are mutually exclusive.
+
+### FR-ACCESS-CODE-001: Access Code Mode Toggle
+
+**Description:** Operators can enable access code mode through the admin dashboard. When enabled, payment is automatically disabled. The two modes are mutually exclusive.
+
+**Acceptance Criteria:**
+- The admin dashboard has a toggle switch for "Enable Access Code Mode" under the Access Codes section.
+- When access code mode is enabled, the system automatically sets `payment_enabled` to `false`.
+- When payment mode is enabled, the system automatically sets `access_code_mode_enabled` to `false`.
+- The toggle state is persisted in the database and survives container restarts.
+- The kiosk features endpoint (`GET /kiosk/features`) returns the current `access_code_mode_enabled` state.
+
+**Priority:** P1
+
+### FR-ACCESS-CODE-002: Code Generation
+
+**Description:** Operators can generate single or batch access codes (up to 100) with configurable type, max uses, and expiration.
+
+**Acceptance Criteria:**
+- Each code has a type: `vibe_check`, `photobooth`, or `universal`.
+- Codes are auto-generated with a type prefix (e.g., `VC-`, `PB-`, `UN-`) and 8 random alphanumeric characters.
+- Each code has a configurable max use count (default 1).
+- Each code can have an optional expiration timestamp.
+- Operators can add notes to generated codes for tracking.
+- Batch generation creates up to 100 codes in a single request.
+
+**Priority:** P1
+
+### FR-ACCESS-CODE-003: Code Validation and Redemption
+
+**Description:** Kiosk users enter access codes on the touchscreen. The system validates the code and, if valid, redeems it and grants access.
+
+**Acceptance Criteria:**
+- Validation checks: code exists, status is `active`, not expired, use_count < max_uses, code_type compatible with session_type.
+- Validation is separate from redemption (validate first, then redeem on confirmation).
+- On successful redemption, use_count is incremented. If use_count reaches max_uses, status transitions to `used`.
+- The kiosk displays a virtual numpad for code entry on the touchscreen.
+- Invalid codes display a clear error message (wrong type, expired, already used, not found).
+- The access code ID is stored on the kiosk session for audit tracking.
+
+**Priority:** P1
+
+### FR-ACCESS-CODE-004: Code Lifecycle Management
+
+**Description:** Operators can manage access codes through the admin dashboard: list, filter, revoke, delete, and generate QR codes.
+
+**Acceptance Criteria:**
+- The admin dashboard lists all codes with filtering by status and type, with pagination.
+- Operators can revoke active codes (prevents further use).
+- Operators can delete codes that have no linked sessions.
+- Each code has a QR code that can be generated on demand for printing or sharing.
+- Code status values: `active`, `used`, `expired`, `revoked`.
+
+**Priority:** P1
+
+### FR-ACCESS-CODE-005: Session Flow Integration
+
+**Description:** When access code mode is enabled, the kiosk session flow inserts an ACCESS_CODE state between IDLE and CAPTURE.
+
+**Acceptance Criteria:**
+- When access code mode is ON and payment is OFF, new sessions transition IDLE → ACCESS_CODE.
+- From ACCESS_CODE, a valid code transitions to CAPTURE.
+- From ACCESS_CODE, user can go back to IDLE (cancel/reset).
+- The ACCESS_CODE state is supported in both Vibe Check and Photobooth flows.
+- When access code mode is OFF, existing flows are unchanged (zero regression).
+
+**Priority:** P1
+
 The failsafe module ensures that the kiosk can recover gracefully from errors, connectivity issues, and unexpected conditions without manual intervention. It is critical for unattended operation.
 
 ### FR-FAILSAFE-001: Connectivity Monitoring

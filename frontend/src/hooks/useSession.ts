@@ -4,7 +4,7 @@ import type { SelectRequest } from '@/api/types';
 
 export function useCreateSession() {
   return useMutation({
-    mutationFn: (data: { payment_enabled: boolean }) =>
+    mutationFn: (data: { payment_enabled: boolean; access_code_mode?: boolean }) =>
       kioskApi.createSession(data),
   });
 }

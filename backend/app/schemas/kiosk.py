@@ -18,6 +18,10 @@ class SessionCreateRequest(BaseModel):
         default=False,
         description='Whether the payment step is enabled for this session',
     )
+    access_code_mode: bool = Field(
+        default=False,
+        description='Whether access code step is required for this session',
+    )
     session_type: str = Field(
         default='vibe_check',
         pattern=r'^(vibe_check|photobooth)$',

@@ -62,7 +62,8 @@ The following diagram shows all major components of VibePrint OS and their conne
 |                          | - Config   |  | OpenAI |  | ESC/   | |  |
 |                          | - Payments |  | Anthro-|  | POS    | |  |
 |                          | - Analytics|  | pic    |  | Protocol| |  |
-|                          |            |  | Google |  |        | |  |
+|                          | - Access   |  | Google |  |        | |  |
+|                          |   Codes    |  |        |  |        | |  |
 |                          +------------+  | Ollama |  +--------+ |  |
 |                                          +---+----+             |  |
 |                                              |                  |  |
@@ -108,7 +109,7 @@ The following diagram shows all major components of VibePrint OS and their conne
 |-----------|-----------|------|
 | **Kiosk UI** | React 19 / TypeScript / Chromium | Public-facing touchscreen interface that guides users through the photobooth flow |
 | **FastAPI Backend** | Python 3.12+ / FastAPI | Serves the frontend static files, provides REST API, orchestrates all business logic |
-| **PostgreSQL** | PostgreSQL 16 | Persistent storage for sessions, configurations, payments, and analytics |
+| **PostgreSQL** | PostgreSQL 16 | Persistent storage for sessions, configurations, payments, access codes, and analytics |
 | **AI Provider** | OpenAI / Anthropic / Google / Ollama | Receives captured images and returns AI-generated text analysis |
 | **Payment Gateway** | Midtrans / Xendit | Processes QRIS payments via QR code generation and webhook callbacks |
 | **Thermal Printer** | USB / ESC/POS | Prints receipts with AI results and optional photo thumbnail |
@@ -245,6 +246,8 @@ The kiosk supports two features: **Vibe Check** (single photo + AI reading) and 
 
 After payment confirmation (or when payment is disabled), the kiosk enters a feature selection screen. If only one feature is enabled, it is selected automatically. The admin can ensure at least one feature remains enabled — the system prevents disabling both.
 
+> **Note: Payment mode and access code mode are mutually exclusive.** When `access_code_mode_enabled` is set to `true` in the `access_code` configuration category, the system automatically disables payment mode. The admin endpoint enforces this: enabling access code mode sets `payment_enabled` to `false`, and vice versa. This ensures a clear entry path: the kiosk transitions to either `PAYMENT` or `ACCESS_CODE`, never both.
+
 ### Vibe Check Flow
 
 ```
@@ -260,8 +263,23 @@ After payment confirmation (or when payment is disabled), the kiosk enters a fea
     |                          v                           |
     |                     [return to IDLE]                 |
     |                                                      |
-    |                      +----------+                    |
-    +--------------------- |          | <------------------+
+    |    access_code      +--------------+                 |
+    +-------------------> |              |                 |
+    |  mode enabled       | ACCESS_CODE  |                 |
+    |                     | - Enter code |                 |
+    |                     +------+-------+                 |
+    |                            |                         |
+    |                            |  valid code             |
+    |                            v                         |
+    |                     +---------+                      |
+    |                     | CAPTURE | <--------------------+
+    |                     +----+----+
+    |                            |
+    |                            |  capture
+    |                            |  success
+    |                            v
+    |                      +----------+
+    +--------------------- |          |
                            | PROCESS  |  AI response
                            | ING      |  received
                            +----+-----+
@@ -301,64 +319,56 @@ After payment confirmation (or when payment is disabled), the kiosk enters a fea
     |  (auto-select if                                     |  complete
     |   only photobooth)                                   v
     |                                                 +----------+
-    +----------------------------------------------- | REVIEW   |
-                                                     | - Browse |
-                                                     |   photos |
-                                                     | - Retake |
-                                                     |   or Done|
-                                                     +----+-----+
-                                                          |
-                                                          | user done
-                                                          v
-                                                     +------------+
-                                                     | FRAME      |
-                                                     | SELECT     |
-                                                     | - Choose   |
-                                                     |   theme    |
-                                                     | - Layout   |
-                                                     |   rows     |
-                                                     +-----+------+
-                                                           |
-                                                           v
-                                                     +----------+
-                                                     | ARRANGE  |
-                                                     | - Drag & |
-                                                     |   drop   |
-                                                     |   photos |
-                                                     +----+-----+
-                                                          |
-                                                          v
-                                                     +------------+
-                                                     | COMPOSITING|
-                                                     | - Generate |
-                                                     |   strip    |
-                                                     +-----+------+
-                                                           |
-                                                           v
-                                                     +----------+
-                                                     | PHOTOBOOTH|
-                                                     | REVEAL    |
-                                                     | - Show    |
-                                                     |   strip   |
-                                                     | - Print   |
-                                                     | - Share   |
-                                                     +----+-----+
-                                                          |
-                                                          v
-                                                     +----------+
-                                                     | RESET    |
-                                                     +----+-----+
-                                                          |
-                                                          v
-                                                     [return to IDLE]
+    |    access_code      +--------------+             | REVIEW   |
+    +-------------------> |              |             | - Browse |
+    |  mode enabled       | ACCESS_CODE  |   +-------> |   photos |
+    |                     | - Enter code |   |         | - Retake |
+    |                     +------+-------+   |         |   or Done|
+    |                            |           |         +----+-----+
+    |                            |  valid    |              |
+    |                            |  code     |              |
+    |                            v           |              |
+    |                     +---------+        |              |
+    |                     | CAPTURE | <------+--------------+
+    |                     +----+----+
+    |                            |
+    +----------------------------+
+```
+
+The post-REVIEW states (FRAME_SELECT through RESET) follow the same path as the non-access-code flow:
+
+```
+REVIEW
+  |  user done
+  v
+FRAME_SELECT
+  |  theme chosen
+  v
+ARRANGE
+  |  arrangement confirmed
+  v
+COMPOSITING
+  |  strip generated
+  v
+PHOTOBOOTH_REVEAL
+  |  print / share / timeout
+  v
+RESET
+  |
+  v
+[return to IDLE]
 ```
 
 ### Complete State Transition Table
 
 | Current State | Event | Next State | Action |
 |--------------|-------|------------|--------|
-| IDLE | User taps "Start" (payment disabled) | FEATURE_SELECT or CAPTURE | Show feature selection or go directly if only one enabled |
+| IDLE | User taps "Start" (payment disabled, access code disabled) | FEATURE_SELECT or CAPTURE | Show feature selection or go directly if only one enabled |
 | IDLE | User taps "Start" (payment enabled) | PAYMENT | Generate QRIS QR code, display to user |
+| IDLE | User taps "Start" (access code mode enabled) | ACCESS_CODE | Show access code entry screen |
+| ACCESS_CODE | User enters valid code | CAPTURE | Validate and redeem code, proceed to capture |
+| ACCESS_CODE | User enters invalid code | ACCESS_CODE | Show error message, remain on entry screen |
+| ACCESS_CODE | Timeout / user backs out | RESET | Clear session, return to idle |
 | PAYMENT | Payment confirmed (webhook) | FEATURE_SELECT or CAPTURE | Stop QR display, show feature selection or start capture |
 | PAYMENT | Payment timeout (15 min) | IDLE | Clear payment session, show "Session expired" |
 | PAYMENT | User cancels | IDLE | Clear payment session |
@@ -418,7 +428,8 @@ The backend follows a strict layered architecture to separate concerns and maint
 |  - ai.py           (image analysis trigger)                      |
 |  - payment.py      (QRIS creation, webhook, status polling)      |
 |  - print.py        (print test, status check)                    |
-|  - admin.py        (auth, config, analytics, hardware tests)     |
+|  - admin.py        (auth, config, analytics, hardware tests,     |
+|                      access code management)                     |
 +--------------------------------+---------------------------------+
                                  |
                                  | Dependency Injection (FastAPI Depends)
@@ -436,6 +447,7 @@ The backend follows a strict layered architecture to separate concerns and maint
 |  - analytics_service.py (session aggregation, revenue reports, feature breakdown) |
 |  - retention_service.py (automated cleanup of expired files and sessions) |
 |  - theme_service.py     (photobooth theme CRUD, enable/disable)  |
+|  - access_code_service.py (access code generation, validation, redemption, CRUD) |
 +--------------------------------+---------------------------------+
                                  |
                                  | Direct instantiation / DI
@@ -451,7 +463,7 @@ The backend follows a strict layered architecture to separate concerns and maint
 | - payment.py   |               | - openai.py     |     | - escpos.py       |
 | - config.py    |               | - anthropic.py  |     | - image.py        |
 | - device.py    |               | - google.py     |     | - validators.py   |
-|                |               | - ollama.py     |     |                   |
+| - access_code  |               | - ollama.py     |     |                   |
 |                |               |                 |     |                   |
 |                |               | payment/        |     |                   |
 |                |               | - base.py       |     |                   |
@@ -473,8 +485,9 @@ The backend follows a strict layered architecture to separate concerns and maint
 | `AIService` | Accept image bytes, select active provider, send to AI API, parse response, handle retries and fallbacks. | AI providers (OpenAI, Anthropic, Google, Ollama) |
 | `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
 | `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. | python-escpos, USB device |
-| `ConfigService` | Read/write configuration categories, validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
+| `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
 | `AnalyticsService` | Aggregate session data, calculate revenue totals, generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment models) |
+| `AccessCodeService` | Generate, validate, redeem, and manage access codes. Codes grant feature access (vibe_check, photobooth, or universal) as an alternative to payment. Supports batch generation, expiration, usage limits, and revocation. | PostgreSQL (AccessCode model) |
 | `RetentionService` | Purge expired session files and data based on configurable retention periods. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
 
 ### Orchestration Flow: Complete Kiosk Session

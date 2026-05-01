@@ -20,6 +20,7 @@ interface KioskStore {
   // Feature flags (fetched on init from admin config)
   vibeCheckEnabled: boolean;
   photoboothEnabled: boolean;
+  accessCodeModeEnabled: boolean;
   featuresLoaded: boolean;
   photoboothMaxPhotos: number;
   photoboothMinPhotos: number;
@@ -42,7 +43,7 @@ interface KioskStore {
   setTimeLimit: (seconds: number) => void;
   setCaptureStartedAt: (ts: number | null) => void;
   setSessionType: (type: SessionType) => void;
-  setFeatures: (data: { vibeCheck: boolean; photobooth: boolean; maxPhotos: number; minPhotos: number; captureTimeLimit: number; defaultLayoutRows: number }) => void;
+  setFeatures: (data: { vibeCheck: boolean; photobooth: boolean; accessCodeMode: boolean; maxPhotos: number; minPhotos: number; captureTimeLimit: number; defaultLayoutRows: number }) => void;
   setPhotoboothThemeId: (id: number | null) => void;
   setPhotoboothLayoutRows: (rows: number) => void;
   setPhotoboothPhotoAssignments: (assignments: Record<number, number>) => void;
@@ -63,6 +64,7 @@ const initialState = {
   sessionType: 'vibe_check' as SessionType,
   vibeCheckEnabled: true,
   photoboothEnabled: true,
+  accessCodeModeEnabled: false,
   featuresLoaded: false,
   photoboothMaxPhotos: 8,
   photoboothMinPhotos: 2,
@@ -86,10 +88,11 @@ export const useKioskStore = create<KioskStore>((set) => ({
   setTimeLimit: (seconds) => set({ timeLimitSeconds: seconds }),
   setCaptureStartedAt: (ts) => set({ captureStartedAt: ts }),
   setSessionType: (type) => set({ sessionType: type }),
-  setFeatures: ({ vibeCheck, photobooth, maxPhotos, minPhotos, captureTimeLimit, defaultLayoutRows }) =>
+  setFeatures: ({ vibeCheck, photobooth, accessCodeMode, maxPhotos, minPhotos, captureTimeLimit, defaultLayoutRows }) =>
     set({
       vibeCheckEnabled: vibeCheck,
       photoboothEnabled: photobooth,
+      accessCodeModeEnabled: accessCodeMode,
       featuresLoaded: true,
       photoboothMaxPhotos: maxPhotos,
       photoboothMinPhotos: minPhotos,

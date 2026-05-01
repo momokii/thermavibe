@@ -11,6 +11,9 @@ import type {
   CaptureResponse,
   SessionFinishResponse,
   SuccessMessage,
+  AccessCodeValidateRequest,
+  AccessCodeValidateResponse,
+  FeaturesResponse,
 } from './types';
 
 export const kioskApi = {
@@ -43,4 +46,13 @@ export const kioskApi = {
 
   finish: (id: string) =>
     apiClient.post<SessionFinishResponse>(`/kiosk/session/${id}/finish`),
+
+  validateAccessCode: (data: AccessCodeValidateRequest) =>
+    apiClient.post<AccessCodeValidateResponse>('/kiosk/validate-access-code', data),
+
+  redeemAccessCode: (sessionId: string, code: string) =>
+    apiClient.post<SessionResponse>(`/kiosk/session/${sessionId}/redeem-code`, { code }),
+
+  getFeatures: () =>
+    apiClient.get<FeaturesResponse>('/kiosk/features'),
 };

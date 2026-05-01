@@ -57,13 +57,24 @@ export function useKioskState() {
       store.setPhotos([]);
       store.selectPhoto(0);
       store.setCaptureStartedAt(null);
-      const response = await createSessionMut.mutateAsync({ payment_enabled: false });
+      const accessCodeMode = useKioskStore.getState().accessCodeModeEnabled;
+      const response = await createSessionMut.mutateAsync({
+        payment_enabled: false,
+        access_code_mode: accessCodeMode,
+      });
+      useKioskStore.getState().setSessionType('vibe_check');
       store.setSession(response.data.id, response.data);
       if (response.data.capture_time_limit) {
         store.setTimeLimit(response.data.capture_time_limit);
       }
-      // Route to payment screen if backend says payment is enabled, otherwise go straight to capture
-      store.setState(response.data.payment_enabled ? 'payment' : 'capture');
+      // Route: payment → access_code → capture
+      if (response.data.payment_enabled) {
+        store.setState('payment');
+      } else if (accessCodeMode) {
+        store.setState('access_code');
+      } else {
+        store.setState('capture');
+      }
     } catch {
       store.reset();
       store.setError('Failed to start session. Please try again.');

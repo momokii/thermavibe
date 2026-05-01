@@ -1,9 +1,9 @@
 # Data Models
 
 > **Document ID:** PRD-05
-> **Version:** 1.1
+> **Version:** 1.2
 > **Status:** Approved
-> **Last Updated:** 2026-04-29
+> **Last Updated:** 2026-05-01
 
 This document defines the data entities, field-level specifications, constraints, indexes, and relationships for the VibePrint OS persistence layer. All data is stored in PostgreSQL 15+ and managed via SQLAlchemy ORM with Alembic migrations.
 
@@ -13,10 +13,11 @@ This document defines the data entities, field-level specifications, constraints
 
 1. [Entity Relationship Diagram](#1-entity-relationship-diagram)
 2. [KioskSession](#2-kiosksession)
-3. [OperatorConfig](#3-operatorconfig)
-4. [AnalyticsEvent](#4-analyticsevent)
-5. [PrintJob](#5-printjob)
-6. [Privacy Model](#6-privacy-model)
+3. [AccessCode](#3-accesscode)
+4. [OperatorConfig](#4-operatorconfig)
+5. [AnalyticsEvent](#5-analyticsevent)
+6. [PrintJob](#6-printjob)
+7. [Privacy Model](#7-privacy-model)
 
 ---
 
@@ -28,22 +29,35 @@ This document defines the data entities, field-level specifications, constraints
 +---------------------------+         +---------------------------+
 | id           UUID (PK)     |<------>| session_id   UUID (FK)     |
 | state        ENUM          |         | id           UUID (PK)     |
-| photo_path   VARCHAR(512)  |         | event_type   ENUM          |
-| ai_response_text TEXT      |         | metadata     JSONB         |
-| ai_provider_used VARCHAR   |         | timestamp    TIMESTAMPTZ   |
-| payment_status ENUM        |         +---------------------------+
-| payment_provider VARCHAR    |
-| payment_amount INTEGER     |         +---------------------------+
-| payment_reference VARCHAR   |         |       PrintJob            |
+| access_code_id INTEGER FK  |         | event_type   ENUM          |
+| photo_path   VARCHAR(512)  |         | metadata     JSONB         |
+| ai_response_text TEXT      |         | timestamp    TIMESTAMPTZ   |
+| ai_provider_used VARCHAR   |         +---------------------------+
+| payment_status ENUM        |
+| payment_provider VARCHAR    |         +---------------------------+
+| payment_amount INTEGER     |         |       PrintJob            |
+| payment_reference VARCHAR   |         +---------------------------+
 | created_at    TIMESTAMPTZ  |<------>| session_id   UUID (FK)     |
 | completed_at  TIMESTAMPTZ  |         +---------------------------+
 | cleared_at    TIMESTAMPTZ  |         | id           UUID (PK)     |
 +---------------------------+         | status       ENUM          |
-                                      | retry_count  INTEGER       |
-                                      | error_message TEXT          |
-                                      | created_at   TIMESTAMPTZ   |
-                                      | completed_at TIMESTAMPTZ   |
-                                      +---------------------------+
+          |                           | retry_count  INTEGER       |
+          | FK                        | error_message TEXT          |
+          v                           | created_at   TIMESTAMPTZ   |
++---------------------------+         | completed_at TIMESTAMPTZ   |
+|       AccessCode          |         +---------------------------+
++---------------------------+
+| id           SERIAL (PK)  |
+| code         VARCHAR(32)  |
+| code_type    VARCHAR(16)  |
+| max_uses     INTEGER      |
+| use_count    INTEGER      |
+| status       VARCHAR(16)  |
+| expires_at   TIMESTAMPTZ  |
+| notes        TEXT          |
+| created_at   TIMESTAMPTZ  |
+| created_by   VARCHAR(64)  |
++---------------------------+
 
 +---------------------------+
 |     OperatorConfig        |
@@ -59,7 +73,12 @@ This document defines the data entities, field-level specifications, constraints
 Relationships:
   KioskSession  1 --- 0..* AnalyticsEvent   (one session generates many events)
   KioskSession  1 --- 0..1 PrintJob          (one session has at most one print job)
+  AccessCode    1 --- 0..* KioskSession       (one code can unlock many sessions)
   OperatorConfig is a standalone key-value store with no foreign key relationships.
+
+Mutually exclusive modes:
+  access_code mode and payment mode cannot both be active simultaneously.
+  When access_code_mode_enabled is true, payment.enabled must be false, and vice versa.
 ```
 
 ---
@@ -77,8 +96,9 @@ The `KioskSession` entity represents a single user interaction cycle with the ki
 | Field                | PostgreSQL Type    | Constraints                          | Description                                                                                     |
 |----------------------|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
 | `id`                 | `UUID`             | PRIMARY KEY, DEFAULT `gen_random_uuid()` | Unique identifier for the session. Generated server-side on creation.                          |
-| `state`              | `VARCHAR(32)`      | NOT NULL, DEFAULT `'idle'`, CHECK constraint | Current state in the state machine. One of: `idle`, `payment`, `capture`, `review`, `processing`, `reveal`, `frame_select`, `arrange`, `compositing`, `photobooth_reveal`, `feature_select`, `reset`. |
+| `state`              | `VARCHAR(32)`      | NOT NULL, DEFAULT `'idle'`, CHECK constraint | Current state in the state machine. One of: `idle`, `access_code`, `payment`, `capture`, `review`, `processing`, `reveal`, `frame_select`, `arrange`, `compositing`, `photobooth_reveal`, `feature_select`, `reset`. |
 | `session_type`       | `VARCHAR(32)`      | NULL                                 | Feature type: `vibe_check` or `photobooth`. Set at session creation based on feature selection. |
+| `access_code_id`     | `INTEGER`          | NULL, FOREIGN KEY REFERENCES `access_codes(id)` ON DELETE SET NULL | The access code used to start this session. NULL if access code mode is disabled or the code was deleted. |
 | `photo_path`         | `VARCHAR(512)`     | NULL                                 | Filesystem path to the captured JPEG photo. Set during CAPTURE state. Cleared during RESET.    |
 | `ai_response_text`   | `TEXT`             | NULL                                 | The AI-generated vibe reading text. Set during PROCESSING state.                                |
 | `ai_provider_used`   | `VARCHAR(64)`      | NULL                                 | Identifier of the AI provider that generated the response. Values: `openai`, `anthropic`, `google`, `ollama`, `fallback`, `mock`. |
@@ -100,7 +120,7 @@ CONSTRAINT pk_kiosk_sessions PRIMARY KEY (id),
 
 -- State must be one of the valid state machine values
 CONSTRAINT chk_kiosk_sessions_state CHECK (
-    state IN ('idle', 'payment', 'capture', 'review', 'processing', 'reveal',
+    state IN ('idle', 'access_code', 'payment', 'capture', 'review', 'processing', 'reveal',
               'frame_select', 'arrange', 'compositing', 'photobooth_reveal',
               'feature_select', 'reset')
 ),
@@ -135,7 +155,12 @@ CONSTRAINT chk_kiosk_sessions_cleared_after_created CHECK (
 CONSTRAINT chk_kiosk_sessions_payment_ref CHECK (
     payment_status != 'confirmed'
     OR payment_reference IS NOT NULL
-)
+),
+
+-- Foreign key to access_codes (SET NULL on code deletion)
+CONSTRAINT fk_kiosk_sessions_access_code FOREIGN KEY (access_code_id)
+    REFERENCES access_codes(id)
+    ON DELETE SET NULL
 ```
 
 ### 2.4 Indexes
@@ -158,6 +183,9 @@ CREATE INDEX idx_kiosk_sessions_active_paid ON kiosk_sessions (state, payment_st
 
 -- Index for finding stale sessions (created but never completed)
 CREATE INDEX idx_kiosk_sessions_stale ON kiosk_sessions (created_at) WHERE completed_at IS NULL AND created_at < NOW() - INTERVAL '10 minutes';
+
+-- Index for querying sessions by access code (usage tracking)
+CREATE INDEX idx_kiosk_sessions_access_code_id ON kiosk_sessions (access_code_id) WHERE access_code_id IS NOT NULL;
 ```
 
 ### 2.5 SQLAlchemy Model (Reference)
@@ -168,6 +196,7 @@ class KioskSession(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     state = Column(String(32), nullable=False, default="idle")
+    access_code_id = Column(Integer, ForeignKey("access_codes.id", ondelete="SET NULL"), nullable=True)
     photo_path = Column(String(512), nullable=True)
     ai_response_text = Column(Text, nullable=True)
     ai_provider_used = Column(String(64), nullable=True)
@@ -181,19 +210,133 @@ class KioskSession(Base):
 
     analytics_events = relationship("AnalyticsEvent", back_populates="session")
     print_job = relationship("PrintJob", back_populates="session", uselist=False)
+    access_code = relationship("AccessCode", back_populates="sessions")
 ```
 
 ---
 
-## 3. OperatorConfig
+## 3. AccessCode
 
-The `OperatorConfig` entity stores all operator-configurable settings as a key-value store. This approach allows flexible configuration without schema migrations when new settings are added.
+The `AccessCode` entity stores redeemable codes that grant access to kiosk features. When access code mode is enabled, users must enter a valid code before proceeding to capture. This is useful for event organizers who want to control access, limit usage per code, and track redemptions.
+
+> **Note:** Access code mode and payment mode are mutually exclusive. When `access_code.access_code_mode_enabled` is `true`, `payment.enabled` must be `false`, and vice versa. The system must enforce this constraint at the configuration validation layer.
 
 ### 3.1 Table Definition
 
-**Table name:** `operator_configs`
+**Table name:** `access_codes`
 
 ### 3.2 Fields
+
+| Field         | PostgreSQL Type    | Constraints                          | Description                                                                                     |
+|---------------|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
+| `id`          | `SERIAL`           | PRIMARY KEY, AUTO INCREMENT          | Auto-incrementing integer identifier.                                                          |
+| `code`        | `VARCHAR(32)`      | NOT NULL, UNIQUE                     | Human-readable code string. Format: alphanumeric with dashes, e.g. `VC-A3B7K9M2`.              |
+| `code_type`   | `VARCHAR(16)`      | NOT NULL                             | Feature scope of this code. Values: `vibe_check`, `photobooth`, `universal`.                   |
+| `max_uses`    | `INTEGER`          | NOT NULL, DEFAULT `1`                | Maximum number of times this code can be redeemed. `1` = single-use.                           |
+| `use_count`   | `INTEGER`          | NOT NULL, DEFAULT `0`                | Current number of redemptions. Incremented atomically on each valid use.                       |
+| `status`      | `VARCHAR(16)`      | NOT NULL, DEFAULT `'active'`         | Current lifecycle status. Values: `active`, `used`, `expired`, `revoked`.                      |
+| `expires_at`  | `TIMESTAMPTZ`      | NULL                                 | When this code becomes invalid. NULL means the code never expires.                             |
+| `notes`       | `TEXT`             | NULL                                 | Operator-facing notes for internal tracking (e.g., "VIP batch — wedding event").              |
+| `created_at`  | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`            | Timestamp when the code was generated.                                                         |
+| `created_by`  | `VARCHAR(64)`      | NOT NULL, DEFAULT `'admin'`          | Identifier of the operator or system that created this code.                                   |
+
+### 3.3 Constraints
+
+```sql
+-- Primary key
+CONSTRAINT pk_access_codes PRIMARY KEY (id),
+
+-- Code must be unique (no duplicate codes)
+CONSTRAINT uq_access_codes_code UNIQUE (code),
+
+-- Code type must be a known value
+CONSTRAINT chk_access_codes_code_type CHECK (
+    code_type IN ('vibe_check', 'photobooth', 'universal')
+),
+
+-- Status must be a known value
+CONSTRAINT chk_access_codes_status CHECK (
+    status IN ('active', 'used', 'expired', 'revoked')
+),
+
+-- Use count cannot exceed max uses
+CONSTRAINT chk_access_codes_use_count CHECK (
+    use_count >= 0 AND use_count <= max_uses
+),
+
+-- Max uses must be at least 1
+CONSTRAINT chk_access_codes_max_uses CHECK (
+    max_uses >= 1
+)
+```
+
+### 3.4 Indexes
+
+```sql
+-- Unique index on code (also enforces uniqueness for lookups)
+CREATE UNIQUE INDEX idx_access_codes_code ON access_codes (code);
+
+-- Index for querying codes by status (find active codes quickly)
+CREATE INDEX idx_access_codes_status ON access_codes (status);
+
+-- Index for querying codes by type
+CREATE INDEX idx_access_codes_code_type ON access_codes (code_type);
+
+-- Index for finding codes that are about to expire (cleanup jobs)
+CREATE INDEX idx_access_codes_expires_at ON access_codes (expires_at) WHERE expires_at IS NOT NULL;
+```
+
+### 3.5 State Machine
+
+When access code mode is enabled, the kiosk state machine inserts an `access_code` state between `idle` and `capture` (or `feature_select`):
+
+```
+    +--------+         +-------------+         +---------+
+    |  IDLE  |-------->| ACCESS_CODE |-------->| CAPTURE |
+    +--------+         +-------------+         +---------+
+                            |
+                            | invalid / expired / revoked
+                            v
+                      (show error, stay in ACCESS_CODE)
+
+    Flow variants:
+      IDLE --> ACCESS_CODE --> FEATURE_SELECT --> CAPTURE  (when both features enabled)
+      IDLE --> ACCESS_CODE --> CAPTURE                     (when one feature enabled)
+```
+
+The `access_code` state replaces the `payment` state in the session lifecycle. A session cannot have both `access_code_id` set and a non-null `payment_status`.
+
+### 3.6 SQLAlchemy Model (Reference)
+
+```python
+class AccessCode(Base):
+    __tablename__ = "access_codes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(32), nullable=False, unique=True)
+    code_type = Column(String(16), nullable=False)
+    max_uses = Column(Integer, nullable=False, default=1)
+    use_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(16), nullable=False, default="active")
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(String(64), nullable=False, default="admin")
+
+    sessions = relationship("KioskSession", back_populates="access_code")
+```
+
+---
+
+## 4. OperatorConfig
+
+The `OperatorConfig` entity stores all operator-configurable settings as a key-value store. This approach allows flexible configuration without schema migrations when new settings are added.
+
+### 4.1 Table Definition
+
+**Table name:** `operator_configs`
+
+### 4.2 Fields
 
 | Field         | PostgreSQL Type    | Constraints                        | Description                                                                                   |
 |---------------|--------------------|------------------------------------|-----------------------------------------------------------------------------------------------|
@@ -204,7 +347,7 @@ The `OperatorConfig` entity stores all operator-configurable settings as a key-v
 | `description` | `TEXT`             | NULL                               | Human-readable description of what this configuration key controls. Displayed as a tooltip or help text in the admin dashboard. |
 | `updated_at`  | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`          | Timestamp of the last update to this configuration value.                                     |
 
-### 3.3 Constraints
+### 4.3 Constraints
 
 ```sql
 -- Primary key
@@ -215,11 +358,11 @@ CONSTRAINT uq_operator_configs_key UNIQUE (key),
 
 -- Category must be a known value
 CONSTRAINT chk_operator_configs_category CHECK (
-    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general', 'vibe_check', 'photobooth')
+    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general', 'vibe_check', 'photobooth', 'access_code')
 )
 ```
 
-### 3.4 Indexes
+### 4.4 Indexes
 
 ```sql
 -- Unique index on key (also enforces uniqueness)
@@ -229,7 +372,7 @@ CREATE UNIQUE INDEX idx_operator_configs_key ON operator_configs (key);
 CREATE INDEX idx_operator_configs_category ON operator_configs (category);
 ```
 
-### 3.5 Standard Configuration Keys
+### 4.5 Standard Configuration Keys
 
 The following configuration keys are used by the system. These are seeded during initial setup and can be modified through the admin dashboard.
 
@@ -274,8 +417,9 @@ The following configuration keys are used by the system. These are seeded during
 | `photobooth.photobooth_watermark_enabled` | `photobooth` | boolean | `false`                  | Add text watermark to photobooth strips                                     |
 | `photobooth.photobooth_watermark_text` | `photobooth` | string | `VibePrint OS`             | Text shown on watermark                                                     |
 | `photobooth.composite_retention_hours` | `photobooth` | integer | `168`                  | Hours to retain photobooth composites for admin gallery (0 = forever)      |
+| `access_code.access_code_mode_enabled` | `access_code` | boolean | `false`                | Whether access code entry is required before photo capture. Mutually exclusive with `payment.enabled`. |
 
-### 3.6 SQLAlchemy Model (Reference)
+### 4.6 SQLAlchemy Model (Reference)
 
 ```python
 class OperatorConfig(Base):
@@ -291,15 +435,15 @@ class OperatorConfig(Base):
 
 ---
 
-## 4. AnalyticsEvent
+## 5. AnalyticsEvent
 
 The `AnalyticsEvent` entity records discrete events that occur during kiosk sessions. This provides an append-only audit log for debugging, reporting, and operational monitoring. Events are lightweight and are inserted asynchronously to avoid impacting user-facing performance.
 
-### 4.1 Table Definition
+### 5.1 Table Definition
 
 **Table name:** `analytics_events`
 
-### 4.2 Fields
+### 5.2 Fields
 
 | Field        | PostgreSQL Type    | Constraints                          | Description                                                                                     |
 |--------------|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
@@ -309,7 +453,7 @@ The `AnalyticsEvent` entity records discrete events that occur during kiosk sess
 | `metadata`   | `JSONB`            | NOT NULL, DEFAULT `'{}'`              | Additional structured data about the event. Schema varies by event_type.                        |
 | `timestamp`  | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`             | When the event occurred.                                                                         |
 
-### 4.3 Event Type Enum Values
+### 5.3 Event Type Enum Values
 
 | Event Type            | Description                                                                 | Typical Metadata Fields                                                                                          |
 |-----------------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
@@ -330,7 +474,7 @@ The `AnalyticsEvent` entity records discrete events that occur during kiosk sess
 | `session_timeout`     | Session timed out in a non-idle state without user completion                | `{ "state_at_timeout": "payment", "elapsed_ms": 120000 }`                                                         |
 | `session_reset`       | Session data cleared, returning to idle                                      | `{ "had_payment": true, "had_print": true, "cleanup_success": true }`                                             |
 
-### 4.4 Constraints
+### 5.4 Constraints
 
 ```sql
 -- Primary key
@@ -364,7 +508,7 @@ CONSTRAINT chk_analytics_events_type CHECK (
 )
 ```
 
-### 4.5 Indexes
+### 5.5 Indexes
 
 ```sql
 -- Index for querying events by session
@@ -386,7 +530,7 @@ CREATE INDEX idx_analytics_events_metadata ON analytics_events USING GIN (metada
 CREATE INDEX idx_analytics_events_errors ON analytics_events (timestamp DESC) WHERE event_type IN ('error', 'print_failed', 'ai_request_failed', 'session_timeout');
 ```
 
-### 4.6 SQLAlchemy Model (Reference)
+### 5.6 SQLAlchemy Model (Reference)
 
 ```python
 class AnalyticsEvent(Base):
@@ -403,15 +547,15 @@ class AnalyticsEvent(Base):
 
 ---
 
-## 5. PrintJob
+## 6. PrintJob
 
 The `PrintJob` entity tracks the lifecycle of a single print operation. It records the status, retry attempts, and any errors encountered. Each session has at most one print job.
 
-### 5.1 Table Definition
+### 6.1 Table Definition
 
 **Table name:** `print_jobs`
 
-### 5.2 Fields
+### 6.2 Fields
 
 | Field           | PostgreSQL Type    | Constraints                          | Description                                                                                     |
 |-----------------|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------------|
@@ -423,7 +567,7 @@ The `PrintJob` entity tracks the lifecycle of a single print operation. It recor
 | `created_at`    | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`            | When the print job was created.                                                                |
 | `completed_at`  | `TIMESTAMPTZ`      | NULL                                 | When the print job reached a terminal state (`complete` or `failed`).                           |
 
-### 5.3 Constraints
+### 6.3 Constraints
 
 ```sql
 -- Primary key
@@ -451,7 +595,7 @@ CONSTRAINT chk_print_jobs_completed_after_created CHECK (
 )
 ```
 
-### 5.4 Indexes
+### 6.4 Indexes
 
 ```sql
 -- Index for querying active/recent print jobs
@@ -464,7 +608,7 @@ CREATE INDEX idx_print_jobs_created_at ON print_jobs (created_at DESC);
 CREATE INDEX idx_print_jobs_failed ON print_jobs (created_at DESC) WHERE status = 'failed';
 ```
 
-### 5.5 Print Job Lifecycle
+### 6.5 Print Job Lifecycle
 
 ```
     +----------+         +----------+         +----------+
@@ -492,7 +636,7 @@ CREATE INDEX idx_print_jobs_failed ON print_jobs (created_at DESC) WHERE status 
 - If the printer is still unavailable after max retries, the status is set to `failed` with the error message.
 - Failed print jobs are visible in the admin dashboard and trigger an operator alert.
 
-### 5.6 SQLAlchemy Model (Reference)
+### 6.6 SQLAlchemy Model (Reference)
 
 ```python
 class PrintJob(Base):
@@ -511,13 +655,13 @@ class PrintJob(Base):
 
 ---
 
-## 6. Privacy Model
+## 7. Privacy Model
 
-### 6.1 Core Principle
+### 7.1 Core Principle
 
 VibePrint OS is designed with privacy as a primary concern. The system captures photographic images of users in public spaces and processes them through AI services. The privacy model ensures that personal data is retained for the minimum time necessary and is not used for any purpose beyond delivering the immediate service.
 
-### 6.2 Data Retention Policy
+### 7.2 Data Retention Policy
 
 | Data Type          | Storage Location    | Retention Period          | Deletion Method                          |
 |--------------------|---------------------|--------------------------|------------------------------------------|
@@ -528,8 +672,9 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 | Payment records    | PostgreSQL `kiosk_sessions` (payment fields) | 90 days after session creation | Required for reconciliation; retained longer than session data |
 | Operator config    | PostgreSQL `operator_configs` | Indefinite (operator-controlled) | Deleted only when operator resets configuration |
 | Print job records  | PostgreSQL `print_jobs` | 30 days after session creation | Cascading delete with session |
+| Access code records | PostgreSQL `access_codes` | Indefinite (operator-controlled) | Revoked or expired codes retained for audit trail; deletion is manual via admin dashboard |
 
-### 6.3 Photo Handling
+### 7.3 Photo Handling
 
 1. **Capture:** Photo is saved to a temporary directory on the local filesystem. Vibe check photos are saved to `/tmp/` with a `vibeprint_` prefix. Photobooth photos are saved to `/tmp/` with a `vibeprint_snap_` prefix.
 2. **Processing (Vibe Check):** The photo is read from disk, converted to base64, and sent to the AI provider. The AI provider's own privacy policy governs what happens to the image on their servers.
@@ -539,21 +684,21 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 6. **Retention:** The retention service background task runs periodically, purging files older than the configured retention period for each feature. The cleanup interval is auto-derived from the shorter of the two retention periods.
 7. **Database reference:** The `photo_path` and `composite_image_path` fields record where files are stored for gallery access.
 
-### 6.4 AI Provider Data Transmission
+### 7.4 AI Provider Data Transmission
 
 - Photos are transmitted to the AI provider over HTTPS (TLS 1.2+)
 - The system does not store AI provider responses beyond what is needed for the current session
 - The `ai_provider_used` field in the database records which provider processed the image but does not store any image data sent to the provider
 - Operators should review the privacy policy of their chosen AI provider to understand how images are handled on the provider's infrastructure
 
-### 6.5 No Facial Recognition or Biometric Storage
+### 7.5 No Facial Recognition or Biometric Storage
 
 - VibePrint OS does not perform facial recognition, face detection beyond what the AI vision model inherently does, or store any biometric data
 - No user identification, tracking, or profiling is performed
 - Sessions are anonymous; no personally identifiable information (PII) is collected beyond the photo itself
 - The AI prompt is designed to analyze the photo for "vibe reading" purposes only and is not configured to extract or store identifying information
 
-### 6.6 Automated Retention Cleanup
+### 7.6 Automated Retention Cleanup
 
 A background task (`retention_service`) starts on application boot and runs periodically to purge expired data:
 
@@ -571,7 +716,7 @@ A background task (`retention_service`) starts on application boot and runs peri
 
 Retention periods are configurable via the admin dashboard under each feature's configuration section. The system auto-derives the cleanup interval to ensure neither feature's files are retained longer than configured.
 
-### 6.7 Compliance Considerations
+### 7.7 Compliance Considerations
 
 - The kiosk should display a visible privacy notice on the attract loop or near the physical kiosk, informing users that their photo will be temporarily captured and processed
 - The notice should state that photos are not stored permanently and are deleted after the session

@@ -8,6 +8,7 @@ import ReviewScreen from './ReviewScreen';
 import ProcessingScreen from './ProcessingScreen';
 import RevealScreen from './RevealScreen';
 import PaymentScreen from './PaymentScreen';
+import AccessCodeScreen from './AccessCodeScreen';
 import PhotoboothCaptureScreen from './PhotoboothCaptureScreen';
 import FrameSelectScreen from './FrameSelectScreen';
 import ArrangeScreen from './ArrangeScreen';
@@ -62,6 +63,11 @@ export default function KioskShell() {
         {state === 'payment' && (
           <motion.div key="payment" {...screenTransition} className="absolute inset-0">
             <PaymentScreen />
+          </motion.div>
+        )}
+        {state === 'access_code' && (
+          <motion.div key="access_code" {...screenTransition} className="absolute inset-0">
+            <AccessCodeScreen />
           </motion.div>
         )}
         {state === 'frame_select' && (

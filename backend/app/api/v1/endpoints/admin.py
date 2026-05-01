@@ -21,6 +21,11 @@ from app.schemas.admin import (
     RevenueAnalyticsResponse,
     SessionAnalyticsResponse,
 )
+from app.schemas.access_code import (
+    AccessCodeCreateRequest,
+    AccessCodeListResponse,
+    AccessCodeResponse,
+)
 from app.schemas.photobooth import (
     ThemeCreateRequest,
     ThemeResponse,
@@ -96,6 +101,12 @@ async def update_config(
                     status_code=422,
                     detail='At least one feature (Vibe Check or Photobooth) must stay enabled.',
                 )
+
+    # Guard: access code mode and payment are mutually exclusive
+    if category == 'access_code' and values.get('access_code_mode_enabled', '').lower() == 'true':
+        await config_service.update_config(db, 'payment', {'payment_enabled': 'false'})
+    elif category == 'payment' and values.get('payment_enabled', '').lower() == 'true':
+        await config_service.update_config(db, 'access_code', {'access_code_mode_enabled': 'false'})
 
     updated = await config_service.update_config(db, category, values)
     all_values = await config_service.get_configs_by_category(db, category)
@@ -477,3 +488,123 @@ async def list_vibe_check_results(
     total = sum(1 for row in count_result if os.path.exists(row[1]))
 
     return VibeCheckResultsResponse(results=results, total=total)
+
+
+# ---------------------------------------------------------------------------
+# Access code management
+# ---------------------------------------------------------------------------
+
+
+@router.get('/access-codes', response_model=AccessCodeListResponse)
+async def list_access_codes(
+    status: str | None = None,
+    code_type: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> AccessCodeListResponse:
+    """List access codes with optional filters and pagination."""
+    from app.services import access_code_service
+
+    codes, total = await access_code_service.list_codes(
+        db=db,
+        status=status,
+        code_type=code_type,
+        limit=limit,
+        offset=offset,
+    )
+    return AccessCodeListResponse(
+        codes=[AccessCodeResponse.model_validate(c) for c in codes],
+        total=total,
+    )
+
+
+@router.post('/access-codes', status_code=201)
+async def create_access_codes(
+    body: AccessCodeCreateRequest,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[AccessCodeResponse]:
+    """Generate access codes (single or batch up to 100)."""
+    from app.services import access_code_service
+
+    codes = await access_code_service.generate_batch(
+        db=db,
+        code_type=body.code_type,
+        count=body.count,
+        max_uses=body.max_uses,
+        expires_at=body.expires_at,
+        notes=body.notes,
+    )
+    return [AccessCodeResponse.model_validate(c) for c in codes]
+
+
+@router.patch('/access-codes/{code_id}/revoke')
+async def revoke_access_code(
+    code_id: int,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> AccessCodeResponse:
+    """Revoke an access code, preventing further use."""
+    from app.services import access_code_service
+
+    try:
+        code = await access_code_service.revoke_code(db=db, code_id=code_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return AccessCodeResponse.model_validate(code)
+
+
+@router.delete('/access-codes/{code_id}', status_code=204)
+async def delete_access_code(
+    code_id: int,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Hard-delete an access code if no sessions reference it."""
+    from app.services import access_code_service
+
+    try:
+        deleted = await access_code_service.delete_code(db=db, code_id=code_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f'Access code {code_id} not found')
+
+
+@router.get('/access-codes/{code_id}/qr')
+async def get_access_code_qr(
+    code_id: int,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Generate a QR code PNG for an access code."""
+    import io
+
+    import qrcode
+    from fastapi.responses import StreamingResponse
+
+    from app.services import access_code_service as svc
+    from sqlalchemy import select
+    from app.models.access_code import AccessCode
+
+    stmt = select(AccessCode).where(AccessCode.id == code_id)
+    result = await db.execute(stmt)
+    code = result.scalar_one_or_none()
+
+    if code is None:
+        raise HTTPException(status_code=404, detail=f'Access code {code_id} not found')
+
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(code.code)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type='image/png')

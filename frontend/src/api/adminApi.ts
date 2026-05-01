@@ -18,6 +18,9 @@ import type {
   CameraSelectResponse,
   StripGalleryResponse,
   VibeCheckResultsResponse,
+  AccessCodeListResponse,
+  AccessCodeCreateRequest,
+  AccessCodeResponse,
 } from './types';
 
 export const adminApi = {
@@ -65,4 +68,21 @@ export const adminApi = {
 
   getVibeCheckResults: (params?: { limit?: number; offset?: number }) =>
     apiClient.get<VibeCheckResultsResponse>('/admin/vibe-check/results', { params }),
+
+  // --- Access Codes ---
+
+  listAccessCodes: (params?: { status?: string; code_type?: string; limit?: number; offset?: number }) =>
+    apiClient.get<AccessCodeListResponse>('/admin/access-codes', { params }),
+
+  createAccessCodes: (data: AccessCodeCreateRequest) =>
+    apiClient.post<AccessCodeResponse[]>('/admin/access-codes', data),
+
+  revokeAccessCode: (codeId: number) =>
+    apiClient.patch<AccessCodeResponse>(`/admin/access-codes/${codeId}/revoke`),
+
+  deleteAccessCode: (codeId: number) =>
+    apiClient.delete(`/admin/access-codes/${codeId}`),
+
+  getAccessCodeQr: (codeId: number) =>
+    apiClient.get(`/admin/access-codes/${codeId}/qr`, { responseType: 'blob' }),
 };

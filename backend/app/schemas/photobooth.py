@@ -152,6 +152,7 @@ class FeaturesResponse(BaseModel):
     photobooth_min_photos: int = 2
     photobooth_capture_time_limit_seconds: int = 30
     photobooth_default_layout_rows: int = 4
+    access_code_mode_enabled: bool = False
 
 
 # ---------------------------------------------------------------------------

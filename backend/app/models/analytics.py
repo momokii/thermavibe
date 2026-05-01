@@ -35,6 +35,7 @@ class EventType(str, enum.Enum):
     PHOTOBOOTH_FRAME_SELECT = 'photobooth_frame_select'
     PHOTOBOOTH_ARRANGE = 'photobooth_arrange'
     PHOTOBOOTH_COMPOSITE_GENERATED = 'photobooth_composite_generated'
+    ACCESS_CODE_VALIDATED = 'access_code_validated'
 
 
 class PrintJobStatus(str, enum.Enum):

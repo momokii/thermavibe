@@ -10,12 +10,14 @@
 
 1. [Common Specifications](#1-common-specifications)
 2. [Health Check](#2-health-check)
-3. [Kiosk Flow](#3-kiosk-flow)
-4. [Camera](#4-camera)
-5. [AI](#5-ai)
-6. [Payment](#6-payment)
-7. [Print](#7-print)
-8. [Admin](#8-admin)
+3. [Kiosk Features & Configuration](#3-kiosk-features--configuration)
+4. [Kiosk Flow](#4-kiosk-flow)
+5. [Camera](#5-camera)
+6. [AI](#6-ai)
+7. [Payment](#7-payment)
+8. [Print](#8-print)
+9. [Admin](#9-admin)
+10. [Access Codes (Admin)](#10-access-codes-admin)
 
 ---
 
@@ -180,7 +182,8 @@ Returns enabled features and photobooth configuration for kiosk initialization. 
   "photobooth_max_photos": 8,
   "photobooth_min_photos": 2,
   "photobooth_capture_time_limit_seconds": 30,
-  "photobooth_default_layout_rows": 4
+  "photobooth_default_layout_rows": 4,
+  "access_code_mode_enabled": false
 }
 ```
 
@@ -192,6 +195,9 @@ Returns enabled features and photobooth configuration for kiosk initialization. 
 | `photobooth_min_photos` | integer | Minimum photos before "Done" button appears |
 | `photobooth_capture_time_limit_seconds` | integer | Capture timer duration in seconds |
 | `photobooth_default_layout_rows` | integer | Default photo slots in strip (1-4) |
+| `access_code_mode_enabled` | boolean | Whether access code mode is active. When true, the kiosk requires a valid access code to proceed. Mutually exclusive with payment: setting this to `true` automatically sets `payment_enabled` to `false`, and vice versa. |
+
+> **Mutual exclusivity note:** `access_code_mode_enabled` and payment are mutually exclusive. When `access_code_mode_enabled` is set to `true` via the admin config, `payment_enabled` is automatically forced to `false`. Likewise, enabling payment disables access code mode. This ensures the kiosk only presents one gating mechanism at a time.
 
 ---
 
@@ -207,13 +213,15 @@ Create a new kiosk session. This initializes the state machine in the IDLE state
 
 ```json
 {
-  "payment_enabled": false
+  "payment_enabled": false,
+  "access_code_mode": false
 }
 ```
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `payment_enabled` | boolean | No | `false` | Whether the payment step is enabled for this session |
+| `access_code_mode` | boolean | No | `false` | Whether access code gating is enabled for this session. Mutually exclusive with `payment_enabled`; if both are `true`, the request is rejected with `400 CONFIG_INVALID`. |
 
 **Response (201 Created):**
 
@@ -222,6 +230,7 @@ Create a new kiosk session. This initializes the state machine in the IDLE state
   "id": "sess_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "state": "IDLE",
   "payment_enabled": false,
+  "access_code_mode": false,
   "payment_status": null,
   "captured_at": null,
   "analysis_text": null,
@@ -406,6 +415,114 @@ End the kiosk session and clear all session data. The session transitions to RES
 | Status | Code | Description |
 |--------|------|-------------|
 | 404 | `NOT_FOUND` | No session exists with the given ID |
+
+---
+
+### `POST /api/v1/kiosk/validate-access-code`
+
+Validate an access code without redeeming it. Used by the kiosk UI to check whether a code is valid before proceeding with the session flow.
+
+**Authentication:** None
+
+**Request Body:**
+
+```json
+{
+  "code": "VC-ABC123",
+  "session_type": "vibe_check"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | The access code to validate |
+| `session_type` | string | Yes | The session type to validate against (`"vibe_check"` or `"photobooth"`) |
+
+**Response (200 OK):**
+
+```json
+{
+  "valid": true,
+  "message": "Access code is valid.",
+  "access_code_id": 42
+}
+```
+
+```json
+{
+  "valid": false,
+  "message": "Access code has expired.",
+  "access_code_id": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `valid` | boolean | Whether the code is valid for the given session type |
+| `message` | string | Human-readable description of the validation result |
+| `access_code_id` | integer or null | Internal ID of the access code if found, `null` otherwise |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 422 | `VALIDATION_ERROR` | Request body is missing required fields |
+
+---
+
+### `POST /api/v1/kiosk/session/{id}/redeem-code`
+
+Validate and redeem an access code against an existing session. On success, the session transitions from `ACCESS_CODE` to `CAPTURE`, consuming one use of the access code.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | string (UUID) | Session ID |
+
+**Request Body:**
+
+```json
+{
+  "code": "VC-ABC123"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | The access code to redeem |
+
+**Response (200 OK):**
+
+Returns the standard session response (same shape as `GET /api/v1/kiosk/session/{id}`):
+
+```json
+{
+  "id": "sess_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "state": "CAPTURE",
+  "payment_enabled": false,
+  "access_code_mode": true,
+  "payment_status": null,
+  "captured_at": null,
+  "analysis_text": null,
+  "analysis_provider": null,
+  "printed_at": null,
+  "created_at": "2025-06-15T10:30:00Z",
+  "updated_at": "2025-06-15T10:30:15Z",
+  "expires_at": "2025-06-15T11:30:00Z"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in `ACCESS_CODE` state |
+| 409 | `INVALID_STATE` | Access code is invalid, expired, revoked, or has no remaining uses |
+| 422 | `VALIDATION_ERROR` | Request body is missing the `code` field |
 
 ---
 
@@ -1392,3 +1509,267 @@ Retrieve a thumbnail (300px width) of a vibe check session photo. Generated on f
 | Status | Code | Description |
 |--------|------|-------------|
 | 404 | `NOT_FOUND` | Session or photo not found |
+
+---
+
+## 10. Access Codes (Admin)
+
+> Access codes provide a free-alternative gating mechanism to payment. They are mutually exclusive with payment: when `access_code_mode_enabled` is `true`, `payment_enabled` is automatically `false`, and vice versa. Codes can be generated in batches, limited by max uses and expiration dates, and revoked at any time.
+
+### Common Schema: `AccessCodeResponse`
+
+All access code endpoints return or accept this shape:
+
+```json
+{
+  "id": 42,
+  "code": "VC-ABC123",
+  "code_type": "vibe_check",
+  "status": "active",
+  "max_uses": 10,
+  "current_uses": 3,
+  "remaining_uses": 7,
+  "expires_at": "2025-07-01T00:00:00Z",
+  "revoked_at": null,
+  "notes": "Event giveaway codes",
+  "created_at": "2025-06-15T10:30:00Z",
+  "updated_at": "2025-06-15T10:30:00Z"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Unique access code ID |
+| `code` | string | Human-readable code string (e.g., `VC-ABC123`) |
+| `code_type` | string | Session type the code is valid for (`"vibe_check"` or `"photobooth"`) |
+| `status` | string | Current status (`"active"`, `"revoked"`, `"expired"`, `"exhausted"`) |
+| `max_uses` | integer | Maximum number of times the code can be redeemed |
+| `current_uses` | integer | Number of times the code has been redeemed so far |
+| `remaining_uses` | integer | Number of remaining redemptions (`max_uses - current_uses`) |
+| `expires_at` | string or null | ISO 8601 expiration timestamp, `null` if no expiration |
+| `revoked_at` | string or null | ISO 8601 revocation timestamp, `null` if not revoked |
+| `notes` | string or null | Optional admin notes about this code |
+| `created_at` | string | ISO 8601 creation timestamp |
+| `updated_at` | string | ISO 8601 last update timestamp |
+
+---
+
+### `GET /api/v1/admin/access-codes`
+
+List access codes with pagination and optional filters by status and code type.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `status` | string | No | All | Filter by status (`"active"`, `"revoked"`, `"expired"`, `"exhausted"`) |
+| `code_type` | string | No | All | Filter by session type (`"vibe_check"` or `"photobooth"`) |
+| `limit` | integer | No | 20 | Items per page (max 100) |
+| `offset` | integer | No | 0 | Number of items to skip |
+
+**Response (200 OK):**
+
+```json
+{
+  "codes": [
+    {
+      "id": 42,
+      "code": "VC-ABC123",
+      "code_type": "vibe_check",
+      "status": "active",
+      "max_uses": 10,
+      "current_uses": 3,
+      "remaining_uses": 7,
+      "expires_at": "2025-07-01T00:00:00Z",
+      "revoked_at": null,
+      "notes": "Event giveaway codes",
+      "created_at": "2025-06-15T10:30:00Z",
+      "updated_at": "2025-06-15T10:30:00Z"
+    }
+  ],
+  "total": 85
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid query parameter values |
+
+---
+
+### `POST /api/v1/admin/access-codes`
+
+Generate access codes (single or batch, up to 100 at once).
+
+**Authentication:** Admin (Bearer token required)
+
+**Request Body:**
+
+```json
+{
+  "code_type": "vibe_check",
+  "count": 10,
+  "max_uses": 5,
+  "expires_at": "2025-07-01T00:00:00Z",
+  "notes": "Weekend event codes"
+}
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `code_type` | string | Yes | — | Session type the codes are valid for (`"vibe_check"` or `"photobooth"`) |
+| `count` | integer | Yes | — | Number of codes to generate (1-100) |
+| `max_uses` | integer | No | 1 | Maximum redemptions per code |
+| `expires_at` | string (ISO 8601) | No | `null` (no expiration) | Expiration timestamp |
+| `notes` | string | No | `null` | Admin notes applied to all generated codes |
+
+**Response (201 Created):**
+
+Returns an array of `AccessCodeResponse` objects:
+
+```json
+[
+  {
+    "id": 42,
+    "code": "VC-ABC123",
+    "code_type": "vibe_check",
+    "status": "active",
+    "max_uses": 5,
+    "current_uses": 0,
+    "remaining_uses": 5,
+    "expires_at": "2025-07-01T00:00:00Z",
+    "revoked_at": null,
+    "notes": "Weekend event codes",
+    "created_at": "2025-06-15T10:30:00Z",
+    "updated_at": "2025-06-15T10:30:00Z"
+  },
+  {
+    "id": 43,
+    "code": "VC-DEF456",
+    "code_type": "vibe_check",
+    "status": "active",
+    "max_uses": 5,
+    "current_uses": 0,
+    "remaining_uses": 5,
+    "expires_at": "2025-07-01T00:00:00Z",
+    "revoked_at": null,
+    "notes": "Weekend event codes",
+    "created_at": "2025-06-15T10:30:00Z",
+    "updated_at": "2025-06-15T10:30:00Z"
+  }
+]
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 400 | `CONFIG_INVALID` | `count` exceeds 100 or `max_uses` is less than 1 |
+| 422 | `VALIDATION_ERROR` | Request body is missing required fields or has invalid values |
+
+---
+
+### `PATCH /api/v1/admin/access-codes/{id}/revoke`
+
+Revoke an access code. A revoked code can no longer be redeemed. This action is reversible only by generating a new code; revoked codes remain in the database for audit purposes.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Access code ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+Returns the updated `AccessCodeResponse`:
+
+```json
+{
+  "id": 42,
+  "code": "VC-ABC123",
+  "code_type": "vibe_check",
+  "status": "revoked",
+  "max_uses": 10,
+  "current_uses": 3,
+  "remaining_uses": 0,
+  "expires_at": "2025-07-01T00:00:00Z",
+  "revoked_at": "2025-06-20T14:00:00Z",
+  "notes": "Revoked: event cancelled",
+  "created_at": "2025-06-15T10:30:00Z",
+  "updated_at": "2025-06-20T14:00:00Z"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Access code does not exist |
+| 409 | `INVALID_STATE` | Code is already revoked |
+
+---
+
+### `DELETE /api/v1/admin/access-codes/{id}`
+
+Hard delete an access code. This permanently removes the code and its redemption history. This action is irreversible.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Access code ID |
+
+**Request Body:** None
+
+**Response (204 No Content):**
+
+No response body.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Access code does not exist |
+
+---
+
+### `GET /api/v1/admin/access-codes/{id}/qr`
+
+Generate a QR code PNG image for the given access code. The QR code encodes the access code string and can be scanned by the kiosk camera or printed on marketing materials.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Access code ID |
+
+**Query Parameters:** None
+
+**Response (200 OK):**
+
+The response is a PNG image (`Content-Type: image/png`), not JSON.
+
+**Response body:** Binary PNG image data.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Access code does not exist |

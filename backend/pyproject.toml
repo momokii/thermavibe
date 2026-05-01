@@ -23,6 +23,7 @@ dependencies = [
     "python-multipart>=0.0.18",
     "pyjwt>=2.9.0",
     "structlog>=0.25.0",
+    "qrcode[pil]>=7.4.0",
 ]
 
 [project.optional-dependencies]

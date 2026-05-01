@@ -218,6 +218,16 @@ The system automatically manages file retention for both features:
 - **Cleanup interval** is auto-derived from the shorter of the two retention periods — no separate cleanup schedule to configure.
 - **Photo preservation**: After session completion, result files (vibe check photos and photobooth composites) are moved to a persistent Docker volume (`/tmp/vibeprint/`) so they survive container restarts and are available in the admin gallery.
 
+#### Access Code Configuration
+
+Access code mode provides a payment alternative for event-hosted kiosks. When enabled, users enter pre-generated codes instead of paying.
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enable Access Code Mode | Replace payment with code-based entry | Disabled |
+
+Access code mode and payment mode are **mutually exclusive** — enabling one automatically disables the other. Codes are managed via the **Admin Dashboard** (`/admin/access-codes`): generate, revoke, delete, and view QR codes.
+
 ---
 
 ## 3. Start Database

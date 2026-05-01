@@ -69,6 +69,9 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'vibe_check_system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for vibe check AI analysis'},
         'vibe_check_retention_hours': {'value': '168', 'description': 'Vibe check result retention period in hours (0 = forever)'},
     },
+    ConfigCategory.ACCESS_CODE: {
+        'access_code_mode_enabled': {'value': 'false', 'description': 'Enable access code mode (disables payment when ON)'},
+    },
 }
 
 

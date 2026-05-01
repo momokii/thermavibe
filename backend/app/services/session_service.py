@@ -35,7 +35,8 @@ logger = structlog.get_logger(__name__)
 # Valid state transition maps per session type
 # Vibe Check flow: IDLE → PAYMENT → CAPTURE → REVIEW → PROCESSING → REVEAL → RESET
 VIBE_CHECK_TRANSITIONS: dict[str, set[str]] = {
-    KioskState.IDLE: {KioskState.PAYMENT, KioskState.CAPTURE},
+    KioskState.IDLE: {KioskState.PAYMENT, KioskState.ACCESS_CODE, KioskState.CAPTURE},
+    KioskState.ACCESS_CODE: {KioskState.CAPTURE, KioskState.RESET},
     KioskState.PAYMENT: {KioskState.CAPTURE, KioskState.RESET},
     KioskState.CAPTURE: {KioskState.REVIEW, KioskState.PROCESSING, KioskState.RESET},
     KioskState.REVIEW: {KioskState.CAPTURE, KioskState.PROCESSING, KioskState.RESET},
@@ -46,7 +47,8 @@ VIBE_CHECK_TRANSITIONS: dict[str, set[str]] = {
 
 # Photobooth flow: IDLE → PAYMENT → CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL → RESET
 PHOTOBOOTH_TRANSITIONS: dict[str, set[str]] = {
-    KioskState.IDLE: {KioskState.PAYMENT, KioskState.CAPTURE},
+    KioskState.IDLE: {KioskState.PAYMENT, KioskState.ACCESS_CODE, KioskState.CAPTURE},
+    KioskState.ACCESS_CODE: {KioskState.CAPTURE, KioskState.RESET},
     KioskState.PAYMENT: {KioskState.CAPTURE, KioskState.RESET},
     KioskState.CAPTURE: {KioskState.FRAME_SELECT, KioskState.RESET},
     KioskState.FRAME_SELECT: {KioskState.ARRANGE, KioskState.CAPTURE, KioskState.RESET},
@@ -203,21 +205,30 @@ async def start_session(
     db: AsyncSession,
     session_id: uuid.UUID,
     payment_enabled: bool = False,
+    access_code_mode: bool = False,
 ) -> KioskSession:
     """Start a session by transitioning from IDLE to the next state.
 
-    If payment is enabled, transitions to PAYMENT. Otherwise,
-    transitions directly to CAPTURE.
+    Routing priority:
+      1. PAYMENT if payment_enabled
+      2. ACCESS_CODE if access_code_mode
+      3. CAPTURE otherwise (free access)
 
     Args:
         db: Async database session.
         session_id: UUID of the session.
         payment_enabled: Whether payment is required.
+        access_code_mode: Whether access code is required.
 
     Returns:
         The updated KioskSession.
     """
-    target = KioskState.PAYMENT if payment_enabled else KioskState.CAPTURE
+    if payment_enabled:
+        target = KioskState.PAYMENT
+    elif access_code_mode:
+        target = KioskState.ACCESS_CODE
+    else:
+        target = KioskState.CAPTURE
     return await transition_state(db, session_id, target)
 
 

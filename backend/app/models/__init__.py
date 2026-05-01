@@ -1,5 +1,6 @@
 """SQLAlchemy ORM models."""
 
+from app.models.access_code import AccessCode, AccessCodeStatus, AccessCodeType
 from app.models.analytics import AnalyticsEvent, EventType, PrintJob, PrintJobStatus
 from app.models.configuration import ConfigCategory, OperatorConfig
 from app.models.device import Device, DeviceType
@@ -7,6 +8,9 @@ from app.models.photobooth_theme import PhotoboothTheme
 from app.models.session import AIProvider, KioskSession, KioskState, PaymentStatus, SessionType
 
 __all__ = [
+    'AccessCode',
+    'AccessCodeStatus',
+    'AccessCodeType',
     'AnalyticsEvent',
     'EventType',
     'PrintJob',

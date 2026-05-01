@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import uuid
 
-from sqlalchemy import Index, String, Text, text
+from sqlalchemy import ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -36,6 +36,7 @@ class KioskState(str, enum.Enum):
     ARRANGE = 'arrange'
     COMPOSITING = 'compositing'
     PHOTOBOOTH_REVEAL = 'photobooth_reveal'
+    ACCESS_CODE = 'access_code'
     RESET = 'reset'
 
 
@@ -120,6 +121,11 @@ class KioskSession(Base):
     payment_provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_amount: Mapped[int | None] = mapped_column(INTEGER, nullable=True)
     payment_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    access_code_id: Mapped[int | None] = mapped_column(
+        ForeignKey('access_codes.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
 
     created_at: Mapped[str] = mapped_column(
         TIMESTAMP(timezone=True),

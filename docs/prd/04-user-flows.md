@@ -16,6 +16,7 @@ This document describes all primary user flows for VibePrint OS, including the e
 3. [Operator Setup Flow](#3-operator-setup-flow)
 4. [Payment Failure Flow](#4-payment-failure-flow)
 5. [AI Failure Flow](#5-ai-failure-flow)
+6. [Access Code Flow](#6-access-code-flow)
 
 ---
 
@@ -1104,6 +1105,81 @@ When the AI system falls back to a template, the operator is notified through th
 
 ---
 
+## 6. Access Code Flow
+
+When access code mode is enabled (and payment disabled), the kiosk uses codes instead of payment as the entry gate. This flow is designed for event-hosted kiosks where attendees receive pre-generated codes.
+
+### 6.1 Access Code Entry Sequence
+
+```
+User               KioskScreen          BackendAPI           Database
+ |                     |                     |                   |
+ |  [Touches screen]   |                     |                   |
+ |-------------------->|                     |                   |
+ |                     | [Feature Select     |                   |
+ |                     |  or auto-route]     |                   |
+ |                     |-------------------->|                   |
+ |                     | POST /session       |                   |
+ |                     | {access_code_mode}  |                   |
+ |                     |                     |------------------>|
+ |                     |                     | Create session    |
+ |                     |                     | IDLE→ACCESS_CODE  |
+ |                     |<--------------------|                   |
+ |                     |                     |                   |
+ |                     | [ACCESS_CODE screen]|                   |
+ |                     | "Enter Access Code" |                   |
+ |                     | Virtual numpad      |                   |
+ |                     |                     |                   |
+ |  [Types code]       |                     |                   |
+ |-------------------->|                     |                   |
+ |                     | POST /validate      |                   |
+ |                     | -access-code        |                   |
+ |                     |                     |------------------>|
+ |                     |                     | Lookup code       |
+ |                     |                     | Check status      |
+ |                     |                     | Check expiry      |
+ |                     |                     | Check type match  |
+ |                     |<--------------------|                   |
+ |                     | {valid: true/false} |                   |
+ |                     |                     |                   |
+ |  [If invalid]       |                     |                   |
+ |  Error shown        |                     |                   |
+ |  auto-dismissed     |                     |                   |
+ |                     |                     |                   |
+ |  [If valid]         |                     |                   |
+ |                     | POST /session/{id}  |                   |
+ |                     | /redeem-code        |                   |
+ |                     |                     |------------------>|
+ |                     |                     | Increment use     |
+ |                     |                     | Attach to session |
+ |                     |                     | ACCESS_CODE→      |
+ |                     |                     | CAPTURE           |
+ |                     |<--------------------|                   |
+ |                     |                     |                   |
+ |                     | [CAPTURE screen]    |                   |
+ |  Normal flow        | Camera preview      |                   |
+ |  continues...       |                     |                   |
+```
+
+### 6.2 Access Code Validation Rules
+
+| Check | Condition | Error Message |
+|-------|-----------|---------------|
+| Code exists | Code string found in DB (case-insensitive) | "Invalid code" |
+| Status active | `status = 'active'` | "Code is no longer active" |
+| Not expired | `expires_at > NOW()` (null = no expiry) | "Code has expired" |
+| Uses remaining | `use_count < max_uses` | "Code has reached maximum uses" |
+| Type compatible | `code_type` matches session_type or is `universal` | "Code is not valid for this feature" |
+
+### 6.3 Error Handling
+
+- Invalid/expired/wrong-type codes show a clear error banner that auto-dismisses after 4 seconds.
+- The user can re-enter a code without limit (no lockout).
+- A "Back" button allows returning to the idle/feature select screen.
+- Code input is limited to 12 characters and auto-uppercased.
+
+---
+
 ## Appendix: State Transition Matrix
 
 The following table defines all valid state transitions and the triggers that cause them:
@@ -1111,8 +1187,11 @@ The following table defines all valid state transitions and the triggers that ca
 | From State        | To State          | Trigger                              | Condition            |
 |-------------------|-------------------|--------------------------------------|----------------------|
 | IDLE              | PAYMENT           | User touches screen                  | Payment enabled      |
+| IDLE              | ACCESS_CODE       | User touches screen                  | Access code mode enabled |
 | IDLE              | FEATURE_SELECT    | User touches screen                  | Payment disabled, both features enabled |
 | IDLE              | CAPTURE           | User touches screen                  | Payment disabled, single feature |
+| ACCESS_CODE       | CAPTURE           | Valid code redeemed                  | Code passes all validation checks |
+| ACCESS_CODE       | RESET             | User taps "Back" or timeout          | User cancels or session timeout |
 | PAYMENT           | FEATURE_SELECT    | Payment confirmed (webhook/poll)     | Both features enabled |
 | PAYMENT           | CAPTURE           | Payment confirmed (webhook/poll)     | Single feature       |
 | PAYMENT           | IDLE              | Payment timeout (120s)               | No payment received  |

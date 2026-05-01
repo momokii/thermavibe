@@ -15,10 +15,11 @@ export default function IdleScreen() {
   useEffect(() => {
     photoboothApi
       .getFeatures()
-      .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number } }) => {
+      .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number; access_code_mode_enabled: boolean } }) => {
         useKioskStore.getState().setFeatures({
           vibeCheck: res.data.vibe_check_enabled,
           photobooth: res.data.photobooth_enabled,
+          accessCodeMode: res.data.access_code_mode_enabled,
           maxPhotos: res.data.photobooth_max_photos,
           minPhotos: res.data.photobooth_min_photos,
           captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
@@ -27,7 +28,7 @@ export default function IdleScreen() {
       })
       .catch(() => {
         useKioskStore.getState().setFeatures({
-          vibeCheck: true, photobooth: true, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4,
+          vibeCheck: true, photobooth: true, accessCodeMode: false, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4,
         });
       });
   }, []);
@@ -49,6 +50,7 @@ export default function IdleScreen() {
       useKioskStore.getState().setFeatures({
         vibeCheck: res.data.vibe_check_enabled,
         photobooth: res.data.photobooth_enabled,
+        accessCodeMode: res.data.access_code_mode_enabled,
         maxPhotos: res.data.photobooth_max_photos,
         minPhotos: res.data.photobooth_min_photos,
         captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
