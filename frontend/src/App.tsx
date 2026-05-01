@@ -11,7 +11,6 @@ import AdminAnalyticsPage from '@/pages/AdminAnalyticsPage';
 import AdminPhotoboothPage from '@/pages/AdminPhotoboothPage';
 import AdminVibeCheckPage from '@/pages/AdminVibeCheckPage';
 import AdminStripsGalleryPage from '@/pages/AdminStripsGalleryPage';
-import AdminAccessCodesPage from '@/pages/AdminAccessCodesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,7 +32,6 @@ function App() {
             <Route path="hardware" element={<AdminHardwarePage />} />
             <Route path="vibe-check" element={<AdminVibeCheckPage />} />
             <Route path="photobooth" element={<AdminPhotoboothPage />} />
-            <Route path="access-codes" element={<AdminAccessCodesPage />} />
             <Route path="strips" element={<AdminStripsGalleryPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
           </Route>
