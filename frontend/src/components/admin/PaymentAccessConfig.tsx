@@ -146,17 +146,16 @@ export default function PaymentAccessConfig() {
   const [expiryValue, setExpiryValue] = useState<number>(0);
   const [expiryUnit, setExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('hours');
 
-  const UNIT_TO_MS: Record<string, number> = {
-    minutes: 60 * 1000,
-    hours: 60 * 60 * 1000,
-    days: 24 * 60 * 60 * 1000,
+  const getDurationMs = (value: number, unit: string): number => {
+    const msPerUnit = unit === 'minutes' ? 60_000 : unit === 'hours' ? 3_600_000 : 86_400_000;
+    return value * msPerUnit;
   };
 
   const generateMutation = useMutation({
     mutationFn: () => {
       let parsedExpiry: string | null = null;
       if (expiryValue > 0) {
-        const durationMs = expiryValue * UNIT_TO_MS[expiryUnit];
+        const durationMs = getDurationMs(expiryValue, expiryUnit);
         if (durationMs < 60 * 1000) {
           toast.error('Expiration must be at least 1 minute');
           return Promise.reject();
