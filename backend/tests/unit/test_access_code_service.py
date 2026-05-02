@@ -289,7 +289,8 @@ class TestListCodes:
         db = _make_mock_db()
         codes = [_make_access_code(id=1), _make_access_code(id=2)]
         db.execute.side_effect = [
-            _mock_scalar_result(2),  # count query
+            _mock_scalars_result([]),  # auto-expire query
+            _mock_scalar_result(2),    # count query
             _mock_scalars_result(codes),  # list query
         ]
 
@@ -298,6 +299,22 @@ class TestListCodes:
         result, total = await list_codes(db)
         assert total == 2
         assert len(result) == 2
+
+    async def test_auto_expires_active_codes_past_expiry(self):
+        """list_codes auto-exires active codes past their expires_at."""
+        db = _make_mock_db()
+        expired = _make_access_code(id=1, expires_at=datetime.now(timezone.utc) - timedelta(hours=1))
+        db.execute.side_effect = [
+            _mock_scalars_result([expired]),  # auto-expire finds one
+            _mock_scalar_result(1),           # count query
+            _mock_scalars_result([expired]),  # list query
+        ]
+
+        from app.services.access_code_service import list_codes
+
+        result, total = await list_codes(db)
+        assert expired.status == AccessCodeStatus.EXPIRED
+        db.commit.assert_awaited()
 
 
 # ---------------------------------------------------------------------------

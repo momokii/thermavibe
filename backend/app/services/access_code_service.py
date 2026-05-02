@@ -250,6 +250,24 @@ async def list_codes(
     """
     limit = max(1, min(limit, 100))
 
+    # Auto-expire any active codes past their expiration
+    now = datetime.now(timezone.utc)
+    expired_stmt = (
+        select(AccessCode)
+        .where(
+            AccessCode.status == AccessCodeStatus.ACTIVE,
+            AccessCode.expires_at.isnot(None),
+            AccessCode.expires_at <= now,
+        )
+    )
+    expired_result = await db.execute(expired_stmt)
+    expired_codes = list(expired_result.scalars().all())
+    for code in expired_codes:
+        code.status = AccessCodeStatus.EXPIRED
+    if expired_codes:
+        await db.commit()
+        logger.info('access_codes_auto_expired', count=len(expired_codes))
+
     # Build filtered query
     stmt = select(AccessCode)
     count_stmt = select(func.count()).select_from(AccessCode)

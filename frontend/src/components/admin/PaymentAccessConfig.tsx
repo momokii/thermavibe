@@ -27,6 +27,13 @@ type EntryMethod = 'free' | 'payment' | 'access_code';
 export default function PaymentAccessConfig() {
   const queryClient = useQueryClient();
 
+  // Tick every 60s to keep relative expiry times accurate
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // ── Config query ──────────────────────────────────────────────
   const { data: config } = useQuery({
     queryKey: ['config'],
@@ -136,16 +143,38 @@ export default function PaymentAccessConfig() {
   const [codeType, setCodeType] = useState<'vibe_check' | 'photobooth' | 'universal'>('universal');
   const [count, setCount] = useState(1);
   const [maxUses, setMaxUses] = useState(1);
+  const [expiryValue, setExpiryValue] = useState<number>(0);
+  const [expiryUnit, setExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('hours');
+
+  const UNIT_TO_MS: Record<string, number> = {
+    minutes: 60 * 1000,
+    hours: 60 * 60 * 1000,
+    days: 24 * 60 * 60 * 1000,
+  };
 
   const generateMutation = useMutation({
-    mutationFn: () =>
-      adminApi.createAccessCodes({
+    mutationFn: () => {
+      let parsedExpiry: string | null = null;
+      if (expiryValue > 0) {
+        const durationMs = expiryValue * UNIT_TO_MS[expiryUnit];
+        if (durationMs < 60 * 1000) {
+          toast.error('Expiration must be at least 1 minute');
+          return Promise.reject();
+        }
+        if (durationMs > 365 * 24 * 60 * 60 * 1000) {
+          toast.error('Expiration cannot exceed 365 days');
+          return Promise.reject();
+        }
+        parsedExpiry = new Date(Date.now() + durationMs).toISOString();
+      }
+      return adminApi.createAccessCodes({
         code_type: codeType,
         count,
         max_uses: maxUses,
-        expires_at: null,
+        expires_at: parsedExpiry,
         notes: null,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['access-codes'] });
       toast.success(`${count} access code(s) generated`);
@@ -264,6 +293,45 @@ export default function PaymentAccessConfig() {
   };
 
   // ── Render ────────────────────────────────────────────────────
+
+  const formatRelativeTime = (isoDate: string | null): string => {
+    if (!isoDate) return 'Never';
+    const now = Date.now();
+    const target = new Date(isoDate).getTime();
+    const diff = target - now;
+    const absDiff = Math.abs(diff);
+    const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+    if (diff > 0) {
+      const parts: string[] = [];
+      if (days > 0) parts.push(`${days}d`);
+      if (hours > 0) parts.push(`${hours}h`);
+      if (days === 0 && mins > 0) parts.push(`${mins}m`);
+      return parts.length > 0 ? parts.join(' ') + ' left' : '<1m left';
+    }
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    return parts.length > 0 ? parts.join(' ') + ' ago' : 'just now';
+  };
+
+  const formatExpiryDate = (isoDate: string | null): string => {
+    if (!isoDate) return '—';
+    return new Date(isoDate).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const isExpired = (isoDate: string | null): boolean => {
+    if (!isoDate) return false;
+    return new Date(isoDate).getTime() <= Date.now();
+  };
+
   return (
     <>
       {/* Entry method selector */}
@@ -457,53 +525,77 @@ export default function PaymentAccessConfig() {
                 Create access codes that grant feature access. Choose a type, set quantity, and
                 configure usage limits.
               </p>
-              <div
-                className="flex flex-wrap items-end gap-3"
-                style={{ marginTop: '0.5rem' }}
-              >
-                <div>
-                  <label className="text-xs text-white/30 block mb-1">Type</label>
-                  <select
-                    value={codeType}
-                    onChange={(e) => setCodeType(e.target.value as typeof codeType)}
-                    className="input-surface text-white text-sm rounded-lg"
-                    style={{ padding: '0.5rem 0.75rem' }}
-                  >
-                    <option value="universal">Universal</option>
-                    <option value="vibe_check">Vibe Check</option>
-                    <option value="photobooth">Photobooth</option>
-                  </select>
+              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="text-xs text-white/30 block mb-1">Type</label>
+                    <select
+                      value={codeType}
+                      onChange={(e) => setCodeType(e.target.value as typeof codeType)}
+                      className="input-surface text-white text-sm rounded-lg"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    >
+                      <option value="universal">Universal</option>
+                      <option value="vibe_check">Vibe Check</option>
+                      <option value="photobooth">Photobooth</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/30 block mb-1">Count</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={count}
+                      onChange={(e) =>
+                        setCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))
+                      }
+                      className="input-surface text-white w-20"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/30 block mb-1">Max Uses</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={maxUses}
+                      onChange={(e) => setMaxUses(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="input-surface text-white w-20"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs text-white/30 block mb-1">Count</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={count}
-                    onChange={(e) =>
-                      setCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))
-                    }
-                    className="input-surface text-white w-20"
-                    style={{ padding: '0.5rem 0.75rem' }}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-white/30 block mb-1">Max Uses</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={maxUses}
-                    onChange={(e) => setMaxUses(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="input-surface text-white w-20"
-                    style={{ padding: '0.5rem 0.75rem' }}
-                  />
+                  <label className="text-xs text-white/30 block mb-1">Expires In</label>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={expiryValue || ''}
+                      placeholder="0"
+                      onChange={(e) => setExpiryValue(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="input-surface text-white w-20"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    />
+                    <select
+                      value={expiryUnit}
+                      onChange={(e) => setExpiryUnit(e.target.value as typeof expiryUnit)}
+                      className="input-surface text-white text-sm rounded-lg"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-white/20 mt-0.5">Leave 0 for no expiry.</p>
                 </div>
                 <Button
                   onClick={() => generateMutation.mutate()}
                   disabled={generateMutation.isPending}
                   className="btn-primary border-0"
-                  style={{ padding: '0.25rem 1.0rem' }}
+                  style={{ padding: '0.25rem 1.0rem', alignSelf: 'flex-start' }}
                 >
                   {generateMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -545,6 +637,7 @@ export default function PaymentAccessConfig() {
                     <th style={{ padding: '0.75rem 1rem' }}>Type</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Uses</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Expiry</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Created</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Actions</th>
                   </tr>
@@ -572,6 +665,18 @@ export default function PaymentAccessConfig() {
                       <td style={{ padding: '0.75rem 1rem' }}>{statusBadge(code.status)}</td>
                       <td style={{ padding: '0.75rem 1rem' }} className="text-white/50">
                         {code.use_count}/{code.max_uses}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        {code.expires_at ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-white/40 text-xs">{formatExpiryDate(code.expires_at)}</span>
+                            <span className={`text-[11px] ${isExpired(code.expires_at) ? 'text-red-400/70' : 'text-emerald-400/60'}`}>
+                              {formatRelativeTime(code.expires_at)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-white/25 text-xs">Never</span>
+                        )}
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }} className="text-white/40">
                         {new Date(code.created_at).toLocaleDateString()}
@@ -620,7 +725,7 @@ export default function PaymentAccessConfig() {
                   {codes.length === 0 && (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         style={{ padding: '2rem 1rem' }}
                         className="text-center text-white/25"
                       >
