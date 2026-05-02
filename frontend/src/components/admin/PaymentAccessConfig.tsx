@@ -333,6 +333,7 @@ export default function PaymentAccessConfig() {
 
   return (
     <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Entry method selector */}
       <Card className="card-surface border-0">
         <CardHeader style={{ padding: '1.5rem' }}>
@@ -767,6 +768,7 @@ export default function PaymentAccessConfig() {
           </CardContent>
         </Card>
       )}
+    </div>
 
       {/* Entry method switch confirmation modal */}
       {pendingMethod &&
