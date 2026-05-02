@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKioskStore } from '@/stores/kioskStore';
 import { usePhotoboothState } from '@/hooks/usePhotoboothState';
-import { CAMERA_STREAM_URL } from '@/lib/constants';
+import { useCountdown } from '@/hooks/useCountdown';
+import { CAMERA_STREAM_URL, COUNTDOWN_SECONDS } from '@/lib/constants';
 
 export default function PhotoboothCaptureScreen() {
   const streamUrl = CAMERA_STREAM_URL;
@@ -11,12 +12,18 @@ export default function PhotoboothCaptureScreen() {
   const captureTimeLimit = useKioskStore((s) => s.photoboothCaptureTimeLimit);
   const maxPhotos = useKioskStore((s) => s.photoboothMaxPhotos);
   const minPhotos = useKioskStore((s) => s.photoboothMinPhotos);
+  const countdownEnabled = useKioskStore((s) => s.photoboothSnapCountdownEnabled);
   const { snapPhotoboothPhoto, finishCapture, isSnapping } = usePhotoboothState();
   const captureStartedAt = useKioskStore((s) => s.captureStartedAt);
   const setCaptureStartedAt = useKioskStore((s) => s.setCaptureStartedAt);
   const reset = useKioskStore((s) => s.reset);
 
   const [timedOutEmpty, setTimedOutEmpty] = useState(false);
+
+  // Countdown state (only used when countdownEnabled)
+  const { count, start: startCountdown, isRunning: isCountingDown } = useCountdown(COUNTDOWN_SECONDS);
+  const [showCountdown, setShowCountdown] = useState(false);
+  const timeoutsRef = useRef<number[]>([]);
 
   const timerSeconds = captureTimeLimit;
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
@@ -57,10 +64,33 @@ export default function PhotoboothCaptureScreen() {
     return () => clearTimeout(timer);
   }, [timedOutEmpty, reset]);
 
+  // When countdown hits 0 and countdown mode is active, snap the photo
+  useEffect(() => {
+    if (!showCountdown) return;
+    if (count === 0) {
+      setShowCountdown(false);
+      snapPhotoboothPhoto();
+    }
+  }, [count, showCountdown, snapPhotoboothPhoto]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach((id) => clearTimeout(id));
+      timeoutsRef.current = [];
+    };
+  }, []);
+
   const handleSnap = useCallback(() => {
     if (isSnapping || photos.length >= maxPhotos || timeLeft <= 0) return;
-    snapPhotoboothPhoto();
-  }, [isSnapping, photos.length, timeLeft, snapPhotoboothPhoto, maxPhotos]);
+
+    if (countdownEnabled) {
+      setShowCountdown(true);
+      startCountdown(COUNTDOWN_SECONDS);
+    } else {
+      snapPhotoboothPhoto();
+    }
+  }, [isSnapping, photos.length, timeLeft, snapPhotoboothPhoto, maxPhotos, countdownEnabled, startCountdown]);
 
   const handleDone = useCallback(() => {
     if (photos.length >= minPhotos) finishCapture();
@@ -122,6 +152,24 @@ export default function PhotoboothCaptureScreen() {
             />
           )}
 
+          {/* Countdown overlay */}
+          <AnimatePresence>
+            {showCountdown && isCountingDown && count > 0 && (
+              <motion.div
+                key={count}
+                initial={{ opacity: 0, scale: 2.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 z-10"
+              >
+                <span className="text-9xl font-display font-black text-white drop-shadow-2xl">
+                  {count}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Flash effect */}
           <AnimatePresence>
             {isSnapping && (
@@ -166,10 +214,10 @@ export default function PhotoboothCaptureScreen() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleSnap}
-            disabled={isSnapping || photos.length >= maxPhotos || timeLeft <= 0}
+            disabled={isSnapping || showCountdown || photos.length >= maxPhotos || timeLeft <= 0}
             className="w-2/8 h-12 py-5 rounded-2xl text-white text-2xl font-display font-bold disabled:opacity-30 transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
           >
-            {isSnapping ? 'Snapping...' : 'Snap!'}
+            {showCountdown ? '...' : isSnapping ? 'Snapping...' : 'Snap!'}
           </motion.button>
 
           {photos.length >= minPhotos && (

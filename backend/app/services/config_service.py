@@ -62,6 +62,7 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'photobooth_watermark_text': {'value': getattr(settings, 'photobooth_watermark_text', 'VibePrint OS'), 'description': 'Watermark text'},
         'photobooth_composite_retention_hours': {'value': str(getattr(settings, 'photobooth_composite_retention_hours', 168)), 'description': 'Composite retention period in hours (0 = forever)'},
         'photobooth_share_url_ttl_seconds': {'value': str(getattr(settings, 'photobooth_share_url_ttl_seconds', 300)), 'description': 'Share URL TTL in seconds'},
+        'photobooth_snap_countdown_enabled': {'value': 'false', 'description': 'Show 3-second countdown before each snap'},
         'photobooth_system_prompt': {'value': 'You are a photobooth AI assistant.', 'description': 'System prompt for photobooth AI features (future use)'},
     },
     ConfigCategory.VIBE_CHECK: {

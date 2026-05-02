@@ -26,6 +26,7 @@ interface KioskStore {
   photoboothMinPhotos: number;
   photoboothCaptureTimeLimit: number;
   photoboothDefaultLayoutRows: number;
+  photoboothSnapCountdownEnabled: boolean;
 
   // Photobooth-specific state
   photoboothThemeId: number | null;
@@ -43,7 +44,7 @@ interface KioskStore {
   setTimeLimit: (seconds: number) => void;
   setCaptureStartedAt: (ts: number | null) => void;
   setSessionType: (type: SessionType) => void;
-  setFeatures: (data: { vibeCheck: boolean; photobooth: boolean; accessCodeMode: boolean; maxPhotos: number; minPhotos: number; captureTimeLimit: number; defaultLayoutRows: number }) => void;
+  setFeatures: (data: { vibeCheck: boolean; photobooth: boolean; accessCodeMode: boolean; maxPhotos: number; minPhotos: number; captureTimeLimit: number; defaultLayoutRows: number; snapCountdown: boolean }) => void;
   setPhotoboothThemeId: (id: number | null) => void;
   setPhotoboothLayoutRows: (rows: number) => void;
   setPhotoboothPhotoAssignments: (assignments: Record<number, number>) => void;
@@ -70,6 +71,7 @@ const initialState = {
   photoboothMinPhotos: 2,
   photoboothCaptureTimeLimit: 30,
   photoboothDefaultLayoutRows: 4,
+  photoboothSnapCountdownEnabled: false,
   photoboothThemeId: null as number | null,
   photoboothLayoutRows: 4,
   photoboothPhotoAssignments: {} as Record<number, number>,
@@ -88,7 +90,7 @@ export const useKioskStore = create<KioskStore>((set) => ({
   setTimeLimit: (seconds) => set({ timeLimitSeconds: seconds }),
   setCaptureStartedAt: (ts) => set({ captureStartedAt: ts }),
   setSessionType: (type) => set({ sessionType: type }),
-  setFeatures: ({ vibeCheck, photobooth, accessCodeMode, maxPhotos, minPhotos, captureTimeLimit, defaultLayoutRows }) =>
+  setFeatures: ({ vibeCheck, photobooth, accessCodeMode, maxPhotos, minPhotos, captureTimeLimit, defaultLayoutRows, snapCountdown }) =>
     set({
       vibeCheckEnabled: vibeCheck,
       photoboothEnabled: photobooth,
@@ -99,6 +101,7 @@ export const useKioskStore = create<KioskStore>((set) => ({
       photoboothCaptureTimeLimit: captureTimeLimit,
       photoboothDefaultLayoutRows: defaultLayoutRows,
       photoboothLayoutRows: defaultLayoutRows,
+      photoboothSnapCountdownEnabled: snapCountdown,
     }),
   setPhotoboothThemeId: (id) => set({ photoboothThemeId: id }),
   setPhotoboothLayoutRows: (rows) => set({ photoboothLayoutRows: rows }),

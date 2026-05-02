@@ -29,6 +29,7 @@ export default function PhotoboothConfig() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState('VibePrint OS');
   const [retentionHours, setRetentionHours] = useState('168');
+  const [snapCountdown, setSnapCountdown] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState('You are a photobooth AI assistant.');
 
   useEffect(() => {
@@ -48,6 +49,8 @@ export default function PhotoboothConfig() {
       setWatermarkText(String(pbConfig.photobooth_watermark_text));
     if (pbConfig.photobooth_composite_retention_hours)
       setRetentionHours(String(pbConfig.photobooth_composite_retention_hours));
+    if (pbConfig.photobooth_snap_countdown_enabled !== undefined)
+      setSnapCountdown(String(pbConfig.photobooth_snap_countdown_enabled) === 'true');
     if (pbConfig.photobooth_system_prompt)
       setSystemPrompt(String(pbConfig.photobooth_system_prompt));
   }, [pbConfig]);
@@ -82,6 +85,7 @@ export default function PhotoboothConfig() {
       photobooth_watermark_enabled: watermarkEnabled,
       photobooth_watermark_text: watermarkText,
       photobooth_composite_retention_hours: Number(retentionHours),
+      photobooth_snap_countdown_enabled: snapCountdown,
       photobooth_system_prompt: systemPrompt,
     });
   };
@@ -122,6 +126,17 @@ export default function PhotoboothConfig() {
             min="5"
             max="120"
           />
+        </div>
+
+        {/* Snap countdown toggle */}
+        <div className="flex items-center justify-between" style={{ padding: '0.5rem 0' }}>
+          <div>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Snap Countdown</Label>
+            <p className="text-xs text-white/25" style={{ marginTop: '0.25rem' }}>
+              Show a 3-second countdown before each snap. When off, photos are taken instantly.
+            </p>
+          </div>
+          <Switch checked={snapCountdown} onCheckedChange={setSnapCountdown} />
         </div>
 
         {/* Max/min photos */}

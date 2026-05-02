@@ -811,6 +811,7 @@ async def get_features(
     min_photos = int(photobooth_config.get('photobooth_min_photos', '2'))
     capture_time_limit = int(photobooth_config.get('photobooth_capture_time_limit_seconds', '30'))
     default_layout_rows = int(photobooth_config.get('photobooth_default_layout_rows', '4'))
+    snap_countdown_enabled = photobooth_config.get('photobooth_snap_countdown_enabled', 'false').lower() == 'true'
 
     vc_config = await config_service.get_configs_by_category(db, 'vibe_check')
     vibe_check_enabled = vc_config.get('vibe_check_enabled', 'true').lower() == 'true'
@@ -825,6 +826,7 @@ async def get_features(
         photobooth_min_photos=min_photos,
         photobooth_capture_time_limit_seconds=capture_time_limit,
         photobooth_default_layout_rows=default_layout_rows,
+        photobooth_snap_countdown_enabled=snap_countdown_enabled,
         access_code_mode_enabled=access_code_mode_enabled,
     )
 
