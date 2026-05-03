@@ -5,12 +5,14 @@ import KioskPage from '@/pages/KioskPage';
 import AdminLoginPage from '@/pages/AdminLoginPage';
 import AdminPage from '@/pages/AdminPage';
 import AdminDashboardPage from '@/pages/AdminDashboardPage';
-import AdminConfigPage from '@/pages/AdminConfigPage';
+import AdminAiProviderPage from '@/pages/AdminAiProviderPage';
+import AdminPaymentAccessPage from '@/pages/AdminPaymentAccessPage';
 import AdminHardwarePage from '@/pages/AdminHardwarePage';
 import AdminAnalyticsPage from '@/pages/AdminAnalyticsPage';
 import AdminPhotoboothPage from '@/pages/AdminPhotoboothPage';
 import AdminVibeCheckPage from '@/pages/AdminVibeCheckPage';
 import AdminStripsGalleryPage from '@/pages/AdminStripsGalleryPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,12 +30,14 @@ function App() {
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin" element={<AdminPage />}>
             <Route index element={<AdminDashboardPage />} />
-            <Route path="config" element={<AdminConfigPage />} />
+            <Route path="ai-provider" element={<AdminAiProviderPage />} />
+            <Route path="payment-access" element={<AdminPaymentAccessPage />} />
             <Route path="hardware" element={<AdminHardwarePage />} />
             <Route path="vibe-check" element={<AdminVibeCheckPage />} />
             <Route path="photobooth" element={<AdminPhotoboothPage />} />
             <Route path="strips" element={<AdminStripsGalleryPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
