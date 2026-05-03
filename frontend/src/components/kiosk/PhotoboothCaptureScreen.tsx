@@ -18,7 +18,8 @@ export default function PhotoboothCaptureScreen() {
   const setCaptureStartedAt = useKioskStore((s) => s.setCaptureStartedAt);
   const reset = useKioskStore((s) => s.reset);
 
-  const [timedOutEmpty, setTimedOutEmpty] = useState(false);
+  // 'none' = no timeout, 'short' = some photos but < minimum, 'empty' = no photos
+  const [timeoutState, setTimeoutState] = useState<'none' | 'short' | 'empty'>('none');
 
   // Countdown state (only used when countdownEnabled)
   const { count, start: startCountdown, isRunning: isCountingDown } = useCountdown(COUNTDOWN_SECONDS);
@@ -27,6 +28,18 @@ export default function PhotoboothCaptureScreen() {
 
   const timerSeconds = captureTimeLimit;
   const [timeLeft, setTimeLeft] = useState(timerSeconds);
+
+  // Reset all local state when a new session starts (prevents stale state from previous session)
+  const prevSessionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sessionId && sessionId !== prevSessionRef.current) {
+      setTimeoutState('none');
+      setShowCountdown(false);
+      setTimeLeft(timerSeconds);
+      setCaptureStartedAt(null);
+    }
+    prevSessionRef.current = sessionId;
+  }, [sessionId, timerSeconds, setCaptureStartedAt]);
 
   // Start timer on mount
   useEffect(() => {
@@ -47,8 +60,10 @@ export default function PhotoboothCaptureScreen() {
         clearInterval(interval);
         if (photos.length >= minPhotos) {
           finishCapture();
+        } else if (photos.length > 0) {
+          setTimeoutState('short');
         } else {
-          setTimedOutEmpty(true);
+          setTimeoutState('empty');
         }
       }
     }, 100);
@@ -57,12 +72,42 @@ export default function PhotoboothCaptureScreen() {
 
   // Auto-redirect back to feature select after timeout with no photos
   useEffect(() => {
-    if (!timedOutEmpty) return;
+    if (timeoutState !== 'empty') return;
     const timer = setTimeout(() => {
       reset();
     }, 4000);
     return () => clearTimeout(timer);
-  }, [timedOutEmpty, reset]);
+  }, [timeoutState, reset]);
+
+  const handleExtendTimer = useCallback(() => {
+    setTimeoutState('none');
+    setCaptureStartedAt(Date.now());
+    setTimeLeft(timerSeconds);
+  }, [timerSeconds, setCaptureStartedAt]);
+
+  const handleContinueAnyway = useCallback(() => {
+    setTimeoutState('none');
+    finishCapture();
+  }, [finishCapture]);
+
+  // Grace period for "short" timeout — auto-return if user doesn't act
+  const [graceRemaining, setGraceRemaining] = useState(0);
+  useEffect(() => {
+    if (timeoutState !== 'short') return;
+    const graceSeconds = timerSeconds;
+    setGraceRemaining(graceSeconds);
+    const interval = setInterval(() => {
+      setGraceRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          reset();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeoutState, timerSeconds, reset]);
 
   // When countdown hits 0 and countdown mode is active, snap the photo
   useEffect(() => {
@@ -110,7 +155,7 @@ export default function PhotoboothCaptureScreen() {
     <div className="kiosk-layout bg-surface-0 relative overflow-hidden">
       {/* Time's up overlay — no photos taken */}
       <AnimatePresence>
-        {timedOutEmpty && (
+        {timeoutState === 'empty' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -121,6 +166,39 @@ export default function PhotoboothCaptureScreen() {
             <h2 className="text-3xl font-display font-black text-white">Time's Up!</h2>
             <p className="text-white/50 text-base">No photos were taken.</p>
             <p className="text-white/30 text-sm">Returning to menu...</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Time's up overlay — some photos but not enough */}
+      <AnimatePresence>
+        {timeoutState === 'short' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-6"
+          >
+            <div className="text-6xl" role="img" aria-label="clock">⏰</div>
+            <h2 className="text-3xl font-display font-black text-white">Time's Up!</h2>
+            <p className="text-white/60 text-lg font-medium">{photos.length}/{minPhotos} photos taken</p>
+            <p className="text-white/30 text-sm">Returning to menu in {graceRemaining}s...</p>
+            <div className="flex gap-4 mt-2">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleExtendTimer}
+                className="py-4 px-16 rounded-2xl text-white text-2xl font-display font-bold transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
+              >
+                Extend Timer
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleContinueAnyway}
+                className="py-4 px-16 rounded-2xl text-white/70 text-lg font-display font-bold transition-all duration-150 btn-secondary"
+              >
+                Continue with {photos.length}
+              </motion.button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
