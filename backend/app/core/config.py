@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ai_model: str = "gpt-4o"
     ai_system_prompt: str = "You are a witty vibe reader."
+    ai_timeout_minutes: int = 5
 
     # Payment
     payment_enabled: bool = False

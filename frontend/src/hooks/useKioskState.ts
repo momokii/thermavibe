@@ -120,12 +120,14 @@ export function useKioskState() {
 
   const confirmSelection = useCallback(async () => {
     if (!sessionId) return;
+    const timeoutMs = useKioskStore.getState().aiTimeoutMinutes * 60 * 1000;
     // Immediately show the processing screen while the API call runs in the background
     store.setState('processing');
     try {
       const response = await selectMut.mutateAsync({
         id: sessionId,
         photoIndex: selectedPhotoIndex,
+        timeoutMs,
       });
       store.setSession(sessionId, response.data as unknown as SessionResponse);
     } catch {
@@ -138,10 +140,11 @@ export function useKioskState() {
 
   const triggerCapture = useCallback(async () => {
     if (!sessionId) return;
+    const timeoutMs = useKioskStore.getState().aiTimeoutMinutes * 60 * 1000;
     // Immediately show the processing screen while the API call runs in the background
     store.setState('processing');
     try {
-      const response = await captureMut.mutateAsync(sessionId);
+      const response = await captureMut.mutateAsync({ id: sessionId, timeoutMs });
       store.setSession(sessionId, response.data as unknown as SessionResponse);
     } catch {
       store.setState('idle');

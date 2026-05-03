@@ -821,6 +821,9 @@ async def get_features(
     ac_config = await config_service.get_configs_by_category(db, 'access_code')
     access_code_mode_enabled = ac_config.get('access_code_mode_enabled', 'false').lower() == 'true'
 
+    ai_config = await config_service.get_configs_by_category(db, 'ai')
+    ai_timeout_minutes = int(ai_config.get('ai_timeout_minutes', '5'))
+
     return FeaturesResponse(
         vibe_check_enabled=vibe_check_enabled,
         photobooth_enabled=photobooth_enabled,
@@ -830,6 +833,7 @@ async def get_features(
         photobooth_default_layout_rows=default_layout_rows,
         photobooth_snap_countdown_enabled=snap_countdown_enabled,
         access_code_mode_enabled=access_code_mode_enabled,
+        ai_timeout_minutes=ai_timeout_minutes,
     )
 
 

@@ -15,7 +15,7 @@ export default function IdleScreen() {
   useEffect(() => {
     photoboothApi
       .getFeatures()
-      .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number; photobooth_snap_countdown_enabled: boolean; access_code_mode_enabled: boolean } }) => {
+      .then((res: { data: { vibe_check_enabled: boolean; photobooth_enabled: boolean; photobooth_max_photos: number; photobooth_min_photos: number; photobooth_capture_time_limit_seconds: number; photobooth_default_layout_rows: number; photobooth_snap_countdown_enabled: boolean; access_code_mode_enabled: boolean; ai_timeout_minutes: number } }) => {
         useKioskStore.getState().setFeatures({
           vibeCheck: res.data.vibe_check_enabled,
           photobooth: res.data.photobooth_enabled,
@@ -25,11 +25,12 @@ export default function IdleScreen() {
           captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
           defaultLayoutRows: res.data.photobooth_default_layout_rows,
           snapCountdown: res.data.photobooth_snap_countdown_enabled,
+          aiTimeoutMinutes: res.data.ai_timeout_minutes,
         });
       })
       .catch(() => {
         useKioskStore.getState().setFeatures({
-          vibeCheck: true, photobooth: true, accessCodeMode: false, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4, snapCountdown: false,
+          vibeCheck: true, photobooth: true, accessCodeMode: false, maxPhotos: 8, minPhotos: 2, captureTimeLimit: 30, defaultLayoutRows: 4, snapCountdown: false, aiTimeoutMinutes: 5,
         });
       });
   }, []);
@@ -57,6 +58,7 @@ export default function IdleScreen() {
         captureTimeLimit: res.data.photobooth_capture_time_limit_seconds,
         defaultLayoutRows: res.data.photobooth_default_layout_rows,
         snapCountdown: res.data.photobooth_snap_countdown_enabled,
+        aiTimeoutMinutes: res.data.ai_timeout_minutes,
       });
     } catch {
       // Use cached values if fetch fails

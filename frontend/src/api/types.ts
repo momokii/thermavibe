@@ -418,6 +418,7 @@ export interface FeaturesResponse {
   photobooth_default_layout_rows: number;
   photobooth_snap_countdown_enabled: boolean;
   access_code_mode_enabled: boolean;
+  ai_timeout_minutes: number;
 }
 
 // --- Strip Gallery ---

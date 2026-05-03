@@ -154,6 +154,7 @@ class FeaturesResponse(BaseModel):
     photobooth_default_layout_rows: int = 4
     photobooth_snap_countdown_enabled: bool = False
     access_code_mode_enabled: bool = False
+    ai_timeout_minutes: int = 5
 
 
 # ---------------------------------------------------------------------------

@@ -17,8 +17,8 @@ export function useSnap() {
 
 export function useSelect() {
   return useMutation({
-    mutationFn: ({ id, photoIndex }: { id: string; photoIndex: number }) =>
-      kioskApi.select(id, { photo_index: photoIndex } satisfies SelectRequest),
+    mutationFn: ({ id, photoIndex, timeoutMs }: { id: string; photoIndex: number; timeoutMs?: number }) =>
+      kioskApi.select(id, { photo_index: photoIndex } satisfies SelectRequest, timeoutMs),
   });
 }
 
@@ -30,7 +30,8 @@ export function useRetake() {
 
 export function useCapture() {
   return useMutation({
-    mutationFn: (id: string) => kioskApi.capture(id),
+    mutationFn: ({ id, timeoutMs }: { id: string; timeoutMs?: number }) =>
+      kioskApi.capture(id, timeoutMs),
   });
 }
 

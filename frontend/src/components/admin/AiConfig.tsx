@@ -22,6 +22,7 @@ export default function AiConfig() {
   const [googleKey, setGoogleKey] = useState(aiConfig.google_api_key as string ?? '');
   const [ollamaUrl, setOllamaUrl] = useState(aiConfig.ollama_base_url as string ?? 'http://localhost:11434');
   const [model, setModel] = useState(aiConfig.model as string ?? '');
+  const [timeoutMinutes, setTimeoutMinutes] = useState(aiConfig.ai_timeout_minutes as string ?? '5');
 
   useEffect(() => {
     if (aiConfig.provider) setProvider(aiConfig.provider as string);
@@ -30,6 +31,7 @@ export default function AiConfig() {
     if (aiConfig.google_api_key) setGoogleKey(aiConfig.google_api_key as string);
     if (aiConfig.ollama_base_url) setOllamaUrl(aiConfig.ollama_base_url as string);
     if (aiConfig.model) setModel(aiConfig.model as string);
+    if (aiConfig.ai_timeout_minutes) setTimeoutMinutes(aiConfig.ai_timeout_minutes as string);
   }, [aiConfig]);
 
   const saveMutation = useMutation({
@@ -38,10 +40,20 @@ export default function AiConfig() {
       queryClient.invalidateQueries({ queryKey: ['config'] });
       toast.success('AI configuration saved');
     },
-    onError: () => toast.error('Failed to save configuration'),
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? 'Failed to save configuration');
+    },
   });
 
   const handleSave = () => {
+    if (provider === 'ollama') {
+      const num = parseInt(timeoutMinutes, 10);
+      if (isNaN(num) || num < 1 || num > 30) {
+        toast.error('Timeout must be between 1 and 30 minutes');
+        return;
+      }
+    }
     saveMutation.mutate({
       provider,
       openai_api_key: openaiKey,
@@ -49,6 +61,7 @@ export default function AiConfig() {
       google_api_key: googleKey,
       ollama_base_url: ollamaUrl,
       model,
+      ai_timeout_minutes: timeoutMinutes,
     });
   };
 
@@ -160,6 +173,29 @@ export default function AiConfig() {
             style={{ padding: '0.75rem 1rem' }}
           />
         </div>
+        {provider === 'ollama' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Label className="text-xs text-white/40 uppercase tracking-wider">Max Timeout (minutes)</Label>
+            <p className="text-xs text-white/25">Maximum wait time for AI analysis. Increase for slow hardware. Range: 1–30 minutes.</p>
+            <Input
+              type="number"
+              min={1}
+              max={30}
+              step={1}
+              value={timeoutMinutes}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d+$/.test(val)) setTimeoutMinutes(val);
+              }}
+              onBlur={() => {
+                const num = parseInt(timeoutMinutes, 10);
+                if (!isNaN(num)) setTimeoutMinutes(String(Math.max(1, Math.min(30, num))));
+              }}
+              className="input-surface text-white placeholder:text-white/20"
+              style={{ padding: '0.75rem 1rem', maxWidth: '8rem' }}
+            />
+          </div>
+        )}
         <Button
           onClick={handleSave}
           disabled={saveMutation.isPending}

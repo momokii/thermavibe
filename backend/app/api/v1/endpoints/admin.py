@@ -108,6 +108,21 @@ async def update_config(
     elif category == 'payment' and values.get('payment_enabled', '').lower() == 'true':
         await config_service.update_config(db, 'access_code', {'access_code_mode_enabled': 'false'})
 
+    # Guard: AI timeout must be between 1 and 30 minutes
+    if category == 'ai' and 'ai_timeout_minutes' in values:
+        try:
+            timeout_val = int(values['ai_timeout_minutes'])
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=422,
+                detail='AI timeout must be a valid number.',
+            )
+        if timeout_val < 1 or timeout_val > 30:
+            raise HTTPException(
+                status_code=422,
+                detail='AI timeout must be between 1 and 30 minutes.',
+            )
+
     updated = await config_service.update_config(db, category, values)
     all_values = await config_service.get_configs_by_category(db, category)
 

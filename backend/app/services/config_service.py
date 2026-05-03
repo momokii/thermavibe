@@ -34,6 +34,7 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'ollama_base_url': {'value': settings.ollama_base_url, 'description': 'Ollama base URL for local inference'},
         'model': {'value': settings.ai_model, 'description': 'Model identifier for the AI provider'},
         'system_prompt': {'value': settings.ai_system_prompt, 'description': 'System prompt for AI analysis'},
+        'ai_timeout_minutes': {'value': str(settings.ai_timeout_minutes), 'description': 'Max wait time for AI analysis in minutes (1-30)'},
     },
     ConfigCategory.PAYMENT: {
         'payment_enabled': {'value': str(settings.payment_enabled).lower(), 'description': 'Enable payment step'},
@@ -227,6 +228,7 @@ async def get_ai_config(db: AsyncSession) -> dict[str, str]:
         'ollama_base_url': db_values.get('ollama_base_url', settings.ollama_base_url),
         'model': db_values.get('model', settings.ai_model),
         'system_prompt': db_values.get('system_prompt', settings.ai_system_prompt),
+        'ai_timeout_minutes': db_values.get('ai_timeout_minutes', str(settings.ai_timeout_minutes)),
     }
 
 

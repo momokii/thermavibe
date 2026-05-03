@@ -40,8 +40,9 @@ _JPEG_QUALITY = 85
 # Provider timeout in seconds (cloud APIs respond fast)
 _PROVIDER_TIMEOUT = 45
 
-# Ollama runs on CPU and needs significantly more time for vision inference
-_OLLAMA_TIMEOUT = 180
+# Ollama runs on CPU and needs significantly more time for vision inference,
+# especially with long system prompts. 5 minutes accommodates most CPU setups.
+_OLLAMA_TIMEOUT = 300
 
 
 def compress_image(image_bytes: bytes) -> bytes:
@@ -104,6 +105,15 @@ async def analyze_image(
     """
     cfg = ai_config or {}
     system_prompt = prompt or cfg.get('system_prompt', settings.ai_system_prompt)
+
+    if len(system_prompt) > 2000:
+        logger.warning(
+            'long_system_prompt',
+            prompt_length=len(system_prompt),
+            provider=cfg.get('provider', settings.ai_provider),
+            note='Long prompts increase inference time, especially on CPU (Ollama)',
+        )
+
     compressed = compress_image(image_bytes)
     b64_image = encode_image_base64(compressed)
 
@@ -370,22 +380,62 @@ async def _analyze_ollama(b64_image: str, system_prompt: str, cfg: dict[str, str
         model = 'llama3.2-vision'
     base_url = _cfg.get('ollama_base_url', settings.ollama_base_url)
 
-    async with httpx.AsyncClient(timeout=_OLLAMA_TIMEOUT) as client:
-        response = await client.post(
-            f'{base_url}/api/generate',
-            json={
-                'model': model,
-                'prompt': f'{system_prompt}\n\nAnalyze this photo and give me a vibe reading.',
-                'images': [b64_image],
-                'stream': False,
-            },
-        )
+    prompt = f'{system_prompt}\n\nAnalyze this photo and give me a vibe reading.'
+    timeout_minutes = int(_cfg.get('ai_timeout_minutes', str(settings.ai_timeout_minutes)))
+    timeout_seconds = max(60, min(timeout_minutes * 60, 1800))
+
+    # Estimate token count (rough: 1 token per 4 chars) and set context window
+    # with headroom. Small vision models (llava-phi3) default to 4096 which
+    # easily gets exceeded by long system prompts + image tokens.
+    estimated_tokens = len(prompt) // 3
+    num_ctx = max(4096, min((estimated_tokens + 2048) // 512 * 512 + 2048, 32768))
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            response = await client.post(
+                f'{base_url}/api/generate',
+                json={
+                    'model': model,
+                    'prompt': prompt,
+                    'images': [b64_image],
+                    'stream': False,
+                    'options': {'num_ctx': num_ctx},
+                },
+            )
+    except httpx.TimeoutException as exc:
+        raise AIProviderError(
+            f'Ollama timed out after {timeout_seconds}s ({timeout_minutes} min, prompt: {len(prompt)} chars): {exc}',
+            AIProvider.OLLAMA,
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise AIProviderError(
+            f'Ollama connection error: {exc}',
+            AIProvider.OLLAMA,
+        ) from exc
 
     if response.status_code != 200:
-        raise AIProviderError(f'Ollama API error: {response.status_code} {response.text}', AIProvider.OLLAMA)
+        error_body = response.text[:500]
+        logger.error(
+            'ollama_api_error',
+            status=response.status_code,
+            body=error_body,
+            model=model,
+            prompt_length=len(prompt),
+        )
+        raise AIProviderError(
+            f'Ollama API error: {response.status_code} {error_body}',
+            AIProvider.OLLAMA,
+        )
 
     data = response.json()
     text = data.get('response', '')
+
+    if not text:
+        error_msg = data.get('error', '')
+        raise AIProviderError(
+            f'Ollama returned empty response{f": {error_msg}" if error_msg else ""}',
+            AIProvider.OLLAMA,
+        )
 
     return AIAnalyzeResponse(
         analysis_text=text,
