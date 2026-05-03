@@ -23,6 +23,11 @@ class AccessCodeCreateRequest(BaseModel):
     max_uses: int = Field(default=1, ge=1, description='Max redemptions per code')
     expires_at: datetime | None = Field(default=None, description='Expiration timestamp (null = no expiry)')
     notes: str | None = Field(default=None, max_length=500, description='Admin notes')
+    price: int | None = Field(
+        default=None,
+        ge=0,
+        description='Price per redemption in smallest currency unit (null = use global default)',
+    )
 
 
 class AccessCodeResponse(BaseModel):
@@ -36,6 +41,7 @@ class AccessCodeResponse(BaseModel):
     status: str
     expires_at: datetime | None = None
     notes: str | None = None
+    price: int | None = None
     created_at: datetime
     created_by: str
 

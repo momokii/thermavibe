@@ -486,8 +486,8 @@ The backend follows a strict layered architecture to separate concerns and maint
 | `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
 | `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. | python-escpos, USB device |
 | `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
-| `AnalyticsService` | Aggregate session data, calculate revenue totals, generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment models) |
-| `AccessCodeService` | Generate, validate, redeem, and manage access codes. Codes grant feature access (vibe_check, photobooth, or universal) as an alternative to payment. Supports batch generation, expiration, usage limits, and revocation. | PostgreSQL (AccessCode model) |
+| `AnalyticsService` | Aggregate session data, calculate revenue totals across all entry methods (confirmed payments AND access-code redemptions with price), generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment, AccessCode models) |
+| `AccessCodeService` | Generate, validate, redeem, and manage access codes. Codes grant feature access (vibe_check, photobooth, or universal) as an alternative to payment. Supports batch generation, expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (AccessCode model) |
 | `RetentionService` | Purge expired session files and data based on configurable retention periods. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
 
 ### Orchestration Flow: Complete Kiosk Session

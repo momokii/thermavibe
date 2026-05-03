@@ -106,7 +106,7 @@ The `KioskSession` entity represents a single user interaction cycle with the ki
 | `photobooth_layout`  | `JSONB`            | NULL                                 | Photobooth layout configuration including theme_id, theme_name, layout_rows, and photo_assignments. |
 | `payment_status`     | `VARCHAR(32)`      | NULL                                 | Current payment status. NULL if payment is disabled. Values: `pending`, `confirmed`, `expired`, `denied`, `refunded`. |
 | `payment_provider`   | `VARCHAR(64)`      | NULL                                 | Payment gateway used. Values: `midtrans`, `xendit`, `mock`, NULL.                              |
-| `payment_amount`     | `INTEGER`          | NULL                                 | Payment amount in the smallest currency unit (Indonesian Rupiah, no decimals). E.g., 10000 = Rp10,000. |
+| `payment_amount`     | `INTEGER`          | NULL                                 | Payment amount in the smallest currency unit (IDR). Set by confirmed payment or copied from access code `price` on redemption. NULL = free session. |
 | `payment_reference`  | `VARCHAR(255)`     | NULL                                 | External reference/transaction ID from the payment gateway for reconciliation.                 |
 | `created_at`         | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`            | Timestamp when the session was created (user touched the screen).                              |
 | `completed_at`       | `TIMESTAMPTZ`      | NULL                                 | Timestamp when the session reached the REVEAL/PRINT state (product delivered to user).         |
@@ -237,6 +237,7 @@ The `AccessCode` entity stores redeemable codes that grant access to kiosk featu
 | `status`      | `VARCHAR(16)`      | NOT NULL, DEFAULT `'active'`         | Current lifecycle status. Values: `active`, `used`, `expired`, `revoked`.                      |
 | `expires_at`  | `TIMESTAMPTZ`      | NULL                                 | When this code becomes invalid. NULL means the code never expires.                             |
 | `notes`       | `TEXT`             | NULL                                 | Operator-facing notes for internal tracking (e.g., "VIP batch — wedding event").              |
+| `price`       | `INTEGER`          | NULL                                 | Optional price per redemption in smallest currency unit (IDR). Copied to session on redemption. NULL = free. |
 | `created_at`  | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`            | Timestamp when the code was generated.                                                         |
 | `created_by`  | `VARCHAR(64)`      | NOT NULL, DEFAULT `'admin'`          | Identifier of the operator or system that created this code.                                   |
 

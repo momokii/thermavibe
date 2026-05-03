@@ -529,6 +529,8 @@ async def create_access_codes(
     """Generate access codes (single or batch up to 100)."""
     from app.services import access_code_service
 
+    code_price = body.price if body.price is not None else settings.payment_amount
+
     codes = await access_code_service.generate_batch(
         db=db,
         code_type=body.code_type,
@@ -536,6 +538,7 @@ async def create_access_codes(
         max_uses=body.max_uses,
         expires_at=body.expires_at,
         notes=body.notes,
+        price=code_price,
     )
     return [AccessCodeResponse.model_validate(c) for c in codes]
 

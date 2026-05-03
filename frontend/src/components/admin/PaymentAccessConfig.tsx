@@ -145,6 +145,7 @@ export default function PaymentAccessConfig() {
   const [maxUses, setMaxUses] = useState(1);
   const [expiryValue, setExpiryValue] = useState<number>(0);
   const [expiryUnit, setExpiryUnit] = useState<'minutes' | 'hours' | 'days'>('hours');
+  const [codePrice, setCodePrice] = useState<string>('');
 
   const getDurationMs = (value: number, unit: string): number => {
     const msPerUnit = unit === 'minutes' ? 60_000 : unit === 'hours' ? 3_600_000 : 86_400_000;
@@ -172,6 +173,7 @@ export default function PaymentAccessConfig() {
         max_uses: maxUses,
         expires_at: parsedExpiry,
         notes: null,
+        price: codePrice ? parseInt(codePrice) : null,
       });
     },
     onSuccess: () => {
@@ -565,6 +567,26 @@ export default function PaymentAccessConfig() {
                       style={{ padding: '0.5rem 0.75rem' }}
                     />
                   </div>
+                  <div>
+                    <label className="text-xs text-white/30 block mb-1">Price (IDR)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder={String(payConfig.payment_amount ?? 5000)}
+                      value={codePrice}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d+$/.test(val)) {
+                          setCodePrice(val);
+                        }
+                      }}
+                      className="input-surface text-white w-28"
+                      style={{ padding: '0.5rem 0.75rem' }}
+                    />
+                    <p className="text-[10px] text-white/20 mt-0.5">
+                      Per redemption. Leave empty for default ({String(payConfig.payment_amount ?? 5000)} IDR).
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs text-white/30 block mb-1">Expires In</label>
@@ -635,6 +657,7 @@ export default function PaymentAccessConfig() {
                   <tr className="text-left text-xs text-white/30 uppercase tracking-wider border-b border-white/[0.06]">
                     <th style={{ padding: '0.75rem 1rem' }}>Code</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Type</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Price</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Status</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Uses</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Expiry</th>
@@ -661,6 +684,11 @@ export default function PaymentAccessConfig() {
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }} className="text-white/50">
                         {code.code_type}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }} className="text-white/50">
+                        {code.price != null
+                          ? `Rp ${code.price.toLocaleString('id-ID')}`
+                          : <span className="text-white/25">—</span>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem' }}>{statusBadge(code.status)}</td>
                       <td style={{ padding: '0.75rem 1rem' }} className="text-white/50">
@@ -725,7 +753,7 @@ export default function PaymentAccessConfig() {
                   {codes.length === 0 && (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         style={{ padding: '2rem 1rem' }}
                         className="text-center text-white/25"
                       >

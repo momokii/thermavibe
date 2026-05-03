@@ -47,6 +47,7 @@ async def generate_code(
     expires_at: datetime | None = None,
     notes: str | None = None,
     created_by: str = 'admin',
+    price: int | None = None,
 ) -> AccessCode:
     """Create a single access code with a random code string.
 
@@ -57,6 +58,7 @@ async def generate_code(
         expires_at: Optional expiration timestamp.
         notes: Optional admin notes.
         created_by: Identifier of the creator.
+        price: Optional price per redemption in smallest currency unit.
 
     Returns:
         The newly created AccessCode ORM object.
@@ -72,12 +74,13 @@ async def generate_code(
         expires_at=expires_at,
         notes=notes,
         created_by=created_by,
+        price=price,
     )
     db.add(access_code)
     await db.commit()
     await db.refresh(access_code)
 
-    logger.info('access_code_generated', code=code_str, code_type=code_type, max_uses=max_uses)
+    logger.info('access_code_generated', code=code_str, code_type=code_type, max_uses=max_uses, price=price)
     return access_code
 
 
@@ -89,6 +92,7 @@ async def generate_batch(
     expires_at: datetime | None = None,
     notes: str | None = None,
     created_by: str = 'admin',
+    price: int | None = None,
 ) -> list[AccessCode]:
     """Batch-create access codes (up to 100).
 
@@ -100,6 +104,7 @@ async def generate_batch(
         expires_at: Optional expiration timestamp.
         notes: Optional admin notes applied to all codes.
         created_by: Identifier of the creator.
+        price: Optional price per redemption in smallest currency unit.
 
     Returns:
         List of newly created AccessCode ORM objects.
@@ -118,6 +123,7 @@ async def generate_batch(
             expires_at=expires_at,
             notes=notes,
             created_by=created_by,
+            price=price,
         )
         db.add(access_code)
         codes.append(access_code)
@@ -225,6 +231,7 @@ async def redeem_code(
         code=access_code.code,
         use_count=access_code.use_count,
         max_uses=access_code.max_uses,
+        price=access_code.price,
     )
     return access_code
 

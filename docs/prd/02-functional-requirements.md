@@ -791,6 +791,20 @@ The access code system provides a payment alternative for event-hosted kiosks. W
 
 **Priority:** P1
 
+### FR-ACCESS-CODE-006: Access Code Pricing
+
+**Description:** Each access code can carry an optional price. On redemption, the price is recorded on the session for revenue tracking. When the code price is `null`, the session's `payment_amount` remains `null` (free session). When the code has a price, that price is copied to `session.payment_amount`, enabling revenue analytics to include access-code sessions alongside confirmed payment sessions.
+
+**Acceptance Criteria:**
+- When generating access codes, the operator can optionally set a price per code batch (in IDR). Default uses the global `payment_amount` setting.
+- On successful code redemption, if the code's `price` is not `null`, the value is copied to the session's `payment_amount` field.
+- If the code's `price` is `null`, the session's `payment_amount` remains `null`.
+- Revenue analytics queries include sessions where `payment_amount` was set via access-code redemption (not only confirmed payments).
+- The admin UI displays the price column in the access codes table and includes a price input in the code generation form.
+- Codes with `null` price are treated as free; codes with a non-null price contribute to revenue totals.
+
+**Priority:** P1
+
 The failsafe module ensures that the kiosk can recover gracefully from errors, connectivity issues, and unexpected conditions without manual intervention. It is critical for unattended operation.
 
 ### FR-FAILSAFE-001: Connectivity Monitoring

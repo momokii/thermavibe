@@ -41,6 +41,7 @@ class AccessCode(Base):
         status: Current status (active, used, expired, revoked).
         expires_at: Optional expiration timestamp (null = no expiry).
         notes: Optional admin notes.
+        price: Optional price in smallest currency unit. Copied to session.payment_amount on redemption.
         created_at: Timestamp when the code was created.
         created_by: Identifier of the admin who created the code.
     """
@@ -86,6 +87,7 @@ class AccessCode(Base):
         index=True,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price: Mapped[int | None] = mapped_column(INTEGER, nullable=True)
     created_at: Mapped[str] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,

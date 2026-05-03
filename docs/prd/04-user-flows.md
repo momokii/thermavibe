@@ -1161,6 +1161,8 @@ User               KioskScreen          BackendAPI           Database
  |  continues...       |                     |                   |
 ```
 
+> **Pricing note:** When generating access codes, operators can optionally set a price per code batch. This price is recorded on the session at redemption time for revenue tracking. If no price is set, the code grants free access.
+
 ### 6.2 Access Code Validation Rules
 
 | Check | Condition | Error Message |

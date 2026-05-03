@@ -51,6 +51,7 @@ def _make_access_code(**overrides) -> MagicMock:
         'status': AccessCodeStatus.ACTIVE,
         'expires_at': None,
         'notes': None,
+        'price': None,
         'created_by': 'admin',
     }
     defaults.update(overrides)
@@ -92,6 +93,30 @@ class TestGenerateCode:
         await generate_code(db, code_type='vibe_check')
         mock_gen.assert_called_once_with('vibe_check')
 
+    async def test_stores_price(self):
+        """generate_code stores the provided price on the AccessCode."""
+        db = _make_mock_db()
+        db.refresh.side_effect = lambda obj: setattr(obj, 'id', 1)
+
+        from app.services.access_code_service import generate_code
+
+        code = await generate_code(db, code_type='universal', price=10000)
+
+        added = db.add.call_args[0][0]
+        assert added.price == 10000
+
+    async def test_price_defaults_to_none(self):
+        """generate_code defaults price to None when not provided."""
+        db = _make_mock_db()
+        db.refresh.side_effect = lambda obj: setattr(obj, 'id', 1)
+
+        from app.services.access_code_service import generate_code
+
+        code = await generate_code(db, code_type='universal')
+
+        added = db.add.call_args[0][0]
+        assert added.price is None
+
 
 # ---------------------------------------------------------------------------
 # generate_batch
@@ -123,6 +148,18 @@ class TestGenerateBatch:
 
         codes = await generate_batch(db, count=200)
         assert db.add.call_count == 100
+
+    async def test_batch_stores_price_on_all_codes(self):
+        """generate_batch applies price to all generated codes."""
+        db = _make_mock_db()
+        db.refresh.side_effect = lambda obj: setattr(obj, 'id', 1)
+
+        from app.services.access_code_service import generate_batch
+
+        codes = await generate_batch(db, count=3, price=7500)
+
+        for call in db.add.call_args_list:
+            assert call[0][0].price == 7500
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +311,17 @@ class TestRedeemCode:
 
         with pytest.raises(ValueError, match='not active'):
             await redeem_code(db, code_id=1)
+
+    async def test_preserves_price_on_redeem(self):
+        """redeem_code returns the code with its price intact."""
+        db = _make_mock_db()
+        code = _make_access_code(price=5000)
+        db.execute.return_value = _mock_scalar_result(code)
+
+        from app.services.access_code_service import redeem_code
+
+        result = await redeem_code(db, code_id=1)
+        assert result.price == 5000
 
 
 # ---------------------------------------------------------------------------

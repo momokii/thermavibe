@@ -528,6 +528,7 @@ export interface AccessCodeResponse {
   status: 'active' | 'used' | 'expired' | 'revoked';
   expires_at: string | null;
   notes: string | null;
+  price: number | null;
   created_at: string;
   created_by: string;
 }
@@ -543,6 +544,7 @@ export interface AccessCodeCreateRequest {
   max_uses: number;
   expires_at: string | null;
   notes: string | null;
+  price?: number | null;
 }
 
 export interface AccessCodeValidateRequest {

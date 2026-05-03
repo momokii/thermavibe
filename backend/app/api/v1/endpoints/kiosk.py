@@ -785,10 +785,12 @@ async def redeem_access_code(
         raise HTTPException(status_code=400, detail=validation['message'])
 
     # Redeem the code (increments use_count)
-    await access_code_service.redeem_code(db=db, code_id=validation['access_code_id'])
+    redeemed_code = await access_code_service.redeem_code(db=db, code_id=validation['access_code_id'])
 
-    # Attach code to session and transition to CAPTURE
+    # Attach code to session and copy price for revenue tracking
     session.access_code_id = validation['access_code_id']
+    if redeemed_code.price is not None:
+        session.payment_amount = redeemed_code.price
     session = await session_service.transition_state(db, session_id, session_service.KioskState.CAPTURE)
 
     return _session_to_response(session, settings)

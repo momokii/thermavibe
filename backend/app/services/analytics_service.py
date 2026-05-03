@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analytics import AnalyticsEvent
@@ -157,13 +157,22 @@ async def get_revenue_analytics(
     if end_date is None:
         end_date = now
 
+    # Revenue from confirmed payments OR access-code sessions with a price
+    revenue_filter = or_(
+        KioskSession.payment_status == PaymentStatus.CONFIRMED,
+        and_(
+            KioskSession.access_code_id.isnot(None),
+            KioskSession.payment_amount.isnot(None),
+        ),
+    )
+
     # Revenue summary
     confirmed_stmt = select(
         func.count().label('tx_count'),
         func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
         func.coalesce(func.avg(KioskSession.payment_amount), 0).label('avg'),
     ).where(
-        KioskSession.payment_status == PaymentStatus.CONFIRMED,
+        revenue_filter,
         KioskSession.created_at >= start_date,
         KioskSession.created_at <= end_date,
     )
@@ -194,7 +203,7 @@ async def get_revenue_analytics(
             func.count().label('transactions'),
         )
         .where(
-            KioskSession.payment_status == PaymentStatus.CONFIRMED,
+            revenue_filter,
             KioskSession.created_at >= start_date,
             KioskSession.created_at <= end_date,
         )
@@ -295,12 +304,18 @@ async def get_feature_breakdown(
         ).where(*base, KioskSession.completed_at.isnot(None))
         avg_duration = float((await db.execute(avg_stmt)).scalar() or 0)
 
-        # Revenue
+        # Revenue (confirmed payments + access-code sessions with price)
         rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
         ).where(
             *base,
-            KioskSession.payment_status == PaymentStatus.CONFIRMED,
+            or_(
+                KioskSession.payment_status == PaymentStatus.CONFIRMED,
+                and_(
+                    KioskSession.access_code_id.isnot(None),
+                    KioskSession.payment_amount.isnot(None),
+                ),
+            ),
         )
         revenue = int((await db.execute(rev_stmt)).scalar() or 0)
 

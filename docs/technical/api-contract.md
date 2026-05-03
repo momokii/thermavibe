@@ -515,6 +515,8 @@ Returns the standard session response (same shape as `GET /api/v1/kiosk/session/
 }
 ```
 
+> **Note:** On successful redemption, if the access code has a non-null `price`, the value is copied to the session's `payment_amount` field for revenue tracking. If the code's `price` is `null`, the session's `payment_amount` remains `null` (free session).
+
 **Error Responses:**
 
 | Status | Code | Description |
@@ -1198,7 +1200,7 @@ GET /api/v1/admin/analytics/sessions?start_date=2025-06-01&end_date=2025-06-15&g
 
 ### `GET /api/v1/admin/analytics/revenue`
 
-Retrieve revenue analytics from payment sessions.
+Retrieve revenue analytics from all monetized sessions, including both confirmed payments and access-code redemptions with a non-null price.
 
 **Authentication:** Admin (Bearer token required)
 
@@ -1531,6 +1533,7 @@ All access code endpoints return or accept this shape:
   "remaining_uses": 7,
   "expires_at": "2025-07-01T00:00:00Z",
   "revoked_at": null,
+  "price": 15000,
   "notes": "Event giveaway codes",
   "created_at": "2025-06-15T10:30:00Z",
   "updated_at": "2025-06-15T10:30:00Z"
@@ -1548,6 +1551,7 @@ All access code endpoints return or accept this shape:
 | `remaining_uses` | integer | Number of remaining redemptions (`max_uses - current_uses`) |
 | `expires_at` | string or null | ISO 8601 expiration timestamp, `null` if no expiration |
 | `revoked_at` | string or null | ISO 8601 revocation timestamp, `null` if not revoked |
+| `price` | integer or null | Optional price per redemption in IDR. When `null`, the code grants free access. |
 | `notes` | string or null | Optional admin notes about this code |
 | `created_at` | string | ISO 8601 creation timestamp |
 | `updated_at` | string | ISO 8601 last update timestamp |
@@ -1616,6 +1620,7 @@ Generate access codes (single or batch, up to 100 at once).
   "count": 10,
   "max_uses": 5,
   "expires_at": "2025-07-01T00:00:00Z",
+  "price": 15000,
   "notes": "Weekend event codes"
 }
 ```
@@ -1626,6 +1631,7 @@ Generate access codes (single or batch, up to 100 at once).
 | `count` | integer | Yes | — | Number of codes to generate (1-100) |
 | `max_uses` | integer | No | 1 | Maximum redemptions per code |
 | `expires_at` | string (ISO 8601) | No | `null` (no expiration) | Expiration timestamp |
+| `price` | integer | No | `null` | Optional price per redemption in IDR. When `null`, uses the global `payment_amount` setting. |
 | `notes` | string | No | `null` | Admin notes applied to all generated codes |
 
 **Response (201 Created):**
@@ -1644,6 +1650,7 @@ Returns an array of `AccessCodeResponse` objects:
     "remaining_uses": 5,
     "expires_at": "2025-07-01T00:00:00Z",
     "revoked_at": null,
+    "price": 15000,
     "notes": "Weekend event codes",
     "created_at": "2025-06-15T10:30:00Z",
     "updated_at": "2025-06-15T10:30:00Z"
@@ -1658,6 +1665,7 @@ Returns an array of `AccessCodeResponse` objects:
     "remaining_uses": 5,
     "expires_at": "2025-07-01T00:00:00Z",
     "revoked_at": null,
+    "price": 15000,
     "notes": "Weekend event codes",
     "created_at": "2025-06-15T10:30:00Z",
     "updated_at": "2025-06-15T10:30:00Z"
