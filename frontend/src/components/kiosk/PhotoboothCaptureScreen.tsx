@@ -85,11 +85,6 @@ export default function PhotoboothCaptureScreen() {
     setTimeLeft(timerSeconds);
   }, [timerSeconds, setCaptureStartedAt]);
 
-  const handleContinueAnyway = useCallback(() => {
-    setTimeoutState('none');
-    finishCapture();
-  }, [finishCapture]);
-
   // Grace period for "short" timeout — auto-return if user doesn't act
   const [graceRemaining, setGraceRemaining] = useState(0);
   useEffect(() => {
@@ -183,22 +178,24 @@ export default function PhotoboothCaptureScreen() {
             <h2 className="text-3xl font-display font-black text-white">Time's Up!</h2>
             <p className="text-white/60 text-lg font-medium">{photos.length}/{minPhotos} photos taken</p>
             <p className="text-white/30 text-sm">Returning to menu in {graceRemaining}s...</p>
-            <div className="flex gap-4 mt-2">
+
+            <div className="flex flex-col gap-4 mt-4 w-full max-w-xs px-4">
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                onClick={handleExtendTimer}
-                className="py-4 px-16 rounded-2xl text-white text-2xl font-display font-bold transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
-              >
-                Extend Timer
-              </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleContinueAnyway}
-                className="py-4 px-16 rounded-2xl text-white/70 text-lg font-display font-bold transition-all duration-150 btn-secondary"
-              >
-                Continue with {photos.length}
-              </motion.button>
-            </div>
+                    onClick={handleExtendTimer}
+                    className="w-full h-16 flex items-center justify-center px-8 rounded-2xl text-white text-xl font-display font-bold transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700 whitespace-nowrap"
+                  >
+                    Extend Timer
+                  </motion.button>
+                  
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => reset()}
+                    className="w-full h-16 flex items-center justify-center px-8 rounded-2xl text-white/70 text-lg font-display font-bold transition-all duration-150 btn-secondary whitespace-nowrap"
+                  >
+                    Return to Menu
+                  </motion.button>
+                </div>
           </motion.div>
         )}
       </AnimatePresence>

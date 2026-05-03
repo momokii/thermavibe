@@ -157,7 +157,8 @@ export function usePhotoboothState() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const finishCapture = useCallback(() => {
-    if (sessionId) doneMutation.mutate(sessionId);
+    if (sessionId) return doneMutation.mutateAsync(sessionId);
+    return Promise.reject(new Error('No active session'));
   }, [sessionId]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
