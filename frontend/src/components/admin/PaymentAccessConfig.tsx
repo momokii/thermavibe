@@ -18,6 +18,7 @@ import {
   QrCode,
   Copy,
   Plus,
+  RefreshCw,
   X,
 } from 'lucide-react';
 import type { AccessCodeResponse } from '@/api/types';
@@ -188,7 +189,7 @@ export default function PaymentAccessConfig() {
   const [page, setPage] = useState(0);
   const limit = 25;
 
-  const { data: codesData } = useQuery({
+  const { data: codesData, refetch: refetchCodes } = useQuery({
     queryKey: ['access-codes', statusFilter, page],
     queryFn: () =>
       adminApi
@@ -629,25 +630,36 @@ export default function PaymentAccessConfig() {
               </div>
             </div>
 
-            {/* Filter */}
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Filter</Label>
-              {['active', 'used', 'expired', 'revoked', ''].map((s) => (
-                <button
-                  key={s || 'all'}
-                  onClick={() => {
-                    setStatusFilter(s);
-                    setPage(0);
-                  }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors border ${
-                    statusFilter === s
-                      ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
-                      : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
-                  }`}
-                >
-                  {s || 'All'}
-                </button>
-              ))}
+            {/* Filter + Refresh */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Filter</Label>
+                {['active', 'used', 'expired', 'revoked', ''].map((s) => (
+                  <button
+                    key={s || 'all'}
+                    onClick={() => {
+                      setStatusFilter(s);
+                      setPage(0);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors border ${
+                      statusFilter === s
+                        ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+                        : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
+                    }`}
+                  >
+                    {s || 'All'}
+                  </button>
+                ))}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetchCodes()}
+                className="text-white/40 hover:text-white/70 gap-1.5"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh
+              </Button>
             </div>
 
             {/* Codes table */}
