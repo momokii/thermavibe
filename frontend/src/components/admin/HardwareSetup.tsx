@@ -210,6 +210,9 @@ export default function HardwareSetup() {
           <div className="flex items-center gap-2.5">
             <Printer className="h-4 w-4 text-violet-400" />
             <CardTitle className="text-base font-display text-white">Printer</CardTitle>
+            {hw?.printer.connected && (
+              <span className="text-xs text-emerald-400/60 ml-1">Auto-detected</span>
+            )}
           </div>
           <Badge
             className={hw?.printer.connected
@@ -291,7 +294,7 @@ export default function HardwareSetup() {
           {/* No printers detected message */}
           {printerDevices.length === 0 && !printersLoading && (
             <div className="text-sm text-amber-400/70 bg-amber-500/10 rounded-lg" style={{ border: '1px solid rgba(245,158,11,0.15)', padding: '0.75rem 1rem' }}>
-              No printers detected. Make sure your thermal printer is connected via USB and click Refresh to scan again.
+              No printers detected. Connect a thermal printer via USB and it will be detected automatically. No restart required.
             </div>
           )}
         </CardContent>

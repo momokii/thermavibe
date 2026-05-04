@@ -89,9 +89,12 @@ services:
       # ── Thermal Printer ──────────────────────────────────────────────────
       # USB vendor/product IDs for your thermal printer (find with `lsusb`).
       # These are passed to python-escpos for direct USB communication.
+      # Auto-detection is enabled by default — these are fallback defaults.
       PRINTER_VENDOR_ID: ${PRINTER_VENDOR_ID:-0x04b8}
       PRINTER_PRODUCT_ID: ${PRINTER_PRODUCT_ID:-0x0e15}
       PRINTER_PAPER_WIDTH: ${PRINTER_PAPER_WIDTH:-384}
+      PRINTER_AUTO_DETECT: ${PRINTER_AUTO_DETECT:-true}
+      PRINTER_HOTPLUG_INTERVAL_SECONDS: ${PRINTER_HOTPLUG_INTERVAL_SECONDS:-30}
 
       # ── Camera ───────────────────────────────────────────────────────────
       # V4L2 device index: 0 = /dev/video0, 1 = /dev/video1, etc.

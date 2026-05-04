@@ -828,7 +828,7 @@ Payment status values: `PENDING`, `PAID`, `EXPIRED`, `FAILED`, `REFUNDED`.
 
 ## 8. Print
 
-### `POST /api/v1/print/test`
+### `POST /api/v1/printer/test`
 
 Print a test receipt to verify the thermal printer is working correctly. The test receipt contains diagnostic information (printer name, timestamp, test pattern).
 
@@ -860,7 +860,7 @@ Print a test receipt to verify the thermal printer is working correctly. The tes
 
 ---
 
-### `GET /api/v1/print/status`
+### `GET /api/v1/printer/status`
 
 Check the current status of the thermal printer connection.
 
@@ -1076,7 +1076,7 @@ A JSON object where keys are configuration field names and values are the new va
 
 ### `GET /api/v1/admin/analytics/features`
 
-Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth session performance. Returns total sessions, completion rate, average duration, and revenue for each feature independently.
+Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth session performance. Returns total sessions, completion rate, average duration, and revenue (split by payment and access code) for each feature independently.
 
 **Authentication:** Admin (Bearer token required)
 
@@ -1099,7 +1099,9 @@ Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth se
       "abandoned_sessions": 15,
       "completion_rate": 0.875,
       "avg_duration_seconds": 45.2,
-      "revenue": 1050000
+      "revenue": 1050000,
+      "payment_revenue": 800000,
+      "access_code_revenue": 250000
     },
     {
       "feature": "photobooth",
@@ -1108,7 +1110,9 @@ Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth se
       "abandoned_sessions": 13,
       "completion_rate": 0.847,
       "avg_duration_seconds": 95.8,
-      "revenue": 720000
+      "revenue": 720000,
+      "payment_revenue": 500000,
+      "access_code_revenue": 220000
     }
   ]
 }
@@ -1228,27 +1232,42 @@ GET /api/v1/admin/analytics/revenue?start_date=2025-06-01&end_date=2025-06-15&gr
     "avg_transaction_amount": 10000,
     "currency": "IDR",
     "refund_count": 2,
-    "refund_total": 20000
+    "refund_total": 20000,
+    "payment_revenue": 2500000,
+    "payment_transactions": 250,
+    "access_code_revenue": 600000,
+    "access_code_transactions": 60
   },
   "timeseries": [
     {
       "period": "2025-06-01",
       "revenue": 160000,
       "transactions": 16,
-      "refunds": 0
+      "refunds": 0,
+      "payment_revenue": 130000,
+      "payment_transactions": 13,
+      "access_code_revenue": 30000,
+      "access_code_transactions": 3
     },
     {
       "period": "2025-06-02",
       "revenue": 220000,
       "transactions": 22,
-      "refunds": 1
+      "refunds": 1,
+      "payment_revenue": 180000,
+      "payment_transactions": 18,
+      "access_code_revenue": 40000,
+      "access_code_transactions": 4
     }
   ],
-  "by_provider": {
-    "midtrans": {
+  "by_entry_method": {
+    "payment": {
       "transactions": 250,
-      "revenue": 2500000,
-      "success_rate": 0.98
+      "revenue": 2500000
+    },
+    "access_code": {
+      "transactions": 60,
+      "revenue": 600000
     }
   }
 }
@@ -1339,7 +1358,7 @@ The response is a JPEG image (`Content-Type: image/jpeg`), not JSON. The fronten
 
 ### `POST /api/v1/admin/hardware/printer/test`
 
-Print a test receipt to verify the thermal printer is working. Identical to `POST /api/v1/print/test` but accessed via the admin hardware route.
+Print a test receipt to verify the thermal printer is working. Identical to `POST /api/v1/printer/test` but accessed via the admin hardware route.
 
 **Authentication:** Admin (Bearer token required)
 
@@ -1376,7 +1395,7 @@ Print a test receipt to verify the thermal printer is working. Identical to `POS
 
 ### `GET /api/v1/printer/devices`
 
-List detected USB printer devices via `lsusb`. Scans all USB devices and maps known ESC/POS vendor IDs.
+List detected USB printer devices via pyusb USB device enumeration. Uses a three-tier detection strategy: (1) USB printer class matching, (2) known ESC/POS vendor IDs, and (3) keyword matching on device descriptions.
 
 **Authentication:** Admin (Bearer token required)
 

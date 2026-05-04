@@ -167,7 +167,7 @@ export const handlers = [
         refund_total: 0,
       },
       timeseries: [],
-      by_provider: {},
+      by_entry_method: {},
     });
   }),
 

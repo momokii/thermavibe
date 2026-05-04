@@ -16,6 +16,7 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "python-escpos>=3.0",
+    "pyusb>=1.2.0",
     "opencv-python-headless>=4.10.0",
     "pillow>=11.0.0",
     "httpx>=0.28.0",

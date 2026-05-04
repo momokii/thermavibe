@@ -98,6 +98,10 @@ class RevenueAnalyticsSummary(BaseModel):
     currency: str = 'IDR'
     refund_count: int
     refund_total: int
+    payment_revenue: int = 0
+    payment_transactions: int = 0
+    access_code_revenue: int = 0
+    access_code_transactions: int = 0
 
 
 class RevenueTimeseriesPoint(BaseModel):
@@ -107,14 +111,17 @@ class RevenueTimeseriesPoint(BaseModel):
     revenue: int
     transactions: int
     refunds: int
+    payment_revenue: int = 0
+    payment_transactions: int = 0
+    access_code_revenue: int = 0
+    access_code_transactions: int = 0
 
 
-class ProviderRevenueStats(BaseModel):
-    """Revenue statistics for a single payment provider."""
+class EntryMethodStats(BaseModel):
+    """Revenue statistics for a single entry method."""
 
     transactions: int
     revenue: int
-    success_rate: float
 
 
 class RevenueAnalyticsResponse(BaseModel):
@@ -122,7 +129,7 @@ class RevenueAnalyticsResponse(BaseModel):
 
     summary: RevenueAnalyticsSummary
     timeseries: list[RevenueTimeseriesPoint]
-    by_provider: dict[str, ProviderRevenueStats] = Field(default_factory=dict)
+    by_entry_method: dict[str, EntryMethodStats] = Field(default_factory=dict)
 
 
 class FeatureBreakdownItem(BaseModel):
@@ -135,6 +142,8 @@ class FeatureBreakdownItem(BaseModel):
     completion_rate: float
     avg_duration_seconds: float
     revenue: int
+    payment_revenue: int = 0
+    access_code_revenue: int = 0
 
 
 class FeatureBreakdownResponse(BaseModel):

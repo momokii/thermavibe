@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     printer_vendor_id: str = "0x04b8"
     printer_product_id: str = "0x0e15"
     printer_paper_width: int = 384
+    printer_auto_detect: bool = True
+    printer_hotplug_interval_seconds: int = 30
 
     # Camera
     camera_device_index: int = 0

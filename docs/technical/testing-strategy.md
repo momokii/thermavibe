@@ -1333,8 +1333,8 @@ Hardware-dependent features cannot be fully tested in CI. The following checklis
 
 | # | Test Case | Steps | Expected Result |
 |---|-----------|-------|----------------|
-| 1 | Printer connection | Connect printer via USB, check `GET /api/v1/print/status` | `connected: true`, correct vendor/model displayed |
-| 2 | Test receipt | Call `POST /api/v1/print/test` | Physical receipt prints with test content |
+| 1 | Printer connection | Connect printer via USB, check `GET /api/v1/printer/status` | `connected: true`, correct vendor/model displayed |
+| 2 | Test receipt | Call `POST /api/v1/printer/test` | Physical receipt prints with test content |
 | 3 | Text alignment | Print a receipt with long text, short text, and special characters | Text is word-wrapped correctly within paper width |
 | 4 | Image quality | Print a receipt with photo thumbnail | Dithered image is recognizable, no vertical line artifacts |
 | 5 | Paper cutting | Print any receipt | Paper is cut cleanly at the end |

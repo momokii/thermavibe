@@ -124,8 +124,8 @@ The following diagram shows all major components of VibePrint OS and their conne
 | Backend to PostgreSQL | TCP (postgresql wire protocol) | Bidirectional | Connection pooled via SQLAlchemy |
 | Backend to AI Provider | HTTPS | Request/Response | Async HTTP via httpx, timeout configurable |
 | Backend to Payment Gateway | HTTPS | Request/Response + Webhook | Payment creation outbound, status callback inbound |
-| Backend to Thermal Printer | USB (bulk transfer) | Outbound only | ESC/POS binary protocol via python-escpos |
-| Backend to Camera | V4L2 (USB) | Inbound only | OpenCV captures frames, MJPEG stream served over HTTP |
+| Backend to Thermal Printer | USB (bulk transfer) | Outbound only | ESC/POS binary protocol via python-escpos. Auto-detected on startup via pyusb enumeration (three-tier: USB class, known vendor IDs, keyword matching). Hot-plug scanner runs every 30 seconds. |
+| Backend to Camera | V4L2 (USB) | Inbound only | OpenCV captures frames, MJPEG stream served over HTTP. Auto-selects first available camera if configured index is unavailable. |
 | Payment Gateway to Backend | HTTPS (webhook) | Inbound | POST callback with signature verification |
 
 ---
@@ -427,7 +427,7 @@ The backend follows a strict layered architecture to separate concerns and maint
 |  - camera.py       (MJPEG stream, device listing)                |
 |  - ai.py           (image analysis trigger)                      |
 |  - payment.py      (QRIS creation, webhook, status polling)      |
-|  - print.py        (print test, status check)                    |
+|  - printer.py      (USB discovery, print test, status check)      |
 |  - admin.py        (auth, config, analytics, hardware tests,     |
 |                      access code management)                     |
 +--------------------------------+---------------------------------+
@@ -481,10 +481,10 @@ The backend follows a strict layered architecture to separate concerns and maint
 | Service | Primary Responsibility | External Dependencies |
 |---------|----------------------|----------------------|
 | `KioskService` | Create, update, and transition session states. Enforce valid state transitions. Clean up expired sessions. | PostgreSQL (Session model) |
-| `CameraService` | Enumerate USB cameras, set active device, capture frames, generate MJPEG stream. | OpenCV, V4L2 |
+| `CameraService` | Enumerate USB cameras, set active device, capture frames, generate MJPEG stream. On startup, auto-selects the first available camera if the configured device index is unavailable. | OpenCV, V4L2 |
 | `AIService` | Accept image bytes, select active provider, send to AI API, parse response, handle retries and fallbacks. | AI providers (OpenAI, Anthropic, Google, Ollama) |
 | `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
-| `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. | python-escpos, USB device |
+| `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. On startup, auto-detects thermal printers via pyusb enumeration using a three-tier strategy: (1) USB printer class matching, (2) known ESC/POS vendor IDs, (3) keyword matching on device descriptions. Runs a background hot-plug scanner at 30-second intervals to detect newly connected printers and auto-reconnects after printer disconnect. | python-escpos, pyusb, USB device |
 | `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
 | `AnalyticsService` | Aggregate session data, calculate revenue totals across all entry methods (confirmed payments AND access-code redemptions with price), generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment, AccessCode models) |
 | `AccessCodeService` | Generate, validate, redeem, and manage access codes. Codes grant feature access (vibe_check, photobooth, or universal) as an alternative to payment. Supports batch generation, expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (AccessCode model) |
@@ -598,7 +598,7 @@ This pattern allows services to be easily mocked in tests by providing alternati
 |  |    - OpenAPI docs at /docs                               |   |
 |  |                                                           |   |
 |  |  USB Device Passthrough:                                  |   |
-|  |    - /dev/bus/usb/XXX/YYY -> thermal printer              |   |
+|  |    - /dev/bus/usb (broad access) -> printer auto-detect  |   |
 |  |    - /dev/video* (auto-detected) -> USB cameras           |   |
 |  |                                                           |   |
 |  |  Environment:                                             |   |
@@ -606,8 +606,8 @@ This pattern allows services to be easily mocked in tests by providing alternati
 |  |    - AI_PROVIDER=openai                                  |   |
 |  |    - OPENAI_API_KEY=sk-...                               |   |
 |  |    - PAYMENT_ENABLED=false                               |   |
-|  |    - PRINTER_VENDOR_ID=0x04b8                            |   |
-|  |    - PRINTER_PRODUCT_ID=0x0202                           |   |
+|  |    - PRINTER_VENDOR_ID=0x04b8  (optional, auto-detect)   |   |
+|  |    - PRINTER_PRODUCT_ID=0x0202 (optional, auto-detect)   |   |
 |  |    - CAMERA_DEVICE_INDEX=0                               |   |
 |  |    - ADMIN_PIN=1234                                      |   |
 |  |    - APP_SECRET_KEY=<random>                             |   |
@@ -657,22 +657,20 @@ Host Machine:
 
 ### USB Device Passthrough
 
-USB devices are passed through to the `app` container using Docker Compose's `devices` configuration. Camera devices are automatically detected by the startup script:
+USB devices are passed through to the `app` container using Docker Compose's `devices` configuration. Both camera and printer devices are automatically detected by the startup script:
 
 ```yaml
-# docker-compose.yml (base — no hardcoded camera devices)
+# docker-compose.yml (base — no hardcoded device paths)
 services:
   app:
-    devices:
-      # Thermal printer (identified by USB device path)
-      - /dev/bus/usb/001/004:/dev/bus/usb/001/004
-      # Camera devices are added dynamically by scripts/start-docker.sh
+    devices: []
+    # All devices are added dynamically by scripts/start-docker.sh
 
 # The startup script generates .docker-compose.devices.yml with detected devices:
 services:
   app:
     devices:
-      - /dev/bus/usb:/dev/bus/usb
+      - /dev/bus/usb:/dev/bus/usb   # Broad USB bus access (for printer auto-detection)
       - /dev/video0:/dev/video0    # Auto-detected
       - /dev/video1:/dev/video1    # Additional cameras if present
     device_cgroup_rules:
@@ -680,15 +678,9 @@ services:
       - 'c 189:* rwm'              # USB devices
 ```
 
-Use `./scripts/start-docker.sh prod` or `make prod` to start — the script scans `/dev/video*` at startup and only maps devices that actually exist, avoiding the "no such file or directory" error that occurs with hardcoded paths after a device reconnection or reboot.
+Use `./scripts/start-docker.sh prod` or `make prod` to start. The script scans `/dev/video*` at startup and only maps devices that actually exist, avoiding the "no such file or directory" error that occurs with hardcoded paths after a device reconnection or reboot.
 
-For the printer, udev rules create stable symlinks:
-
-```
-# /etc/udev/rules.d/99-thermavibe.rules
-# Thermal printer (Epson TM-T20X)
-SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", ATTR{idProduct}=="0202", SYMLINK+="thermavibe-printer"
-```
+No manual VID/PID configuration is needed. The startup script installs a broad udev rule that grants access to all USB devices, and the backend auto-detects thermal printers via pyusb enumeration on startup. No per-device udev rules are required.
 
 ### Host Processes
 

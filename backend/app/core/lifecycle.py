@@ -33,20 +33,39 @@ async def check_database_health() -> dict[str, str]:
 def check_printer_status() -> dict[str, str]:
     """Check thermal printer connectivity status.
 
+    Queries the printer service for real connection status.
+
     Returns:
         Dict with 'printer' key set to 'ok' or 'unavailable'.
-        Real hardware detection implemented in Wave 3.
     """
-    # Placeholder — real ESC/POS USB detection comes in Wave 3
-    return {'printer': 'ok'}
+    try:
+        from app.services.printer_service import get_printer_status
+
+        status = get_printer_status()
+        return {'printer': 'ok' if status.connected else 'unavailable'}
+    except Exception:
+        return {'printer': 'unavailable'}
 
 
 def check_camera_status() -> dict[str, str]:
     """Check camera device status.
 
+    Probes for available cameras and logs what was detected.
+
     Returns:
         Dict with 'camera' key set to 'ok' or 'unavailable'.
-        Real hardware detection implemented in Wave 3.
     """
-    # Placeholder — real OpenCV/V4L2 detection comes in Wave 3
-    return {'camera': 'ok'}
+    try:
+        from app.services.camera_service import get_active_camera, list_devices
+
+        devices = list_devices()
+        if devices.devices:
+            for d in devices.devices:
+                logger.info('camera_detected', index=d.index, name=d.name, path=d.path)
+        else:
+            logger.warning('no_cameras_detected')
+
+        active = get_active_camera()
+        return {'camera': 'ok' if active else 'unavailable'}
+    except Exception:
+        return {'camera': 'unavailable'}

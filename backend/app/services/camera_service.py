@@ -494,3 +494,22 @@ def _get_supported_resolutions(cap: cv2.VideoCapture) -> list[ResolutionInfo]:
 _active_device_index = settings.camera_device_index
 _active_device_name = _get_device_name(_active_device_index) if _active_device_index is not None else ''
 _active_device_path = f'/dev/video{_active_device_index}' if _active_device_index is not None else ''
+
+# Verify configured camera works, fall back to first available
+if _active_device_index is not None:
+    _probe = cv2.VideoCapture(_active_device_index)
+    if not _probe.isOpened():
+        logger.warning('configured_camera_unavailable', index=_active_device_index)
+        _probe.release()
+        for _idx in range(10):
+            _probe = cv2.VideoCapture(_idx)
+            if _probe.isOpened():
+                _active_device_index = _idx
+                _active_device_name = _get_device_name(_idx)
+                _active_device_path = f'/dev/video{_idx}'
+                logger.info('camera_auto_selected', index=_idx)
+                _probe.release()
+                break
+            _probe.release()
+    else:
+        _probe.release()

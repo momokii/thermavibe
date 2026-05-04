@@ -109,9 +109,29 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning('retention_task_start_failed', error=str(exc))
 
+    # Start background printer hot-plug scanner
+    hotplug_task: asyncio.Task | None = None
+    try:
+        from app.core.config import settings
+        from app.services.printer_service import printer_hotplug_scan
+
+        hotplug_task = asyncio.create_task(
+            printer_hotplug_scan(interval_seconds=settings.printer_hotplug_interval_seconds),
+            name='printer_hotplug_scan',
+        )
+    except Exception as exc:
+        logger.warning('hotplug_task_start_failed', error=str(exc))
+
     yield  # Application runs here
 
     # --- Shutdown ---
+    if hotplug_task and not hotplug_task.done():
+        hotplug_task.cancel()
+        try:
+            await hotplug_task
+        except asyncio.CancelledError:
+            pass
+
     if retention_task and not retention_task.done():
         retention_task.cancel()
         try:

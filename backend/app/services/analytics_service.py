@@ -10,15 +10,15 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analytics import AnalyticsEvent
 from app.models.session import KioskSession, PaymentStatus, SessionType
 from app.schemas.admin import (
+    EntryMethodStats,
     FeatureBreakdownItem,
     FeatureBreakdownResponse,
-    ProviderRevenueStats,
     RevenueAnalyticsResponse,
     RevenueAnalyticsSummary,
     RevenueTimeseriesPoint,
@@ -149,7 +149,7 @@ async def get_revenue_analytics(
     end_date: datetime | None = None,
     group_by: str = 'day',
 ) -> RevenueAnalyticsResponse:
-    """Get revenue analytics with summary and timeseries."""
+    """Get revenue analytics with summary, timeseries, and entry method breakdown."""
     now = datetime.now(timezone.utc)
     if start_date is None:
         start_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
@@ -157,31 +157,36 @@ async def get_revenue_analytics(
     if end_date is None:
         end_date = now
 
-    # Revenue from confirmed payments OR access-code sessions with a price
-    revenue_filter = or_(
-        KioskSession.payment_status == PaymentStatus.CONFIRMED,
-        and_(
-            KioskSession.access_code_id.isnot(None),
-            KioskSession.payment_amount.isnot(None),
-        ),
-    )
-
-    # Revenue summary
-    confirmed_stmt = select(
+    # Payment revenue (QRIS/cashless)
+    payment_stmt = select(
         func.count().label('tx_count'),
         func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
-        func.coalesce(func.avg(KioskSession.payment_amount), 0).label('avg'),
     ).where(
-        revenue_filter,
+        KioskSession.payment_status == PaymentStatus.CONFIRMED,
         KioskSession.created_at >= start_date,
         KioskSession.created_at <= end_date,
     )
-    confirmed_result = await db.execute(confirmed_stmt)
-    row = confirmed_result.one()
+    payment_row = (await db.execute(payment_stmt)).one()
+    payment_tx = payment_row.tx_count or 0
+    payment_rev = int(payment_row.total or 0)
 
-    total_transactions = row.tx_count or 0
-    total_revenue = int(row.total or 0)
-    avg_transaction = int(row.avg or 0)
+    # Access code revenue (priced codes)
+    ac_stmt = select(
+        func.count().label('tx_count'),
+        func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
+    ).where(
+        KioskSession.access_code_id.isnot(None),
+        KioskSession.payment_amount.isnot(None),
+        KioskSession.created_at >= start_date,
+        KioskSession.created_at <= end_date,
+    )
+    ac_row = (await db.execute(ac_stmt)).one()
+    ac_tx = ac_row.tx_count or 0
+    ac_rev = int(ac_row.total or 0)
+
+    total_transactions = payment_tx + ac_tx
+    total_revenue = payment_rev + ac_rev
+    avg_transaction = int(total_revenue / total_transactions) if total_transactions > 0 else 0
 
     summary = RevenueAnalyticsSummary(
         total_revenue=total_revenue,
@@ -190,9 +195,22 @@ async def get_revenue_analytics(
         currency='IDR',
         refund_count=0,
         refund_total=0,
+        payment_revenue=payment_rev,
+        payment_transactions=payment_tx,
+        access_code_revenue=ac_rev,
+        access_code_transactions=ac_tx,
     )
 
-    # Time-series
+    # Revenue filter for timeseries (same combined logic)
+    revenue_filter = or_(
+        KioskSession.payment_status == PaymentStatus.CONFIRMED,
+        and_(
+            KioskSession.access_code_id.isnot(None),
+            KioskSession.payment_amount.isnot(None),
+        ),
+    )
+
+    # Time-series with per-period entry method breakdown
     trunc_map = {'day': 'day', 'week': 'week', 'month': 'month'}
     trunc = trunc_map.get(group_by, 'day')
 
@@ -201,6 +219,22 @@ async def get_revenue_analytics(
             func.date_trunc(trunc, KioskSession.created_at).label('period'),
             func.coalesce(func.sum(KioskSession.payment_amount), 0).label('revenue'),
             func.count().label('transactions'),
+            func.coalesce(func.sum(case(
+                (KioskSession.payment_status == PaymentStatus.CONFIRMED, KioskSession.payment_amount),
+                else_=0,
+            )), 0).label('payment_revenue'),
+            func.sum(case(
+                (KioskSession.payment_status == PaymentStatus.CONFIRMED, 1),
+                else_=0,
+            )).label('payment_tx'),
+            func.coalesce(func.sum(case(
+                (KioskSession.access_code_id.isnot(None), KioskSession.payment_amount),
+                else_=0,
+            )), 0).label('ac_revenue'),
+            func.sum(case(
+                (KioskSession.access_code_id.isnot(None), 1),
+                else_=0,
+            )).label('ac_tx'),
         )
         .where(
             revenue_filter,
@@ -228,14 +262,24 @@ async def get_revenue_analytics(
             revenue=int(row.revenue or 0),
             transactions=row.transactions or 0,
             refunds=0,
+            payment_revenue=int(row.payment_revenue or 0),
+            payment_transactions=int(row.payment_tx or 0),
+            access_code_revenue=int(row.ac_revenue or 0),
+            access_code_transactions=int(row.ac_tx or 0),
         )
         for row in ts_rows
     ]
 
+    by_entry_method: dict[str, EntryMethodStats] = {}
+    if payment_tx > 0:
+        by_entry_method['payment'] = EntryMethodStats(transactions=payment_tx, revenue=payment_rev)
+    if ac_tx > 0:
+        by_entry_method['access_code'] = EntryMethodStats(transactions=ac_tx, revenue=ac_rev)
+
     return RevenueAnalyticsResponse(
         summary=summary,
         timeseries=timeseries,
-        by_provider={},
+        by_entry_method=by_entry_method,
     )
 
 
@@ -304,20 +348,26 @@ async def get_feature_breakdown(
         ).where(*base, KioskSession.completed_at.isnot(None))
         avg_duration = float((await db.execute(avg_stmt)).scalar() or 0)
 
-        # Revenue (confirmed payments + access-code sessions with price)
-        rev_stmt = select(
+        # Revenue: payment (cashless)
+        payment_rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
         ).where(
             *base,
-            or_(
-                KioskSession.payment_status == PaymentStatus.CONFIRMED,
-                and_(
-                    KioskSession.access_code_id.isnot(None),
-                    KioskSession.payment_amount.isnot(None),
-                ),
-            ),
+            KioskSession.payment_status == PaymentStatus.CONFIRMED,
         )
-        revenue = int((await db.execute(rev_stmt)).scalar() or 0)
+        payment_revenue = int((await db.execute(payment_rev_stmt)).scalar() or 0)
+
+        # Revenue: access code
+        ac_rev_stmt = select(
+            func.coalesce(func.sum(KioskSession.payment_amount), 0),
+        ).where(
+            *base,
+            KioskSession.access_code_id.isnot(None),
+            KioskSession.payment_amount.isnot(None),
+        )
+        access_code_revenue = int((await db.execute(ac_rev_stmt)).scalar() or 0)
+
+        revenue = payment_revenue + access_code_revenue
 
         features.append(FeatureBreakdownItem(
             feature=session_type.value,
@@ -327,6 +377,8 @@ async def get_feature_breakdown(
             completion_rate=round(completion_rate, 2),
             avg_duration_seconds=round(avg_duration, 2),
             revenue=revenue,
+            payment_revenue=payment_revenue,
+            access_code_revenue=access_code_revenue,
         ))
 
     return FeatureBreakdownResponse(features=features)

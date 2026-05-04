@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import {
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import { adminApi } from '@/api/adminApi';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { formatDuration, formatIDR, formatPercent, formatPeriod } from '@/lib/formatters';
 
 const STATE_LABELS: Record<string, string> = {
@@ -28,7 +29,14 @@ const FEATURE_LABELS: Record<string, string> = {
   photobooth: 'Photobooth',
 };
 
-const MAX_TABLE_ROWS = 14;
+const COLORS = {
+  payment: '#8b5cf6',
+  access_code: '#06b6d4',
+  completed: '#22c55e',
+  abandoned: '#ef4444',
+};
+
+const MAX_CHART_POINTS = 30;
 
 type Range = '7d' | '30d' | '90d' | 'all';
 
@@ -67,6 +75,14 @@ function getRangeParams(range: Range) {
   return { start_date: start, end_date: end, group_by };
 }
 
+const chartTooltipStyle = {
+  backgroundColor: 'rgba(15,15,20,0.95)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: '8px',
+  color: 'white',
+  fontSize: '13px',
+};
+
 interface Props {
   mode?: 'summary' | 'full';
 }
@@ -96,9 +112,9 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
   const hasData = (sessions?.summary.total_sessions ?? 0) > 0;
   const sessionRows = sessions?.timeseries ?? [];
-  const displayRows = sessionRows.slice(-MAX_TABLE_ROWS);
+  const chartSessionRows = sessionRows.slice(-MAX_CHART_POINTS);
   const revenueRows = revenue?.timeseries ?? [];
-  const displayRevenueRows = revenueRows.slice(-MAX_TABLE_ROWS);
+  const chartRevenueRows = revenueRows.slice(-MAX_CHART_POINTS);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -133,40 +149,46 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
       {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            title: 'Total Sessions',
-            value: sessions?.summary.total_sessions ?? 0,
-            raw: true,
-            description: 'All photo sessions started, including abandoned ones.',
-          },
-          {
-            title: 'Completion Rate',
-            value: formatPercent(sessions?.summary.completion_rate ?? 0),
-            raw: false,
-            description: 'Sessions that reached the reveal/print stage.',
-          },
-          {
-            title: 'Avg Duration',
-            value: formatDuration(sessions?.summary.avg_duration_seconds ?? 0),
-            raw: false,
-            description: 'Average time from session start to completion.',
-          },
-          {
-            title: 'Revenue',
-            value: formatIDR(revenue?.summary.total_revenue ?? 0),
-            raw: false,
-            description: 'Total confirmed payments received.',
-          },
-        ].map((card) => (
-          <Card key={card.title} className="card-surface border-0" style={{ padding: '1.25rem' }}>
-            <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>{card.title}</p>
-            <p className={`text-2xl font-bold font-display text-white ${card.raw ? 'tabular-nums' : ''}`}>
-              {card.value}
-            </p>
-            <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>{card.description}</p>
-          </Card>
-        ))}
+        <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
+          <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Total Sessions</p>
+          <p className="text-2xl font-bold font-display text-white tabular-nums">
+            {sessions?.summary.total_sessions ?? 0}
+          </p>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>All photo sessions started, including abandoned ones.</p>
+        </Card>
+
+        <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
+          <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Completion Rate</p>
+          <p className="text-2xl font-bold font-display text-white">
+            {formatPercent(sessions?.summary.completion_rate ?? 0)}
+          </p>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>Sessions that reached the reveal/print stage.</p>
+        </Card>
+
+        <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
+          <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Avg Duration</p>
+          <p className="text-2xl font-bold font-display text-white">
+            {formatDuration(sessions?.summary.avg_duration_seconds ?? 0)}
+          </p>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>Average time from session start to completion.</p>
+        </Card>
+
+        <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
+          <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Revenue</p>
+          <p className="text-2xl font-bold font-display text-white">
+            {formatIDR(revenue?.summary.total_revenue ?? 0)}
+          </p>
+          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span className="text-xs text-white/30">
+              <span style={{ color: COLORS.payment }}>Payment:</span>{' '}
+              {formatIDR(revenue?.summary.payment_revenue ?? 0)}
+            </span>
+            <span className="text-xs text-white/30">
+              <span style={{ color: COLORS.access_code }}>Access Code:</span>{' '}
+              {formatIDR(revenue?.summary.access_code_revenue ?? 0)}
+            </span>
+          </div>
+        </Card>
       </div>
 
       {/* Feature Breakdown */}
@@ -203,6 +225,10 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                     <div>
                       <p className="text-xs text-white/30">Revenue</p>
                       <p className="text-sm font-display font-semibold text-white/80">{formatIDR(f.revenue)}</p>
+                      <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.5rem' }}>
+                        <span className="text-xs" style={{ color: COLORS.payment }}>{formatIDR(f.payment_revenue)}</span>
+                        <span className="text-xs" style={{ color: COLORS.access_code }}>{formatIDR(f.access_code_revenue)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -224,71 +250,93 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             </Card>
           )}
 
-          {/* Session History */}
-          {displayRows.length > 0 && (
+          {/* Session History Chart */}
+          {chartSessionRows.length > 0 && (
             <Card className="card-surface border-0">
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Session History</h3>
                 <p className="text-xs text-white/25" style={{ marginBottom: '1rem' }}>
-                  Breakdown of sessions over time. A session counts as abandoned if the user leaves before reaching the reveal stage.
+                  Completed vs abandoned sessions per period.
                 </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/[0.06] hover:bg-transparent">
-                      <TableHead className="text-white/35">Date</TableHead>
-                      <TableHead className="text-white/35 text-right">Sessions</TableHead>
-                      <TableHead className="text-white/35 text-right">Completed</TableHead>
-                      <TableHead className="text-white/35 text-right">Abandoned</TableHead>
-                      <TableHead className="text-white/35 text-right">Avg Duration</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayRows.map((point) => (
-                      <TableRow key={point.period} className="border-white/[0.04] hover:bg-white/[0.02]">
-                        <TableCell className="font-medium text-white/70">{formatPeriod(point.period)}</TableCell>
-                        <TableCell className="text-white/50 text-right tabular-nums">{point.sessions}</TableCell>
-                        <TableCell className="text-white/50 text-right tabular-nums">{point.completed}</TableCell>
-                        <TableCell className="text-white/50 text-right tabular-nums">{point.abandoned}</TableCell>
-                        <TableCell className="text-white/50 text-right">{formatDuration(point.avg_duration_seconds)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {sessionRows.length > MAX_TABLE_ROWS && (
-                  <p className="text-xs text-white/20" style={{ marginTop: '0.75rem' }}>
-                    Showing last {MAX_TABLE_ROWS} of {sessionRows.length} periods.
-                  </p>
-                )}
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartSessionRows}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis
+                        dataKey="period"
+                        tickFormatter={(p: string) => formatPeriod(p)}
+                        stroke="rgba(255,255,255,0.3)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+                      />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.3)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={chartTooltipStyle}
+                        labelFormatter={(p: string) => formatPeriod(p)}
+                      />
+                      <Legend />
+                      <Bar dataKey="completed" name="Completed" stackId="sessions" fill={COLORS.completed} />
+                      <Bar dataKey="abandoned" name="Abandoned" stackId="sessions" fill={COLORS.abandoned} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </Card>
           )}
 
-          {/* Revenue History */}
-          {displayRevenueRows.length > 0 && (
+          {/* Revenue History Chart */}
+          {chartRevenueRows.length > 0 && (
             <Card className="card-surface border-0">
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Revenue History</h3>
                 <p className="text-xs text-white/25" style={{ marginBottom: '1rem' }}>
-                  Confirmed payment transactions over time. Only completed payments are counted.
+                  Revenue breakdown by entry method (payment vs access code).
                 </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/[0.06] hover:bg-transparent">
-                      <TableHead className="text-white/35">Date</TableHead>
-                      <TableHead className="text-white/35 text-right">Revenue</TableHead>
-                      <TableHead className="text-white/35 text-right">Transactions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayRevenueRows.map((point) => (
-                      <TableRow key={point.period} className="border-white/[0.04] hover:bg-white/[0.02]">
-                        <TableCell className="font-medium text-white/70">{formatPeriod(point.period)}</TableCell>
-                        <TableCell className="text-white/50 text-right tabular-nums">{formatIDR(point.revenue)}</TableCell>
-                        <TableCell className="text-white/50 text-right tabular-nums">{point.transactions}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div style={{ width: '100%', height: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartRevenueRows}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis
+                        dataKey="period"
+                        tickFormatter={(p: string) => formatPeriod(p)}
+                        stroke="rgba(255,255,255,0.3)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+                      />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.3)"
+                        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+                        tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={chartTooltipStyle}
+                        labelFormatter={(p: string) => formatPeriod(p)}
+                        formatter={(value: number) => formatIDR(value)}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="payment_revenue"
+                        name="Payment"
+                        stroke={COLORS.payment}
+                        fill={COLORS.payment}
+                        fillOpacity={0.3}
+                        stackId="revenue"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="access_code_revenue"
+                        name="Access Code"
+                        stroke={COLORS.access_code}
+                        fill={COLORS.access_code}
+                        fillOpacity={0.3}
+                        stackId="revenue"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </Card>
           )}

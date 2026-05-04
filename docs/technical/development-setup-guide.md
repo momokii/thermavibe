@@ -166,8 +166,8 @@ Review and edit the `.env` file. The following table describes each variable:
 | Variable | Description | Default (Dev) |
 |----------|-------------|---------------|
 | `PRINTER_ENABLED` | Enable thermal printer support | `true` |
-| `PRINTER_VENDOR_ID` | USB vendor ID (hex with 0x prefix) | `0x04b8` |
-| `PRINTER_PRODUCT_ID` | USB product ID (hex with 0x prefix) | `0x0202` |
+| `PRINTER_VENDOR_ID` | USB vendor ID (hex with 0x prefix) -- only needed if auto-detection fails | `0x04b8` |
+| `PRINTER_PRODUCT_ID` | USB product ID (hex with 0x prefix) -- only needed if auto-detection fails | `0x0202` |
 | `PRINTER_INTERFACE` | USB interface number | `0` |
 | `PRINTER_IN_EP` | USB input endpoint | `0x81` |
 | `PRINTER_OUT_EP` | USB output endpoint | `0x03` |
@@ -497,66 +497,21 @@ This runs backend tests in Docker and frontend tests locally in parallel.
 
 ### Thermal Printer Setup
 
-#### 1. Identify the Printer
+#### 1. Connect and Auto-Detect
 
-Connect the thermal printer via USB and identify its USB vendor ID and product ID:
-
-```bash
-lsusb
-# Look for your printer, e.g.:
-# Bus 001 Device 004: ID 04b8:0202 Seiko Epson Corp. TM-T20II
-# Vendor ID: 04b8, Product ID: 0202
-```
-
-Update the `.env` file:
+Connect the thermal printer via USB. Run the startup script:
 
 ```bash
-PRINTER_VENDOR_ID=0x04b8
-PRINTER_PRODUCT_ID=0x0202
+./scripts/start-docker.sh dev
 ```
 
-#### 2. Configure udev Rules (Linux)
+The printer is auto-detected on startup via pyusb USB device enumeration. The startup script handles USB permissions automatically by installing a broad udev rule that covers all USB devices. No manual `lsusb`, `.env` editing, or per-device udev rule creation is needed.
 
-Create a udev rule to give the Docker user read/write access to the printer without running as root:
+Printers can be connected or disconnected at any time without restart. A background hot-plug scanner checks for newly connected printers every 30 seconds.
 
-```bash
-sudo tee /etc/udev/rules.d/99-thermavibe-printer.rules << 'EOF'
-# VibePrint OS thermal printer
-SUBSYSTEM=="usb", ATTR{idVendor}=="04b8", ATTR{idProduct}=="0202", MODE="0666"
-EOF
+#### 2. Test the Printer
 
-# Reload udev rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-
-# Verify permissions
-ls -la /dev/bus/usb/001/004
-# Should show crw-rw-rw- (world readable/writable)
-```
-
-#### 3. Pass USB Device to Docker Container
-
-Update `docker-compose.yml` (or `docker-compose.dev.yml`) to pass the printer device:
-
-```yaml
-services:
-  app:
-    devices:
-      - /dev/bus/usb/001/004:/dev/bus/usb/001/004
-```
-
-For a more robust approach, use the udev symlink:
-
-```yaml
-services:
-  app:
-    devices:
-      - /dev/thermavibe-printer:/dev/thermavibe-printer
-```
-
-#### 4. Test the Printer
-
-Use the admin API to print a test receipt:
+Use the admin API to print a test receipt and verify the printer is working:
 
 ```bash
 # First, log in to get an admin token
@@ -566,16 +521,16 @@ curl -X POST http://localhost:8000/api/v1/admin/login \
 # Response: {"token": "eyJ..."}
 
 # Then, print a test receipt
-curl -X POST http://localhost:8000/api/v1/print/test \
+curl -X POST http://localhost:8000/api/v1/printer/test \
   -H "Authorization: Bearer eyJ..."
 ```
 
 Alternatively, use the Swagger UI at http://localhost:8000/docs to test interactively.
 
-#### 5. Check Printer Status
+#### 3. Check Printer Status
 
 ```bash
-curl -X GET http://localhost:8000/api/v1/print/status \
+curl -X GET http://localhost:8000/api/v1/printer/status \
   -H "Authorization: Bearer eyJ..."
 # Response: {"connected": true, "vendor": "Epson", "model": "TM-T20II"}
 ```

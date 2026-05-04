@@ -95,6 +95,8 @@ def _reset_printer_state():
 class TestGetPrinterStatus:
     """Tests for get_printer_status()."""
 
+    @patch('app.services.printer_service._active_product_id', '0x0e15')
+    @patch('app.services.printer_service._active_vendor_id', '0x04b8')
     @patch('app.services.printer_service._get_printer')
     def test_connected_printer(self, mock_get_printer):
         """When printer is connected, response has connected=True and printer info."""
@@ -322,3 +324,350 @@ class TestWrapText:
         """Empty string returns empty string."""
         result = _wrap_text('')
         assert result == ''
+
+
+# ---------------------------------------------------------------------------
+# Helpers for USB mock devices
+# ---------------------------------------------------------------------------
+
+
+def _make_usb_device(
+    vendor_id: int,
+    product_id: int,
+    device_class: int = 0,
+    manufacturer: str = '',
+    product: str = '',
+    has_printer_interface: bool = False,
+) -> MagicMock:
+    """Build a mock USB device object with realistic attributes.
+
+    Args:
+        vendor_id: USB vendor ID as integer (e.g. 0x04b8).
+        product_id: USB product ID as integer.
+        device_class: bDeviceClass value (0 = per-interface, 7 = printer).
+        manufacturer: USB manufacturer string descriptor.
+        product: USB product string descriptor.
+        has_printer_interface: If True, iterating configs yields an interface
+            with bInterfaceClass == USB_CLASS_PRINTER.
+    """
+    dev = MagicMock()
+    dev.idVendor = vendor_id
+    dev.idProduct = product_id
+    dev.bDeviceClass = device_class
+    dev.manufacturer = manufacturer
+    dev.product = product
+
+    if has_printer_interface:
+        iface = MagicMock()
+        iface.bInterfaceClass = 0x07  # USB_CLASS_PRINTER
+        cfg = MagicMock()
+        # Iterating over cfg yields interfaces; iterating over dev yields configs
+        cfg.__iter__ = MagicMock(return_value=iter([iface]))
+        dev.__iter__ = MagicMock(return_value=iter([cfg]))
+    else:
+        # No interfaces — iterating over configs raises or yields nothing useful
+        dev.__iter__ = MagicMock(return_value=iter([]))
+
+    return dev
+
+
+# ---------------------------------------------------------------------------
+# discover_usb_printers
+# ---------------------------------------------------------------------------
+
+
+class TestDiscoverUsbPrinters:
+    """Tests for discover_usb_printers().
+
+    Uses unittest.mock.patch to mock usb.core.find so no real USB hardware
+    is required.
+    """
+
+    @patch('usb.core.find')
+    def test_finds_known_vendor_device(self, mock_find):
+        """Device with VID in THERMAL_PRINTER_VENDORS is detected with medium confidence."""
+        from app.services.printer_service import (
+            THERMAL_PRINTER_VENDORS,
+            discover_usb_printers,
+        )
+
+        # Epson VID 0x04b8 is in THERMAL_PRINTER_VENDORS
+        dev = _make_usb_device(
+            vendor_id=0x04B8,
+            product_id=0x0E15,
+            device_class=0,
+            manufacturer='Epson',
+            product='TM-T20III',
+        )
+        mock_find.return_value = iter([dev])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.vendor_id == '0x04b8'
+        assert r.product_id == '0x0e15'
+        assert r.confidence == 'medium'
+        assert r.vendor_name == 'Epson'
+        assert r.chip_type == 'native'
+
+    @patch('usb.core.find')
+    def test_finds_printer_class_device(self, mock_find):
+        """USB device with bDeviceClass 7 (printer) is detected with high confidence."""
+        from app.services.printer_service import discover_usb_printers
+
+        dev = _make_usb_device(
+            vendor_id=0x9999,
+            product_id=0x0001,
+            device_class=0x07,
+            manufacturer='Acme',
+            product='Thermal Printer',
+        )
+        mock_find.return_value = iter([dev])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+        assert results[0].confidence == 'high'
+        assert results[0].usb_class == 0x07
+        assert results[0].chip_type == 'native'
+
+    @patch('usb.core.find')
+    def test_finds_ics_advent_bridge(self, mock_find):
+        """ICS Advent (0fe6) USB-parallel bridge is detected as medium confidence."""
+        from app.services.printer_service import discover_usb_printers
+
+        dev = _make_usb_device(
+            vendor_id=0x0FE6,
+            product_id=0x0011,
+            device_class=0,
+            manufacturer='ICS Advent',
+            product='USB-Parallel Bridge',
+        )
+        mock_find.return_value = iter([dev])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+        r = results[0]
+        assert r.vendor_id == '0x0fe6'
+        assert r.vendor_name == 'ICS Advent'
+        assert r.chip_type == 'usb_parallel'
+        assert r.confidence == 'medium'
+
+    @patch('usb.core.find')
+    def test_no_usb_devices_returns_empty(self, mock_find):
+        """When no USB devices are found, returns an empty list."""
+        from app.services.printer_service import discover_usb_printers
+
+        mock_find.return_value = iter([])
+
+        results = discover_usb_printers()
+
+        assert results == []
+
+    @patch('usb.core.find')
+    def test_filters_non_printer_devices(self, mock_find):
+        """Non-printer devices (keyboard, hub) are excluded from results."""
+        from app.services.printer_service import discover_usb_printers
+
+        keyboard = _make_usb_device(
+            vendor_id=0x046D,
+            product_id=0xC52B,
+            device_class=0,
+            manufacturer='Logitech',
+            product='USB Keyboard',
+        )
+        hub = _make_usb_device(
+            vendor_id=0x1D6B,
+            product_id=0x0002,
+            device_class=0x09,  # USB_CLASS_HUB
+            manufacturer='Linux Foundation',
+            product='USB 2.0 Hub',
+        )
+        mock_find.return_value = iter([keyboard, hub])
+
+        results = discover_usb_printers()
+
+        assert results == []
+
+    @patch('usb.core.find')
+    def test_interface_level_printer_class(self, mock_find):
+        """Device with printer class at interface level (not device level) is high confidence."""
+        from app.services.printer_service import discover_usb_printers
+
+        dev = _make_usb_device(
+            vendor_id=0xAAAA,
+            product_id=0xBBBB,
+            device_class=0,  # per-interface class
+            manufacturer='Generic',
+            product='POS Printer',
+            has_printer_interface=True,
+        )
+        mock_find.return_value = iter([dev])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+        assert results[0].confidence == 'high'
+        assert results[0].usb_class == 0x07
+
+    @patch('usb.core.find')
+    def test_keyword_match_gives_low_confidence(self, mock_find):
+        """Device with 'thermal' in product name but unknown VID gets low confidence."""
+        from app.services.printer_service import discover_usb_printers
+
+        dev = _make_usb_device(
+            vendor_id=0xDEAD,
+            product_id=0xBEEF,
+            device_class=0,
+            manufacturer='Unknown Corp',
+            product='Thermal Receipt Printer',
+        )
+        mock_find.return_value = iter([dev])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+        assert results[0].confidence == 'low'
+        assert results[0].chip_type == 'unknown'
+
+    @patch('usb.core.find')
+    def test_duplicate_vid_pid_deduplicated(self, mock_find):
+        """Two devices with the same VID:PID are deduplicated."""
+        from app.services.printer_service import discover_usb_printers
+
+        dev1 = _make_usb_device(
+            vendor_id=0x04B8,
+            product_id=0x0E15,
+            device_class=0x07,
+            manufacturer='Epson',
+            product='TM-T20III',
+        )
+        dev2 = _make_usb_device(
+            vendor_id=0x04B8,
+            product_id=0x0E15,
+            device_class=0x07,
+            manufacturer='Epson',
+            product='TM-T20III',
+        )
+        mock_find.return_value = iter([dev1, dev2])
+
+        results = discover_usb_printers()
+
+        assert len(results) == 1
+
+    @patch('usb.core.find')
+    def test_usb_scan_exception_returns_empty(self, mock_find):
+        """If usb.core.find raises an exception, returns empty list safely."""
+        from app.services.printer_service import discover_usb_printers
+
+        mock_find.side_effect = Exception('USB subsystem error')
+
+        results = discover_usb_printers()
+
+        assert results == []
+
+
+# ---------------------------------------------------------------------------
+# auto_select_printer
+# ---------------------------------------------------------------------------
+
+
+class TestAutoSelectPrinter:
+    """Tests for auto_select_printer().
+
+    Mocks discover_usb_printers so no USB hardware or pyusb is needed.
+    """
+
+    @patch('app.services.printer_service.discover_usb_printers')
+    @patch('app.services.printer_service.get_printer_status')
+    def test_single_printer_auto_selected(self, mock_get_status, mock_discover):
+        """When exactly one printer is found, it is auto-selected."""
+        from app.services.printer_service import DiscoveredPrinter, auto_select_printer
+
+        candidate = DiscoveredPrinter(
+            vendor_id='0x04b8',
+            product_id='0x0e15',
+            vendor_name='Epson',
+            product_name='TM-T20III',
+            chip_type='native',
+            usb_class=0x07,
+            confidence='high',
+        )
+        mock_discover.return_value = [candidate]
+
+        fake_status = MagicMock()
+        mock_get_status.return_value = fake_status
+
+        result = auto_select_printer()
+
+        assert result is fake_status
+        mock_get_status.assert_called_once()
+
+    @patch('app.services.printer_service.discover_usb_printers')
+    def test_no_printers_returns_none(self, mock_discover):
+        """When no printers are found, returns None."""
+        from app.services.printer_service import auto_select_printer
+
+        mock_discover.return_value = []
+
+        result = auto_select_printer()
+
+        assert result is None
+
+    @patch('app.services.printer_service.discover_usb_printers')
+    def test_multiple_printers_returns_none(self, mock_discover):
+        """When multiple printers are found, returns None (admin must choose)."""
+        from app.services.printer_service import DiscoveredPrinter, auto_select_printer
+
+        printers = [
+            DiscoveredPrinter(
+                vendor_id='0x04b8',
+                product_id='0x0e15',
+                vendor_name='Epson',
+                product_name='TM-T20III',
+                chip_type='native',
+                usb_class=0x07,
+                confidence='high',
+            ),
+            DiscoveredPrinter(
+                vendor_id='0x0fe6',
+                product_id='0x0011',
+                vendor_name='ICS Advent',
+                product_name='USB-Parallel Bridge',
+                chip_type='usb_parallel',
+                usb_class=0,
+                confidence='medium',
+            ),
+        ]
+        mock_discover.return_value = printers
+
+        result = auto_select_printer()
+
+        assert result is None
+
+    @patch('app.services.printer_service.discover_usb_printers')
+    @patch('app.services.printer_service.get_printer_status')
+    def test_prefers_higher_confidence(self, mock_get_status, mock_discover):
+        """When exactly one printer exists, confidence sorting does not matter."""
+        from app.services.printer_service import DiscoveredPrinter, auto_select_printer
+
+        # Single medium-confidence printer should still be auto-selected
+        candidate = DiscoveredPrinter(
+            vendor_id='0x0fe6',
+            product_id='0x0011',
+            vendor_name='ICS Advent',
+            product_name='USB-Parallel Bridge',
+            chip_type='usb_parallel',
+            usb_class=0,
+            confidence='medium',
+        )
+        mock_discover.return_value = [candidate]
+
+        fake_status = MagicMock()
+        mock_get_status.return_value = fake_status
+
+        result = auto_select_printer()
+
+        assert result is fake_status

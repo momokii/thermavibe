@@ -37,7 +37,7 @@ class PrintHardwareStatus(BaseModel):
 
 
 class PrintTestResponse(BaseModel):
-    """Response for POST /api/v1/print/test."""
+    """Response for POST /api/v1/printer/test."""
 
     success: bool
     message: str
@@ -45,7 +45,7 @@ class PrintTestResponse(BaseModel):
 
 
 class PrintStatusResponse(BaseModel):
-    """Response for GET /api/v1/print/status."""
+    """Response for GET /api/v1/printer/status."""
 
     connected: bool
     printer: PrinterInfo | None = None

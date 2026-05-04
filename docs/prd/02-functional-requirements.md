@@ -189,13 +189,13 @@ The admin dashboard is a web-based interface accessible from any device on the l
 **Description:** The admin dashboard provides operators with analytics on kiosk usage, revenue, session completion rates, and hardware health over configurable time ranges.
 
 **Acceptance Criteria:**
-- The dashboard displays a summary of key metrics for the current day: total sessions, completed sessions, failed sessions, total revenue, average session duration.
-- The operator can select a date range (today, last 7 days, last 30 days, custom range) for all analytics views.
-- A line chart shows sessions per day over the selected range, with separate lines for completed and failed sessions.
-- A bar chart shows revenue per day over the selected range.
-- A pie chart shows session outcome distribution (completed, payment timeout, AI failure, printer failure, user abandonment).
+- The dashboard displays a summary of key metrics for the current day: total sessions, completed sessions, failed sessions, total revenue (split by payment and access code), average session duration.
+- The operator can select a date range (last 7 days, last 30 days, last 90 days, all time) for all analytics views.
+- A stacked bar chart shows sessions per period over the selected range, with completed (green) and abandoned (red) sessions.
+- A stacked area chart shows revenue per period over the selected range, with separate areas for payment revenue and access code revenue.
 - The dashboard calculates and displays the session completion rate (completed sessions / total started sessions) as a percentage.
 - The dashboard calculates and displays the average end-to-end session duration (touch to print).
+- Revenue breakdown shows payment (QRIS/cashless) vs access code entry methods in the summary card, charts, and feature breakdown.
 - Analytics data is stored in the PostgreSQL database and persists across system restarts.
 - All analytics views are exportable as CSV for external analysis.
 
@@ -407,6 +407,23 @@ The AI engine handles communication with AI providers, including image compressi
 ## Module 5: Thermal Printer (FR-PRINT)
 
 The printer module handles all interaction with the ESC/POS-compatible thermal printer, including image dithering, text formatting, print job construction, and hardware communication. It is implemented using the python-escpos library.
+
+### FR-PRINT-000: Printer Auto-Detection and Hot-Plug
+
+**Description:** The printer module automatically discovers thermal printers on system startup without requiring manual configuration of vendor IDs or product IDs. A background scanner monitors for newly connected printers and reconnects automatically after disconnection.
+
+**Acceptance Criteria:**
+- On startup, the system automatically detects connected ESC/POS-compatible thermal printers via pyusb USB device enumeration.
+- Detection uses a three-tier strategy: (1) USB printer class matching, (2) known ESC/POS vendor IDs, (3) keyword matching on device descriptions.
+- No manual `lsusb`, `.env` editing, or per-device udev rule creation is required.
+- A background scanner checks for newly connected printers at 30-second intervals (hot-plug support).
+- When a printer is disconnected during operation, the system detects the disconnection and marks the printer as offline.
+- When a previously disconnected printer is reconnected, the system auto-reconnects within 30 seconds without requiring a restart.
+- If auto-detection fails, the operator can still manually specify a printer via the admin dashboard (`POST /api/v1/printer/select`).
+
+**Priority:** P0
+
+---
 
 ### FR-PRINT-001: Image Dithering
 
@@ -696,8 +713,9 @@ The admin gallery allows operators to browse, view, and download session results
 
 **Acceptance Criteria:**
 - A Feature Breakdown card shows side-by-side comparison of both features.
-- Metrics per feature include: total sessions, completion rate, average duration, revenue.
+- Metrics per feature include: total sessions, completion rate, average duration, revenue (split by payment and access code).
 - The breakdown is visible on both the main dashboard (summary) and the full analytics page.
+- Revenue per feature shows separate amounts for payment (QRIS/cashless) and access code entry methods.
 - State distribution includes labels for all states including photobooth-specific ones (Frame Select, Arrange, Compositing, Photobooth Reveal).
 
 **Priority:** P1

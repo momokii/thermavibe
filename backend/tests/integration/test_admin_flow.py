@@ -18,9 +18,11 @@ from app.main import app
 from app.schemas.admin import (
     ConfigAllResponse,
     ConfigUpdateResponse,
+    EntryMethodStats,
     HardwareStatusResponse,
     LoginResponse,
     RevenueAnalyticsResponse,
+    RevenueAnalyticsSummary,
     SessionAnalyticsResponse,
 )
 from app.schemas.print import PrintStatusResponse, PrintTestResponse
@@ -226,16 +228,16 @@ async def test_session_analytics_with_auth_returns_200(client: AsyncClient, auth
 async def test_revenue_analytics_with_auth_returns_200(client: AsyncClient, auth_headers: dict[str, str]):
     """GET /api/v1/admin/analytics/revenue with auth returns revenue analytics."""
     mock_response = RevenueAnalyticsResponse(
-        summary={
-            'total_revenue': 425000,
-            'total_transactions': 85,
-            'avg_transaction_amount': 5000,
-            'currency': 'IDR',
-            'refund_count': 2,
-            'refund_total': 10000,
-        },
+        summary=RevenueAnalyticsSummary(
+            total_revenue=425000,
+            total_transactions=85,
+            avg_transaction_amount=5000,
+            currency='IDR',
+            refund_count=2,
+            refund_total=10000,
+        ),
         timeseries=[],
-        by_provider={'mock': {'transactions': 85, 'revenue': 425000, 'success_rate': 100.0}},
+        by_entry_method={'payment': EntryMethodStats(transactions=85, revenue=425000)},
     )
 
     with patch('app.api.v1.endpoints.admin.analytics_service') as analytics_svc:
@@ -249,7 +251,7 @@ async def test_revenue_analytics_with_auth_returns_200(client: AsyncClient, auth
     assert data['summary']['total_revenue'] == 425000
     assert data['summary']['total_transactions'] == 85
     assert 'timeseries' in data
-    assert 'by_provider' in data
+    assert 'by_entry_method' in data
 
 
 @pytest.mark.asyncio
@@ -376,7 +378,7 @@ async def test_test_printer_admin_offline(client: AsyncClient, auth_headers: dic
 
 @pytest.mark.asyncio
 async def test_print_status_with_auth_returns_200(client: AsyncClient, auth_headers: dict[str, str]):
-    """GET /api/v1/print/status with auth returns printer status."""
+    """GET /api/v1/printer/status with auth returns printer status."""
     mock_status = PrintStatusResponse(
         connected=False,
         printer=None,
@@ -386,7 +388,7 @@ async def test_print_status_with_auth_returns_200(client: AsyncClient, auth_head
     )
 
     with patch('app.api.v1.endpoints.printer.get_printer_status', return_value=mock_status):
-        resp = await client.get('/api/v1/print/status', headers=auth_headers)
+        resp = await client.get('/api/v1/printer/status', headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -395,15 +397,15 @@ async def test_print_status_with_auth_returns_200(client: AsyncClient, auth_head
 
 @pytest.mark.asyncio
 async def test_print_status_without_auth_returns_401_or_403(client: AsyncClient):
-    """GET /api/v1/print/status without auth returns 401 or 403."""
-    resp = await client.get('/api/v1/print/status')
+    """GET /api/v1/printer/status without auth returns 401 or 403."""
+    resp = await client.get('/api/v1/printer/status')
 
     assert resp.status_code in (401, 403)
 
 
 @pytest.mark.asyncio
 async def test_print_test_with_auth_returns_200(client: AsyncClient, auth_headers: dict[str, str]):
-    """POST /api/v1/print/test with auth returns test print result."""
+    """POST /api/v1/printer/test with auth returns test print result."""
     mock_result = PrintTestResponse(
         success=True,
         message='Test print sent successfully',
@@ -411,7 +413,7 @@ async def test_print_test_with_auth_returns_200(client: AsyncClient, auth_header
     )
 
     with patch('app.api.v1.endpoints.printer.print_test_page', return_value=mock_result):
-        resp = await client.post('/api/v1/print/test', headers=auth_headers)
+        resp = await client.post('/api/v1/printer/test', headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -420,15 +422,15 @@ async def test_print_test_with_auth_returns_200(client: AsyncClient, auth_header
 
 @pytest.mark.asyncio
 async def test_print_test_without_auth_returns_401_or_403(client: AsyncClient):
-    """POST /api/v1/print/test without auth returns 401 or 403."""
-    resp = await client.post('/api/v1/print/test')
+    """POST /api/v1/printer/test without auth returns 401 or 403."""
+    resp = await client.post('/api/v1/printer/test')
 
     assert resp.status_code in (401, 403)
 
 
 @pytest.mark.asyncio
 async def test_print_status_connected(client: AsyncClient, auth_headers: dict[str, str]):
-    """GET /api/v1/print/status returns printer info when connected."""
+    """GET /api/v1/printer/status returns printer info when connected."""
     from app.schemas.print import PrinterInfo, PrintHardwareStatus
 
     mock_status = PrintStatusResponse(
@@ -448,7 +450,7 @@ async def test_print_status_connected(client: AsyncClient, auth_headers: dict[st
     )
 
     with patch('app.api.v1.endpoints.printer.get_printer_status', return_value=mock_status):
-        resp = await client.get('/api/v1/print/status', headers=auth_headers)
+        resp = await client.get('/api/v1/printer/status', headers=auth_headers)
 
     assert resp.status_code == 200
     data = resp.json()

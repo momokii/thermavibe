@@ -301,7 +301,9 @@ ls -la /dev/bus/usb/001/004
 # crw-rw-rw-+ 1 root root 189, 387 Jun 15 10:00 /dev/bus/usb/001/004
 ```
 
-### Step 2: Create Persistent udev Rules
+### Step 2: Create Persistent udev Rules (Optional)
+
+> **Note:** The `start-docker.sh` launcher script automatically installs a broad udev rule (`SUBSYSTEM=="usb", MODE="0666"`) and blacklists the `usblp` kernel module. This step is **not required** for basic plug-and-play operation. It is only needed for advanced setups requiring stable device symlinks or multi-kiosk deployments.
 
 USB device bus paths (`/dev/bus/usb/001/004`) change when devices are unplugged and reconnected. Create udev rules that create stable symlinks based on vendor and product IDs:
 
@@ -826,9 +828,9 @@ cp /etc/udev/rules.d/99-thermavibe.rules /opt/thermavibe/backups/udev_rules_$(da
 ### Printer Not Found in Container
 
 **Symptoms:**
-- `POST /api/v1/print/status` returns `connected: false`
+- `POST /api/v1/printer/status` returns `connected: false`
 - Backend logs show `USB device not found`
-- `POST /api/v1/print/test` returns 503 PRINTER_ERROR
+- `POST /api/v1/printer/test` returns 503 PRINTER_ERROR
 
 **Diagnosis:**
 

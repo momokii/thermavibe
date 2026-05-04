@@ -268,6 +268,10 @@ export interface RevenueAnalyticsSummary {
   currency: string;
   refund_count: number;
   refund_total: number;
+  payment_revenue: number;
+  payment_transactions: number;
+  access_code_revenue: number;
+  access_code_transactions: number;
 }
 
 export interface RevenueTimeseriesPoint {
@@ -275,18 +279,21 @@ export interface RevenueTimeseriesPoint {
   revenue: number;
   transactions: number;
   refunds: number;
+  payment_revenue: number;
+  payment_transactions: number;
+  access_code_revenue: number;
+  access_code_transactions: number;
 }
 
-export interface ProviderRevenueStats {
+export interface EntryMethodStats {
   transactions: number;
   revenue: number;
-  success_rate: number;
 }
 
 export interface RevenueAnalyticsResponse {
   summary: RevenueAnalyticsSummary;
   timeseries: RevenueTimeseriesPoint[];
-  by_provider: Record<string, ProviderRevenueStats>;
+  by_entry_method: Record<string, EntryMethodStats>;
 }
 
 // --- Feature Breakdown ---
@@ -299,6 +306,8 @@ export interface FeatureBreakdownItem {
   completion_rate: number;
   avg_duration_seconds: number;
   revenue: number;
+  payment_revenue: number;
+  access_code_revenue: number;
 }
 
 export interface FeatureBreakdownResponse {
