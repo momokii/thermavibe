@@ -193,7 +193,7 @@ async def test_print_receipt_no_ai_text(client: AsyncClient, sample_session_id: 
 
 @pytest.mark.asyncio
 async def test_print_receipt_printer_failure(client: AsyncClient, sample_session_id: uuid.UUID):
-    """POST /api/v1/kiosk/session/{id}/print returns failure message on printer error."""
+    """POST /api/v1/kiosk/session/{id}/print returns 502 on printer error."""
     mock_session = _make_mock_session(
         session_id=sample_session_id,
         state=KioskState.REVEAL,
@@ -208,9 +208,8 @@ async def test_print_receipt_printer_failure(client: AsyncClient, sample_session
 
         resp = await client.post(f'/api/v1/kiosk/session/{sample_session_id}/print')
 
-    assert resp.status_code == 200
-    data = resp.json()
-    assert 'Print failed' in data['message']
+    assert resp.status_code == 502
+    assert 'Print failed' in resp.json()['detail']
 
 
 @pytest.mark.asyncio

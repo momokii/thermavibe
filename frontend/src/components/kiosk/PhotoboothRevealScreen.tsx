@@ -8,9 +8,10 @@ import { REVEAL_DURATION_SECONDS } from '@/lib/constants';
 export default function PhotoboothRevealScreen() {
   const sessionId = useKioskStore((s) => s.sessionId);
   const photoboothCompositeUrl = useKioskStore((s) => s.photoboothCompositeUrl);
-  const { printStrip, getShareUrl, shareData, shareError, isSharing, finishPhotobooth } = usePhotoboothState();
+  const { printStrip, getShareUrl, shareData, shareError, isSharing, isPrinting, printError, finishPhotobooth } = usePhotoboothState();
 
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [printed, setPrinted] = useState(false);
 
   // Timer state
   const [timeLeft, setTimeLeft] = useState(REVEAL_DURATION_SECONDS);
@@ -24,12 +25,16 @@ export default function PhotoboothRevealScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-print after 1.5s
+  // Auto-print after composite loads
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const timer = setTimeout(() => printStrip(), 1500);
+    if (!sessionId) return;
+    const timer = setTimeout(() => {
+      printStrip();
+      setPrinted(true);
+    }, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [sessionId]);
 
   // Generate share URL
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,7 +57,10 @@ export default function PhotoboothRevealScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handlePrintAgain = () => printStrip();
+  const handlePrintAgain = () => {
+    printStrip();
+    setPrinted(true);
+  };
   const handleStartOver = () => finishPhotobooth();
 
   const compositeSrc = photoboothCompositeUrl || (sessionId ? `/api/v1/kiosk/session/${sessionId}/photobooth/composite` : null);
@@ -166,9 +174,14 @@ export default function PhotoboothRevealScreen() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handlePrintAgain}
-            className="flex-1 py-4 rounded-xl text-white/70 text-lg font-display font-semibold transition-all duration-150 btn-secondary"
+            disabled={isPrinting}
+            className={`flex-1 py-4 rounded-xl text-lg font-display font-semibold transition-all duration-150 ${
+              isPrinting
+                ? 'text-white/40 btn-secondary opacity-60'
+                : 'text-white/70 btn-secondary'
+            }`}
           >
-            Print Again
+            {isPrinting ? 'Printing...' : 'Print Again'}
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
@@ -189,7 +202,10 @@ export default function PhotoboothRevealScreen() {
         }}
       >
         <p className="text-base text-white/70 font-display font-semibold">
-          Your strip is printing...
+          {printError ? 'Print failed — tap Print Again to retry'
+            : isPrinting ? 'Your strip is printing...'
+            : printed ? 'Print sent!'
+            : 'Preparing print...'}
         </p>
         <p className="text-sm text-white/40 mt-1">
           Tap anywhere to continue

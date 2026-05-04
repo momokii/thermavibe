@@ -442,7 +442,7 @@ async def print_receipt(
         )
         return SuccessMessage(message=result.get('message', 'Print sent'))
     except Exception as exc:
-        return SuccessMessage(message=f'Print failed: {exc}')
+        raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
 
 
 @router.post('/session/{session_id}/finish', response_model=SessionFinishResponse)
@@ -656,7 +656,7 @@ async def photobooth_print(
         result = print_photobooth_strip(session.composite_image_path)
         return SuccessMessage(message=result.get('message', 'Print sent'))
     except Exception as exc:
-        return SuccessMessage(message=f'Print failed: {exc}')
+        raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
 
 
 @router.post('/session/{session_id}/photobooth/retake', response_model=SessionResponse)

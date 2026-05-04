@@ -234,6 +234,7 @@ export function usePhotoboothState() {
     isArranging: arrangeMutation.isPending,
     arrangeError: arrangeMutation.error?.message ?? null,
     isPrinting: printMutation.isPending,
+    printError: printMutation.error?.message ?? null,
     isSharing: shareMutation.isPending,
     shareError: shareMutation.error?.message ?? null,
     shareData: (shareMutation.data as { data: ShareResponse } | undefined)?.data ?? null,
