@@ -228,8 +228,13 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
     Some USB printer chips (0fe6, 067b, etc.) get claimed by the Linux
     usblp kernel module or CUPS. We detach the kernel driver from each
     interface before python-escpos tries to claim them.
+
+    We also perform a USB device reset to release any stale usbfs handles
+    that would cause "Resource busy" errors when Usb() tries to claim
+    the interface internally.
     """
     import usb.core
+    import usb.util
 
     from escpos.printer import Usb
 
@@ -246,6 +251,44 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
                         dev.detach_kernel_driver(iface.bInterfaceNumber)
                     except Exception:
                         pass
+    except Exception:
+        pass
+
+    # Release any stale usbfs/libusb handles on the device
+    try:
+        usb.util.dispose_resources(dev)
+    except Exception:
+        pass
+
+    # Reset the device to clear any leftover claims from previous handles
+    try:
+        dev.reset()
+    except Exception:
+        pass
+
+    # Small delay to let the device re-enumerate after reset
+    import time
+    time.sleep(0.3)
+
+    # Re-find the device after reset (old handle is invalid)
+    dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+    if dev is None:
+        raise PrinterOfflineError()
+
+    # Detach kernel driver again in case reset re-triggered auto-binding
+    try:
+        for cfg in dev:
+            for iface in cfg:
+                if dev.is_kernel_driver_active(iface.bInterfaceNumber):
+                    try:
+                        dev.detach_kernel_driver(iface.bInterfaceNumber)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    try:
+        usb.util.dispose_resources(dev)
     except Exception:
         pass
 
