@@ -519,7 +519,7 @@ def _dither_image(image_bytes: bytes, width: int = 384) -> Image.Image:
     aspect = img.height / img.width
     new_height = int(width * aspect)
     img = img.resize((width, new_height), Image.Resampling.LANCZOS)
-    img = img.convert('1', method=Image.Dither.FLOYDSTEINBERG)
+    img = img.convert('1')
     return img
 
 
