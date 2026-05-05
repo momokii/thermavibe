@@ -222,11 +222,14 @@ def auto_select_printer() -> PrintStatusResponse | None:
 
 
 def _connect_usb_printer(vendor_id: int, product_id: int):
-    """Create a python-escpos Usb printer, detaching kernel drivers if needed.
+    """Create a python-escpos Usb printer.
 
-    Since discover_usb_printers() uses sysfs (no USB handles opened),
-    the device should be free of stale usbfs claims when we reach here.
+    Resets the device to clear any usbfs claims, then lets Usb() open
+    a fresh handle to the re-enumerated device. Discovery uses sysfs so
+    the reset won't break future discovery scans.
     """
+    import time
+
     import usb.core
 
     from escpos.printer import Usb
@@ -246,6 +249,14 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
                         pass
     except Exception:
         pass
+
+    # Reset to clear usbfs claims, then wait for re-enumeration.
+    # Usb() will do its own fresh usb.core.find() internally.
+    try:
+        dev.reset()
+    except Exception:
+        pass
+    time.sleep(1.0)
 
     return Usb(vendor_id, product_id)
 
