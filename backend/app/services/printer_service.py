@@ -232,10 +232,13 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
     """Create a python-escpos Usb printer, detaching kernel drivers if needed.
 
     Some USB printer chips (0fe6, 067b, etc.) get claimed by the Linux
-    usblp kernel module or CUPS. We detach the kernel driver from each
-    interface before python-escpos tries to claim them.
+    usblp kernel module or usbfs. We reset the device to clear any stale
+    kernel-level claims, then create the Usb printer instance.
     """
+    import time
+
     import usb.core
+    import usb.util
 
     from escpos.printer import Usb
 
@@ -254,6 +257,38 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
                         pass
     except Exception:
         pass
+
+    # Reset the device to clear usbfs claims at the kernel level.
+    # Without this, set_configuration() inside Usb() gets "Resource busy".
+    try:
+        dev.reset()
+    except Exception:
+        pass
+
+    # Release our handle — the reset invalidated it
+    usb.util.dispose_resources(dev)
+
+    # Wait for the device to re-enumerate after reset
+    time.sleep(1.0)
+
+    # Verify device is back after reset
+    dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+    if dev is None:
+        raise PrinterOfflineError()
+
+    # Detach kernel driver again (reset may re-trigger auto-binding)
+    try:
+        for cfg in dev:
+            for iface in cfg:
+                if dev.is_kernel_driver_active(iface.bInterfaceNumber):
+                    try:
+                        dev.detach_kernel_driver(iface.bInterfaceNumber)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    usb.util.dispose_resources(dev)
 
     return Usb(vendor_id, product_id)
 
