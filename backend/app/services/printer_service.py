@@ -70,8 +70,21 @@ class DiscoveredPrinter:
     confidence: str  # "high" (class match), "medium" (vendor match), "low" (keyword match)
 
 
+def _read_sysfs(path: str) -> str:
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except Exception:
+        return ''
+
+
 def discover_usb_printers() -> list[DiscoveredPrinter]:
-    """Scan all USB devices and return candidates that look like thermal printers.
+    """Scan USB devices via sysfs (no USB handles opened).
+
+    Uses /sys/bus/usb/devices/ to read vendor/product IDs without
+    opening any USB handles. This avoids usbfs claims that block
+    python-escpos from connecting, and works reliably for hot-plug
+    detection in long-running processes.
 
     Detection strategy (in priority order):
     1. USB class 7 (printer class) devices
@@ -81,64 +94,54 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
     Returns:
         List of DiscoveredPrinter instances with connection details.
     """
-    import usb.core
+    import glob
 
     candidates: list[DiscoveredPrinter] = []
-    seen: set[tuple[int, int]] = set()
+    seen: set[tuple[str, str]] = set()
 
-    try:
-        devices = usb.core.find(find_all=True)
-    except Exception as exc:
-        logger.warning('usb_scan_failed', error=str(exc))
-        return []
+    for dev_path in glob.glob('/sys/bus/usb/devices/*/idVendor'):
+        vid_str = _read_sysfs(dev_path)
+        if not vid_str:
+            continue
 
-    for dev in devices:
-        vid_pid = (dev.idVendor, dev.idProduct)
+        dev_dir = dev_path.rsplit('/', 1)[0]
+        pid_str = _read_sysfs(f'{dev_dir}/idProduct')
+        dev_class = _read_sysfs(f'{dev_dir}/bDeviceClass')
+        manufacturer = _read_sysfs(f'{dev_dir}/manufacturer')
+        product_name = _read_sysfs(f'{dev_dir}/product')
+
+        vid_pid = (vid_str, pid_str)
         if vid_pid in seen:
             continue
         seen.add(vid_pid)
 
-        vid_hex = f'0x{dev.idVendor:04x}'
-        pid_hex = f'0x{dev.idProduct:04x}'
-        vid_str = f'{dev.idVendor:04x}'
+        vid_hex = f'0x{vid_str}'
+        pid_hex = f'0x{pid_str}'
 
-        # Get manufacturer/product strings
-        manufacturer = ''
-        product_name = ''
-        try:
-            manufacturer = dev.manufacturer or ''
-        except Exception:
-            pass
-        try:
-            product_name = dev.product or ''
-        except Exception:
-            pass
+        # Skip hubs and host controllers
+        if dev_class in ('09',):
+            continue
 
-        # Tier 1: USB printer class
-        if dev.bDeviceClass == USB_CLASS_PRINTER:
+        # Tier 1: USB printer class (at device or interface level)
+        if dev_class == '07':
             candidates.append(DiscoveredPrinter(
                 vendor_id=vid_hex,
                 product_id=pid_hex,
                 vendor_name=manufacturer or 'Unknown',
                 product_name=product_name or 'USB Printer',
                 chip_type='native',
-                usb_class=dev.bDeviceClass,
+                usb_class=0x07,
                 confidence='high',
             ))
             continue
 
-        # Check interfaces for printer class (some printers use class at interface level)
+        # Check interface classes for printer class
         has_printer_interface = False
-        try:
-            for cfg in dev:
-                for iface in cfg:
-                    if iface.bInterfaceClass == USB_CLASS_PRINTER:
-                        has_printer_interface = True
-                        break
-                if has_printer_interface:
-                    break
-        except Exception:
-            pass
+        for iface_path in glob.glob(f'{dev_dir}/*/bInterfaceClass'):
+            iface_class = _read_sysfs(iface_path)
+            if iface_class == '07':
+                has_printer_interface = True
+                break
 
         if has_printer_interface:
             candidates.append(DiscoveredPrinter(
@@ -147,7 +150,7 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
                 vendor_name=manufacturer or 'Unknown',
                 product_name=product_name or 'USB Printer',
                 chip_type='native',
-                usb_class=USB_CLASS_PRINTER,
+                usb_class=0x07,
                 confidence='high',
             ))
             continue
@@ -161,7 +164,7 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
                 vendor_name=info['name'],
                 product_name=product_name or f'{info["name"]} Device',
                 chip_type=info['type'],
-                usb_class=dev.bDeviceClass,
+                usb_class=int(dev_class, 16) if dev_class else 0,
                 confidence='medium',
             ))
             continue
@@ -175,7 +178,7 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
                 vendor_name=manufacturer or 'Unknown',
                 product_name=product_name or 'USB Device',
                 chip_type='unknown',
-                usb_class=dev.bDeviceClass,
+                usb_class=int(dev_class, 16) if dev_class else 0,
                 confidence='low',
             ))
 
@@ -221,15 +224,10 @@ def auto_select_printer() -> PrintStatusResponse | None:
 def _connect_usb_printer(vendor_id: int, product_id: int):
     """Create a python-escpos Usb printer, detaching kernel drivers if needed.
 
-    Some USB printer chips (0fe6, 067b, etc.) get claimed by the kernel's
-    usbfs driver, which blocks python-escpos's set_configuration() with
-    "Resource busy". We reset the device to clear the kernel claim, then
-    let Usb() open it fresh.
+    Since discover_usb_printers() uses sysfs (no USB handles opened),
+    the device should be free of stale usbfs claims when we reach here.
     """
-    import time
-
     import usb.core
-    import usb.util
 
     from escpos.printer import Usb
 
@@ -248,17 +246,6 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
                         pass
     except Exception:
         pass
-
-    # Reset the device to clear usbfs claims at the kernel level.
-    # Without this, set_configuration() inside Usb() gets "Resource busy".
-    try:
-        dev.reset()
-    except Exception:
-        pass
-
-    # Wait for the device to re-enumerate after reset.
-    # Usb() will do its own usb.core.find() internally.
-    time.sleep(1.0)
 
     return Usb(vendor_id, product_id)
 
