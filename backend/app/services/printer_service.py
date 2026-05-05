@@ -82,11 +82,9 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
         List of DiscoveredPrinter instances with connection details.
     """
     import usb.core
-    import usb.util
 
     candidates: list[DiscoveredPrinter] = []
     seen: set[tuple[int, int]] = set()
-    scanned_devices: list = []
 
     try:
         devices = usb.core.find(find_all=True)
@@ -95,7 +93,6 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
         return []
 
     for dev in devices:
-        scanned_devices.append(dev)
         vid_pid = (dev.idVendor, dev.idProduct)
         if vid_pid in seen:
             continue
@@ -182,13 +179,6 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
                 confidence='low',
             ))
 
-    # Release all handles opened during discovery so Usb() can claim them later
-    for dev in scanned_devices:
-        try:
-            usb.util.dispose_resources(dev)
-        except Exception:
-            pass
-
     return candidates
 
 
@@ -231,9 +221,10 @@ def auto_select_printer() -> PrintStatusResponse | None:
 def _connect_usb_printer(vendor_id: int, product_id: int):
     """Create a python-escpos Usb printer, detaching kernel drivers if needed.
 
-    Some USB printer chips (0fe6, 067b, etc.) get claimed by the Linux
-    usblp kernel module or usbfs. We reset the device to clear any stale
-    kernel-level claims, then create the Usb printer instance.
+    Some USB printer chips (0fe6, 067b, etc.) get claimed by the kernel's
+    usbfs driver, which blocks python-escpos's set_configuration() with
+    "Resource busy". We reset the device to clear the kernel claim, then
+    let Usb() open it fresh.
     """
     import time
 
@@ -265,30 +256,9 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
     except Exception:
         pass
 
-    # Release our handle — the reset invalidated it
-    usb.util.dispose_resources(dev)
-
-    # Wait for the device to re-enumerate after reset
+    # Wait for the device to re-enumerate after reset.
+    # Usb() will do its own usb.core.find() internally.
     time.sleep(1.0)
-
-    # Verify device is back after reset
-    dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
-    if dev is None:
-        raise PrinterOfflineError()
-
-    # Detach kernel driver again (reset may re-trigger auto-binding)
-    try:
-        for cfg in dev:
-            for iface in cfg:
-                if dev.is_kernel_driver_active(iface.bInterfaceNumber):
-                    try:
-                        dev.detach_kernel_driver(iface.bInterfaceNumber)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-
-    usb.util.dispose_resources(dev)
 
     return Usb(vendor_id, product_id)
 
