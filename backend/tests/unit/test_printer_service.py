@@ -11,7 +11,6 @@ from PIL import Image
 from app.core.exceptions import PrinterError, PrinterOfflineError
 from app.services.printer_service import (
     _dither_image,
-    _printer,
     _wrap_text,
     get_printer_status,
     print_receipt,
@@ -327,51 +326,6 @@ class TestWrapText:
 
 
 # ---------------------------------------------------------------------------
-# Helpers for USB mock devices
-# ---------------------------------------------------------------------------
-
-
-def _make_usb_device(
-    vendor_id: int,
-    product_id: int,
-    device_class: int = 0,
-    manufacturer: str = '',
-    product: str = '',
-    has_printer_interface: bool = False,
-) -> MagicMock:
-    """Build a mock USB device object with realistic attributes.
-
-    Args:
-        vendor_id: USB vendor ID as integer (e.g. 0x04b8).
-        product_id: USB product ID as integer.
-        device_class: bDeviceClass value (0 = per-interface, 7 = printer).
-        manufacturer: USB manufacturer string descriptor.
-        product: USB product string descriptor.
-        has_printer_interface: If True, iterating configs yields an interface
-            with bInterfaceClass == USB_CLASS_PRINTER.
-    """
-    dev = MagicMock()
-    dev.idVendor = vendor_id
-    dev.idProduct = product_id
-    dev.bDeviceClass = device_class
-    dev.manufacturer = manufacturer
-    dev.product = product
-
-    if has_printer_interface:
-        iface = MagicMock()
-        iface.bInterfaceClass = 0x07  # USB_CLASS_PRINTER
-        cfg = MagicMock()
-        # Iterating over cfg yields interfaces; iterating over dev yields configs
-        cfg.__iter__ = MagicMock(return_value=iter([iface]))
-        dev.__iter__ = MagicMock(return_value=iter([cfg]))
-    else:
-        # No interfaces — iterating over configs raises or yields nothing useful
-        dev.__iter__ = MagicMock(return_value=iter([]))
-
-    return dev
-
-
-# ---------------------------------------------------------------------------
 # discover_usb_printers
 # ---------------------------------------------------------------------------
 
@@ -379,29 +333,58 @@ def _make_usb_device(
 class TestDiscoverUsbPrinters:
     """Tests for discover_usb_printers().
 
-    Uses unittest.mock.patch to mock usb.core.find so no real USB hardware
-    is required.
+    Mocks glob.glob and _read_sysfs to simulate sysfs USB device entries
+    without requiring real hardware.
     """
 
-    @patch('usb.core.find')
-    def test_finds_known_vendor_device(self, mock_find):
+    def _mock_sysfs_device(
+        self,
+        mock_glob: MagicMock,
+        mock_read: MagicMock,
+        dev_dir: str,
+        vid: str,
+        pid: str,
+        dev_class: str = '00',
+        manufacturer: str = '',
+        product: str = '',
+        iface_classes: list[str] | None = None,
+    ):
+        """Configure mocks for a single USB device in sysfs."""
+        id_vendor_path = f'{dev_dir}/idVendor'
+        mock_glob.return_value = [id_vendor_path]
+
+        read_map = {
+            f'{dev_dir}/idVendor': vid,
+            f'{dev_dir}/idProduct': pid,
+            f'{dev_dir}/bDeviceClass': dev_class,
+            f'{dev_dir}/manufacturer': manufacturer,
+            f'{dev_dir}/product': product,
+        }
+
+        if iface_classes:
+            iface_paths = [f'{dev_dir}/{i}/bInterfaceClass' for i in range(len(iface_classes))]
+            for path, cls in zip(iface_paths, iface_classes):
+                read_map[path] = cls
+            # glob for interface classes needs separate mock
+            with patch('glob.glob', side_effect=lambda p: iface_paths if '*/bInterfaceClass' in p else [id_vendor_path]):
+                mock_read.side_effect = lambda p: read_map.get(p, '')
+        else:
+            mock_read.side_effect = lambda p: read_map.get(p, '')
+
+    @patch('app.services.printer_service._read_sysfs')
+    def test_finds_known_vendor_device(self, mock_read):
         """Device with VID in THERMAL_PRINTER_VENDORS is detected with medium confidence."""
-        from app.services.printer_service import (
-            THERMAL_PRINTER_VENDORS,
-            discover_usb_printers,
-        )
+        from app.services.printer_service import discover_usb_printers
 
-        # Epson VID 0x04b8 is in THERMAL_PRINTER_VENDORS
-        dev = _make_usb_device(
-            vendor_id=0x04B8,
-            product_id=0x0E15,
-            device_class=0,
-            manufacturer='Epson',
-            product='TM-T20III',
-        )
-        mock_find.return_value = iter([dev])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=['/sys/bus/usb/devices/1-1/idVendor']):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': '04b8',
+                '/sys/bus/usb/devices/1-1/idProduct': '0e15',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '00',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Epson',
+                '/sys/bus/usb/devices/1-1/product': 'TM-T20III',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
         r = results[0]
@@ -411,42 +394,40 @@ class TestDiscoverUsbPrinters:
         assert r.vendor_name == 'Epson'
         assert r.chip_type == 'native'
 
-    @patch('usb.core.find')
-    def test_finds_printer_class_device(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_finds_printer_class_device(self, mock_read):
         """USB device with bDeviceClass 7 (printer) is detected with high confidence."""
         from app.services.printer_service import discover_usb_printers
 
-        dev = _make_usb_device(
-            vendor_id=0x9999,
-            product_id=0x0001,
-            device_class=0x07,
-            manufacturer='Acme',
-            product='Thermal Printer',
-        )
-        mock_find.return_value = iter([dev])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=['/sys/bus/usb/devices/1-1/idVendor']):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': '9999',
+                '/sys/bus/usb/devices/1-1/idProduct': '0001',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '07',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Acme',
+                '/sys/bus/usb/devices/1-1/product': 'Thermal Printer',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
         assert results[0].confidence == 'high'
         assert results[0].usb_class == 0x07
         assert results[0].chip_type == 'native'
 
-    @patch('usb.core.find')
-    def test_finds_ics_advent_bridge(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_finds_ics_advent_bridge(self, mock_read):
         """ICS Advent (0fe6) USB-parallel bridge is detected as medium confidence."""
         from app.services.printer_service import discover_usb_printers
 
-        dev = _make_usb_device(
-            vendor_id=0x0FE6,
-            product_id=0x0011,
-            device_class=0,
-            manufacturer='ICS Advent',
-            product='USB-Parallel Bridge',
-        )
-        mock_find.return_value = iter([dev])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=['/sys/bus/usb/devices/1-1/idVendor']):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': '0fe6',
+                '/sys/bus/usb/devices/1-1/idProduct': '0011',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '00',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'ICS Advent',
+                '/sys/bus/usb/devices/1-1/product': 'USB-Parallel Bridge',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
         r = results[0]
@@ -455,116 +436,117 @@ class TestDiscoverUsbPrinters:
         assert r.chip_type == 'usb_parallel'
         assert r.confidence == 'medium'
 
-    @patch('usb.core.find')
-    def test_no_usb_devices_returns_empty(self, mock_find):
+    def test_no_usb_devices_returns_empty(self):
         """When no USB devices are found, returns an empty list."""
         from app.services.printer_service import discover_usb_printers
 
-        mock_find.return_value = iter([])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=[]):
+            results = discover_usb_printers()
 
         assert results == []
 
-    @patch('usb.core.find')
-    def test_filters_non_printer_devices(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_filters_non_printer_devices(self, mock_read):
         """Non-printer devices (keyboard, hub) are excluded from results."""
         from app.services.printer_service import discover_usb_printers
 
-        keyboard = _make_usb_device(
-            vendor_id=0x046D,
-            product_id=0xC52B,
-            device_class=0,
-            manufacturer='Logitech',
-            product='USB Keyboard',
-        )
-        hub = _make_usb_device(
-            vendor_id=0x1D6B,
-            product_id=0x0002,
-            device_class=0x09,  # USB_CLASS_HUB
-            manufacturer='Linux Foundation',
-            product='USB 2.0 Hub',
-        )
-        mock_find.return_value = iter([keyboard, hub])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=[
+            '/sys/bus/usb/devices/1-1/idVendor',
+            '/sys/bus/usb/devices/1-2/idVendor',
+        ]):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': '046d',
+                '/sys/bus/usb/devices/1-1/idProduct': 'c52b',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '00',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Logitech',
+                '/sys/bus/usb/devices/1-1/product': 'USB Keyboard',
+                '/sys/bus/usb/devices/1-2/idVendor': '1d6b',
+                '/sys/bus/usb/devices/1-2/idProduct': '0002',
+                '/sys/bus/usb/devices/1-2/bDeviceClass': '09',
+                '/sys/bus/usb/devices/1-2/manufacturer': 'Linux Foundation',
+                '/sys/bus/usb/devices/1-2/product': 'USB 2.0 Hub',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert results == []
 
-    @patch('usb.core.find')
-    def test_interface_level_printer_class(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_interface_level_printer_class(self, mock_read):
         """Device with printer class at interface level (not device level) is high confidence."""
         from app.services.printer_service import discover_usb_printers
 
-        dev = _make_usb_device(
-            vendor_id=0xAAAA,
-            product_id=0xBBBB,
-            device_class=0,  # per-interface class
-            manufacturer='Generic',
-            product='POS Printer',
-            has_printer_interface=True,
-        )
-        mock_find.return_value = iter([dev])
+        iface_class_path = '/sys/bus/usb/devices/1-1/1-1:1.0/bInterfaceClass'
 
-        results = discover_usb_printers()
+        def glob_side_effect(pattern):
+            if '*/bInterfaceClass' in pattern:
+                return [iface_class_path]
+            return ['/sys/bus/usb/devices/1-1/idVendor']
+
+        with patch('glob.glob', side_effect=glob_side_effect):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': 'aaaa',
+                '/sys/bus/usb/devices/1-1/idProduct': 'bbbb',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '00',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Generic',
+                '/sys/bus/usb/devices/1-1/product': 'POS Printer',
+                iface_class_path: '07',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
         assert results[0].confidence == 'high'
         assert results[0].usb_class == 0x07
 
-    @patch('usb.core.find')
-    def test_keyword_match_gives_low_confidence(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_keyword_match_gives_low_confidence(self, mock_read):
         """Device with 'thermal' in product name but unknown VID gets low confidence."""
         from app.services.printer_service import discover_usb_printers
 
-        dev = _make_usb_device(
-            vendor_id=0xDEAD,
-            product_id=0xBEEF,
-            device_class=0,
-            manufacturer='Unknown Corp',
-            product='Thermal Receipt Printer',
-        )
-        mock_find.return_value = iter([dev])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=['/sys/bus/usb/devices/1-1/idVendor']):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': 'dead',
+                '/sys/bus/usb/devices/1-1/idProduct': 'beef',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '00',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Unknown Corp',
+                '/sys/bus/usb/devices/1-1/product': 'Thermal Receipt Printer',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
         assert results[0].confidence == 'low'
         assert results[0].chip_type == 'unknown'
 
-    @patch('usb.core.find')
-    def test_duplicate_vid_pid_deduplicated(self, mock_find):
+    @patch('app.services.printer_service._read_sysfs')
+    def test_duplicate_vid_pid_deduplicated(self, mock_read):
         """Two devices with the same VID:PID are deduplicated."""
         from app.services.printer_service import discover_usb_printers
 
-        dev1 = _make_usb_device(
-            vendor_id=0x04B8,
-            product_id=0x0E15,
-            device_class=0x07,
-            manufacturer='Epson',
-            product='TM-T20III',
-        )
-        dev2 = _make_usb_device(
-            vendor_id=0x04B8,
-            product_id=0x0E15,
-            device_class=0x07,
-            manufacturer='Epson',
-            product='TM-T20III',
-        )
-        mock_find.return_value = iter([dev1, dev2])
-
-        results = discover_usb_printers()
+        with patch('glob.glob', return_value=[
+            '/sys/bus/usb/devices/1-1/idVendor',
+            '/sys/bus/usb/devices/1-2/idVendor',
+        ]):
+            mock_read.side_effect = lambda p: {
+                '/sys/bus/usb/devices/1-1/idVendor': '04b8',
+                '/sys/bus/usb/devices/1-1/idProduct': '0e15',
+                '/sys/bus/usb/devices/1-1/bDeviceClass': '07',
+                '/sys/bus/usb/devices/1-1/manufacturer': 'Epson',
+                '/sys/bus/usb/devices/1-1/product': 'TM-T20III',
+                '/sys/bus/usb/devices/1-2/idVendor': '04b8',
+                '/sys/bus/usb/devices/1-2/idProduct': '0e15',
+                '/sys/bus/usb/devices/1-2/bDeviceClass': '07',
+                '/sys/bus/usb/devices/1-2/manufacturer': 'Epson',
+                '/sys/bus/usb/devices/1-2/product': 'TM-T20III',
+            }.get(p, '')
+            results = discover_usb_printers()
 
         assert len(results) == 1
 
-    @patch('usb.core.find')
-    def test_usb_scan_exception_returns_empty(self, mock_find):
-        """If usb.core.find raises an exception, returns empty list safely."""
+    def test_usb_scan_exception_returns_empty(self):
+        """If glob raises an exception, returns empty list safely."""
         from app.services.printer_service import discover_usb_printers
 
-        mock_find.side_effect = Exception('USB subsystem error')
-
-        results = discover_usb_printers()
+        with patch('glob.glob', side_effect=Exception('sysfs error')):
+            results = discover_usb_printers()
 
         assert results == []
 
@@ -581,8 +563,8 @@ class TestAutoSelectPrinter:
     """
 
     @patch('app.services.printer_service.discover_usb_printers')
-    @patch('app.services.printer_service.get_printer_status')
-    def test_single_printer_auto_selected(self, mock_get_status, mock_discover):
+    @patch('app.services.printer_service.select_printer')
+    def test_single_printer_auto_selected(self, mock_select, mock_discover):
         """When exactly one printer is found, it is auto-selected."""
         from app.services.printer_service import DiscoveredPrinter, auto_select_printer
 
@@ -598,12 +580,12 @@ class TestAutoSelectPrinter:
         mock_discover.return_value = [candidate]
 
         fake_status = MagicMock()
-        mock_get_status.return_value = fake_status
+        mock_select.return_value = fake_status
 
         result = auto_select_printer()
 
         assert result is fake_status
-        mock_get_status.assert_called_once()
+        mock_select.assert_called_once_with('0x04b8', '0x0e15')
 
     @patch('app.services.printer_service.discover_usb_printers')
     def test_no_printers_returns_none(self, mock_discover):
@@ -648,8 +630,8 @@ class TestAutoSelectPrinter:
         assert result is None
 
     @patch('app.services.printer_service.discover_usb_printers')
-    @patch('app.services.printer_service.get_printer_status')
-    def test_prefers_higher_confidence(self, mock_get_status, mock_discover):
+    @patch('app.services.printer_service.select_printer')
+    def test_prefers_higher_confidence(self, mock_select, mock_discover):
         """When exactly one printer exists, confidence sorting does not matter."""
         from app.services.printer_service import DiscoveredPrinter, auto_select_printer
 
@@ -666,7 +648,7 @@ class TestAutoSelectPrinter:
         mock_discover.return_value = [candidate]
 
         fake_status = MagicMock()
-        mock_get_status.return_value = fake_status
+        mock_select.return_value = fake_status
 
         result = auto_select_printer()
 

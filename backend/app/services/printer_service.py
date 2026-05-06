@@ -7,9 +7,10 @@ Auto-discovers connected printers on startup and supports hot-plug detection.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from PIL import Image
@@ -17,8 +18,8 @@ from PIL import Image
 from app.core.config import settings
 from app.core.exceptions import PrinterError, PrinterOfflineError
 from app.schemas.print import (
-    PrintHardwareStatus,
     PrinterInfo,
+    PrintHardwareStatus,
     PrintStatusResponse,
     PrintTestResponse,
 )
@@ -29,6 +30,7 @@ logger = structlog.get_logger(__name__)
 _printer = None
 _last_print_at: datetime | None = None
 _total_prints_today: int = 0
+_connecting: bool = False  # Guard against re-entrant connection attempts
 
 # Dynamic printer IDs — override settings when changed via admin UI.
 _active_vendor_id: str = settings.printer_vendor_id
@@ -36,6 +38,37 @@ _active_product_id: str = settings.printer_product_id
 
 # USB device class code for printers
 USB_CLASS_PRINTER = 0x07
+
+class _SafeUsbPrinter:
+    """Subclass of python-escpos Usb that skips the destructive dev.reset().
+
+    python-escpos's ``Usb._configure_usb()`` calls ``self.device.reset()``
+    after ``set_configuration()``.  That USB port reset causes
+    USB-to-parallel/serial bridge chips (0fe6, 067b, 1a86, etc.) to
+    re-enumerate, invalidating the handle.  Subsequent writes silently
+    fail — the API returns success but no paper comes out.
+
+    This subclass overrides ``_configure_usb()`` to skip the reset,
+    keeping the handle valid while preserving all other python-escpos
+    functionality.
+    """
+
+    def __new__(cls, vendor_id: int, product_id: int):
+        from escpos.printer import Usb as EscposUsb
+
+        # Create a dynamic subclass that overrides _configure_usb
+        class _NoResetUsb(EscposUsb):
+            def _configure_usb(self) -> None:
+                if not self.device:
+                    return
+                import usb.core
+
+                with contextlib.suppress(usb.core.USBError):
+                    self.device.set_configuration()
+                # Skip self.device.reset() — it breaks bridge chips
+
+        return _NoResetUsb(vendor_id, product_id)
+
 
 # Known ESC/POS thermal printer vendor IDs and their chip types
 THERMAL_PRINTER_VENDORS: dict[str, dict[str, str]] = {
@@ -78,6 +111,33 @@ def _read_sysfs(path: str) -> str:
         return ''
 
 
+def _is_device_present() -> bool:
+    """Check if the configured USB printer is physically connected via sysfs.
+
+    Reads /sys/bus/usb/devices/ to find a device matching the active VID:PID.
+    This avoids sending any USB commands (like is_online()) that can fail on
+    USB-to-parallel/serial bridge chips and cause unnecessary reconnect cycles.
+    """
+    if not _active_vendor_id or not _active_product_id:
+        return False
+
+    import glob
+
+    target_vid = _active_vendor_id.replace('0x', '')
+    target_pid = _active_product_id.replace('0x', '')
+
+    for dev_path in glob.glob('/sys/bus/usb/devices/*/idVendor'):
+        vid_str = _read_sysfs(dev_path)
+        if vid_str != target_vid:
+            continue
+        dev_dir = dev_path.rsplit('/', 1)[0]
+        pid_str = _read_sysfs(f'{dev_dir}/idProduct')
+        if pid_str == target_pid:
+            return True
+
+    return False
+
+
 def discover_usb_printers() -> list[DiscoveredPrinter]:
     """Scan USB devices via sysfs (no USB handles opened).
 
@@ -99,7 +159,12 @@ def discover_usb_printers() -> list[DiscoveredPrinter]:
     candidates: list[DiscoveredPrinter] = []
     seen: set[tuple[str, str]] = set()
 
-    for dev_path in glob.glob('/sys/bus/usb/devices/*/idVendor'):
+    try:
+        device_paths = glob.glob('/sys/bus/usb/devices/*/idVendor')
+    except Exception:
+        return []
+
+    for dev_path in device_paths:
         vid_str = _read_sysfs(dev_path)
         if not vid_str:
             continue
@@ -221,69 +286,186 @@ def auto_select_printer() -> PrintStatusResponse | None:
     return None
 
 
-def _connect_usb_printer(vendor_id: int, product_id: int):
-    """Create a python-escpos Usb printer.
+def _close_printer(printer) -> None:
+    """Close a printer connection and release all USB resources."""
+    with contextlib.suppress(Exception):
+        printer.close()
+    try:
+        import usb.util
 
-    Resets the device to clear any usbfs claims, then lets Usb() open
-    a fresh handle to the re-enumerated device. Discovery uses sysfs so
-    the reset won't break future discovery scans.
+        raw_dev = getattr(printer, '_device', None)
+        if raw_dev and raw_dev is not False and raw_dev is not None:
+            usb.util.dispose_resources(raw_dev)
+    except Exception:
+        pass
+
+
+def _is_printer_usable(printer) -> bool:
+    """Check if a printer object has a valid open device handle.
+
+    Verifies the USB device file still exists at the cached bus/address.
+    After power cycle, the device re-enumerates with a new address, so
+    the old address file disappears — this detects the stale handle.
     """
+    import os
+
+    raw_dev = getattr(printer, '_device', None)
+    if raw_dev is None or raw_dev is False:
+        logger.info('printer_usable_check', result=False, reason='device_is_none_or_false')
+        return False
+    try:
+        dev_path = f'/dev/bus/usb/{raw_dev.bus:03d}/{raw_dev.address:03d}'
+        exists = os.path.exists(dev_path)
+        logger.info('printer_usable_check', result=exists, bus=raw_dev.bus, address=raw_dev.address, dev_path=dev_path)
+        return exists
+    except Exception as exc:
+        logger.info('printer_usable_check', result=False, error=str(exc))
+        return False
+
+
+def _connect_usb_printer(vendor_id: int, product_id: int):
+    """Create a USB printer connection with retry.
+
+    Uses _SafeUsbPrinter which skips the destructive dev.reset() that
+    python-escpos's Usb class performs.  Two attempts: direct open,
+    then after clearing stale USB claims.
+    """
+    global _connecting
+
+    if _connecting:
+        raise PrinterOfflineError()
+    _connecting = True
+
+    try:
+        return _connect_usb_printer_inner(vendor_id, product_id)
+    finally:
+        _connecting = False
+
+
+def _connect_usb_printer_inner(vendor_id: int, product_id: int):
+    """Inner connection logic — called by _connect_usb_printer with guard."""
     import time
 
     import usb.core
+    import usb.util
 
-    from escpos.printer import Usb
+    # Attempt 1: Direct open with safe wrapper (no dev.reset())
+    try:
+        printer = _SafeUsbPrinter(vendor_id, product_id)
+        printer.open()
+        usable = _is_printer_usable(printer)
+        logger.info('connect_attempt_1', usable=usable, device_type=type(printer._device).__name__)
+        if usable:
+            return printer
+        _close_printer(printer)
+    except Exception as exc:
+        logger.info('connect_attempt_1_failed', error=str(exc))
 
+    # Attempt 2: USB port reset to clear stale kernel state, then reopen.
+    # After power cycle, the kernel USB stack has stale state for the device.
+    # dev.reset() forces re-enumeration (new address, clean state).
+    # We do this BEFORE creating the printer — the printer then opens on
+    # the fresh device without needing another reset.
     dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
     if dev is None:
+        logger.info('connect_attempt_2_device_not_found')
         raise PrinterOfflineError()
 
-    # Detach kernel driver (usblp / CUPS) from all interfaces
-    try:
-        for cfg in dev:
-            for iface in cfg:
-                if dev.is_kernel_driver_active(iface.bInterfaceNumber):
-                    try:
-                        dev.detach_kernel_driver(iface.bInterfaceNumber)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+    logger.info('connect_attempt_2_reset', bus=dev.bus, address=dev.address)
 
-    # Reset to clear usbfs claims, then wait for re-enumeration.
-    # Usb() will do its own fresh usb.core.find() internally.
-    try:
+    # Try pyusb reset first
+    with contextlib.suppress(Exception):
         dev.reset()
-    except Exception:
-        pass
-    time.sleep(1.0)
 
-    return Usb(vendor_id, product_id)
+    with contextlib.suppress(Exception):
+        usb.util.dispose_resources(dev)
+
+    time.sleep(2)
+
+    # Try opening after reset
+    try:
+        printer = _SafeUsbPrinter(vendor_id, product_id)
+        printer.open()
+        usable = _is_printer_usable(printer)
+        logger.info('connect_attempt_2_after_reset', usable=usable, device_type=type(printer._device).__name__)
+        if usable:
+            return printer
+        _close_printer(printer)
+    except Exception as exc:
+        logger.info('connect_attempt_2_after_reset_failed', error=str(exc))
+
+    # Attempt 3: sysfs authorized reset (kernel-level, no USB I/O needed)
+    vid_hex = f'{vendor_id:04x}'
+    pid_hex = f'{product_id:04x}'
+    if _reset_usb_port_sysfs(vid_hex, pid_hex):
+        time.sleep(3)
+        try:
+            printer = _SafeUsbPrinter(vendor_id, product_id)
+            printer.open()
+            usable = _is_printer_usable(printer)
+            logger.info('connect_attempt_3_sysfs', usable=usable)
+            if usable:
+                return printer
+        except Exception as exc:
+            logger.info('connect_attempt_3_sysfs_failed', error=str(exc))
+
+    raise PrinterOfflineError()
+
+
+def _reset_usb_port_sysfs(vid_hex: str, pid_hex: str) -> bool:
+    """Reset USB port via sysfs authorized file.
+
+    Forces a USB port reset at the host controller level without
+    requiring any USB I/O. Works when the device firmware is stuck
+    or the kernel has stale USB state.
+    """
+    import glob
+    import os
+    import time
+
+    for dev_path in glob.glob('/sys/bus/usb/devices/*/idVendor'):
+        if _read_sysfs(dev_path) != vid_hex:
+            continue
+        dev_dir = dev_path.rsplit('/', 1)[0]
+        if _read_sysfs(f'{dev_dir}/idProduct') != pid_hex:
+            continue
+
+        authorized = f'{dev_dir}/authorized'
+        if not os.path.exists(authorized):
+            logger.info('sysfs_reset_no_authorized', dev_dir=dev_dir)
+            continue
+
+        try:
+            logger.info('sysfs_reset_deauthorizing', dev_dir=dev_dir)
+            with open(authorized, 'w') as f:
+                f.write('0\n')
+            time.sleep(1)
+            logger.info('sysfs_reset_reauthorizing', dev_dir=dev_dir)
+            with open(authorized, 'w') as f:
+                f.write('1\n')
+            return True
+        except Exception as exc:
+            logger.info('sysfs_reset_failed', dev_dir=dev_dir, error=str(exc))
+
+    return False
 
 
 def _get_printer():
-    """Get or initialize the ESC/POS printer connection.
-
-    Attempts reconnection if the current printer is disconnected,
-    falling back to auto-discovery if needed.
-
-    Returns:
-        escpos printer instance.
-
-    Raises:
-        PrinterOfflineError: If the printer cannot be found.
-    """
+    """Get or initialize the ESC/POS printer connection."""
     global _printer
 
     if _printer is not None:
-        try:
-            _printer.is_online()
+        present = _is_device_present()
+        usable = _is_printer_usable(_printer)
+        logger.info('get_printer_cached_check', present=present, usable=usable)
+        if present and usable:
             return _printer
-        except Exception:
-            logger.info('printer_connection_lost_reconnecting')
-            _printer = None
+        # Device physically gone or handle stale — close and reconnect
+        logger.info('printer_connection_lost_reconnecting', present=present, usable=usable)
+        _close_printer(_printer)
+        _printer = None
 
-    # Try to reconnect with current IDs first
+    # Try to reconnect with current IDs
     if _active_vendor_id and _active_product_id:
         try:
             vendor_id = int(_active_vendor_id, 16)
@@ -292,13 +474,7 @@ def _get_printer():
             logger.info('printer_reconnected', vid=_active_vendor_id, pid=_active_product_id)
             return _printer
         except Exception:
-            pass
-
-    # If reconnect fails, try auto-discovery
-    if settings.printer_auto_detect:
-        result = auto_select_printer()
-        if result and result.connected:
-            return _printer
+            logger.info('printer_reconnect_failed', vid=_active_vendor_id, pid=_active_product_id)
 
     raise PrinterOfflineError()
 
@@ -309,16 +485,10 @@ def get_printer_status() -> PrintStatusResponse:
     Returns:
         PrintStatusResponse with connection and hardware status.
     """
-    try:
-        printer = _get_printer()
+    global _printer
 
-        # Try real paper status query
-        paper_ok = True
-        try:
-            status = printer.paper_status()
-            paper_ok = status != 0
-        except Exception:
-            pass
+    try:
+        _get_printer()
 
         return PrintStatusResponse(
             connected=True,
@@ -329,7 +499,7 @@ def get_printer_status() -> PrintStatusResponse:
                 product_id=_active_product_id,
             ),
             status=PrintHardwareStatus(
-                paper_ok=paper_ok,
+                paper_ok=True,
                 printer_online=True,
             ),
             last_print_at=_last_print_at,
@@ -352,24 +522,13 @@ def get_printer_status() -> PrintStatusResponse:
 def select_printer(vendor_id: str, product_id: str) -> PrintStatusResponse:
     """Set the active USB printer by vendor/product ID.
 
-    Tears down any existing printer connection and updates the module-level
-    IDs so the next _get_printer() call opens the new device.
-
-    Args:
-        vendor_id: USB vendor ID hex string (e.g. "0x04b8").
-        product_id: USB product ID hex string (e.g. "0x0e15").
-
-    Returns:
-        PrintStatusResponse after attempting connection.
+    Updates the active IDs. The actual USB connection is opened lazily
+    on the next print or status call that triggers _get_printer().
     """
     global _printer, _active_vendor_id, _active_product_id
 
-    # Tear down existing connection
     if _printer is not None:
-        try:
-            _printer.close()
-        except Exception:
-            pass
+        _close_printer(_printer)
         _printer = None
 
     _active_vendor_id = vendor_id
@@ -377,8 +536,22 @@ def select_printer(vendor_id: str, product_id: str) -> PrintStatusResponse:
 
     logger.info('printer_selected', vendor_id=vendor_id, product_id=product_id)
 
-    # Attempt connection and return status
-    return get_printer_status()
+    present = _is_device_present()
+    return PrintStatusResponse(
+        connected=present,
+        printer=PrinterInfo(
+            vendor='USB',
+            model=f'VID:{vendor_id} PID:{product_id}',
+            vendor_id=vendor_id,
+            product_id=product_id,
+        ),
+        status=PrintHardwareStatus(
+            paper_ok=present,
+            printer_online=present,
+        ),
+        last_print_at=_last_print_at,
+        total_prints_today=_total_prints_today,
+    )
 
 
 def print_test_page() -> PrintTestResponse:
@@ -392,6 +565,13 @@ def print_test_page() -> PrintTestResponse:
     try:
         printer = _get_printer()
 
+        # Diagnostic: log the printer's USB device info
+        raw_dev = getattr(printer, '_device', None)
+        if raw_dev and raw_dev is not False:
+            logger.info('test_print_device_info', bus=raw_dev.bus, address=raw_dev.address, type=type(printer).__name__)
+        else:
+            logger.info('test_print_device_info', device='NONE')
+
         printer.set(align='center', bold=True, height=2)
         printer.text('VibePrint OS\n')
         printer.set(align='center', bold=False, height=1)
@@ -399,12 +579,12 @@ def print_test_page() -> PrintTestResponse:
         printer.text('-' * 32 + '\n')
         printer.text(f'Printer: {_active_vendor_id}:{_active_product_id}\n')
         printer.text(f'Paper Width: {settings.printer_paper_width} dots\n')
-        printer.text(f'Time: {datetime.now(timezone.utc).isoformat()}\n')
+        printer.text(f'Time: {datetime.now(UTC).isoformat()}\n')
         printer.text('-' * 32 + '\n')
         printer.text('Print test successful!\n\n')
         printer.cut()
 
-        _last_print_at = datetime.now(timezone.utc)
+        _last_print_at = datetime.now(UTC)
         _total_prints_today += 1
 
         logger.info('test_print_success')
@@ -461,10 +641,10 @@ def print_receipt(
         printer.set(align='center', bold=False, height=1)
         printer.text('-' * 32 + '\n')
         printer.text('VibePrint OS\n')
-        printer.text(f'{datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")}\n')
+        printer.text(f'{datetime.now(UTC).strftime("%Y-%m-%d %H:%M")}\n')
         printer.cut()
 
-        _last_print_at = datetime.now(timezone.utc)
+        _last_print_at = datetime.now(UTC)
         _total_prints_today += 1
 
         logger.info('receipt_printed')
@@ -526,7 +706,7 @@ def print_photobooth_strip(composite_image_path: str) -> dict:
         printer.text('\n')
         printer.cut()
 
-        _last_print_at = datetime.now(timezone.utc)
+        _last_print_at = datetime.now(UTC)
         _total_prints_today += 1
 
         logger.info('photobooth_strip_printed', path=composite_image_path)
@@ -550,12 +730,11 @@ async def printer_hotplug_scan(interval_seconds: int = 30) -> None:
 
         # Only auto-discover if no printer currently connected
         if _printer is not None:
-            try:
-                _printer.is_online()
+            if _is_device_present() and _is_printer_usable(_printer):
                 continue
-            except Exception:
-                _printer = None
-                logger.info('printer_hotplug_reconnecting')
+            _close_printer(_printer)
+            _printer = None
+            logger.info('printer_hotplug_reconnecting')
 
         if not settings.printer_auto_detect:
             continue
