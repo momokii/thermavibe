@@ -32,6 +32,46 @@ from app.schemas.admin import (
 logger = structlog.get_logger(__name__)
 
 
+async def _session_summary(
+    db: AsyncSession,
+    start_date: datetime,
+    end_date: datetime,
+) -> SessionAnalyticsSummary:
+    """Compute session summary for a date range."""
+    total = (await db.execute(
+        select(func.count()).select_from(KioskSession).where(
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+    )).scalar() or 0
+
+    completed = (await db.execute(
+        select(func.count()).select_from(KioskSession).where(
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+            KioskSession.completed_at.isnot(None),
+        )
+    )).scalar() or 0
+
+    avg_duration = float((await db.execute(
+        select(func.avg(
+            func.extract('epoch', KioskSession.completed_at - KioskSession.created_at),
+        )).where(
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+            KioskSession.completed_at.isnot(None),
+        )
+    )).scalar() or 0)
+
+    return SessionAnalyticsSummary(
+        total_sessions=total,
+        completed_sessions=completed,
+        abandoned_sessions=total - completed,
+        completion_rate=round((completed / total) if total > 0 else 0.0, 2),
+        avg_duration_seconds=round(avg_duration, 2),
+    )
+
+
 async def get_session_analytics(
     db: AsyncSession,
     start_date: datetime | None = None,
@@ -46,36 +86,11 @@ async def get_session_analytics(
     if end_date is None:
         end_date = now
 
-    # Summary stats
-    total_stmt = select(func.count()).select_from(KioskSession).where(
-        KioskSession.created_at >= start_date,
-        KioskSession.created_at <= end_date,
-    )
-    total_result = await db.execute(total_stmt)
-    total_sessions = total_result.scalar() or 0
+    summary = await _session_summary(db, start_date, end_date)
 
-    completed_stmt = select(func.count()).select_from(KioskSession).where(
-        KioskSession.created_at >= start_date,
-        KioskSession.created_at <= end_date,
-        KioskSession.completed_at.isnot(None),
-    )
-    completed_result = await db.execute(completed_stmt)
-    completed_sessions = completed_result.scalar() or 0
-
-    abandoned_sessions = total_sessions - completed_sessions
-    completion_rate = (completed_sessions / total_sessions) if total_sessions > 0 else 0.0
-
-    avg_duration_stmt = select(
-        func.avg(
-            func.extract('epoch', KioskSession.completed_at - KioskSession.created_at)
-        )
-    ).where(
-        KioskSession.created_at >= start_date,
-        KioskSession.created_at <= end_date,
-        KioskSession.completed_at.isnot(None),
-    )
-    avg_result = await db.execute(avg_duration_stmt)
-    avg_duration = float(avg_result.scalar() or 0)
+    # Previous period: same duration, shifted back
+    span = end_date - start_date
+    prev_summary = await _session_summary(db, start_date - span, start_date)
 
     # State distribution
     state_stmt = (
@@ -85,14 +100,6 @@ async def get_session_analytics(
     )
     state_result = await db.execute(state_stmt)
     state_distribution = dict(state_result.all())
-
-    summary = SessionAnalyticsSummary(
-        total_sessions=total_sessions,
-        completed_sessions=completed_sessions,
-        abandoned_sessions=abandoned_sessions,
-        completion_rate=round(completion_rate, 2),
-        avg_duration_seconds=round(avg_duration, 2),
-    )
 
     # Time-series
     trunc_map = {'day': 'day', 'week': 'week', 'month': 'month'}
@@ -137,11 +144,63 @@ async def get_session_analytics(
 
     return SessionAnalyticsResponse(
         summary=summary,
+        previous_summary=prev_summary,
         state_distribution=state_distribution,
         timeseries=timeseries,
         page=1,
         per_page=len(timeseries),
         total_periods=len(timeseries),
+    )
+
+
+async def _revenue_summary(
+    db: AsyncSession,
+    start_date: datetime,
+    end_date: datetime,
+) -> RevenueAnalyticsSummary:
+    """Compute revenue summary for a date range."""
+    payment_row = (await db.execute(
+        select(
+            func.count().label('tx_count'),
+            func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
+        ).where(
+            KioskSession.payment_status == PaymentStatus.CONFIRMED,
+            KioskSession.access_code_id.is_(None),
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+    )).one()
+    payment_tx = payment_row.tx_count or 0
+    payment_rev = int(payment_row.total or 0)
+
+    ac_row = (await db.execute(
+        select(
+            func.count().label('tx_count'),
+            func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
+        ).where(
+            KioskSession.access_code_id.isnot(None),
+            KioskSession.payment_amount > 0,
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+    )).one()
+    ac_tx = ac_row.tx_count or 0
+    ac_rev = int(ac_row.total or 0)
+
+    total_tx = payment_tx + ac_tx
+    total_rev = payment_rev + ac_rev
+
+    return RevenueAnalyticsSummary(
+        total_revenue=total_rev,
+        total_transactions=total_tx,
+        avg_transaction_amount=int(total_rev / total_tx) if total_tx > 0 else 0,
+        currency='IDR',
+        refund_count=0,
+        refund_total=0,
+        payment_revenue=payment_rev,
+        payment_transactions=payment_tx,
+        access_code_revenue=ac_rev,
+        access_code_transactions=ac_tx,
     )
 
 
@@ -159,50 +218,10 @@ async def get_revenue_analytics(
     if end_date is None:
         end_date = now
 
-    # Payment revenue (QRIS/cashless) — exclude access-code sessions
-    payment_stmt = select(
-        func.count().label('tx_count'),
-        func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
-    ).where(
-        KioskSession.payment_status == PaymentStatus.CONFIRMED,
-        KioskSession.access_code_id.is_(None),
-        KioskSession.created_at >= start_date,
-        KioskSession.created_at <= end_date,
-    )
-    payment_row = (await db.execute(payment_stmt)).one()
-    payment_tx = payment_row.tx_count or 0
-    payment_rev = int(payment_row.total or 0)
+    summary = await _revenue_summary(db, start_date, end_date)
 
-    # Access code revenue (priced codes) — only positive amounts
-    ac_stmt = select(
-        func.count().label('tx_count'),
-        func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
-    ).where(
-        KioskSession.access_code_id.isnot(None),
-        KioskSession.payment_amount > 0,
-        KioskSession.created_at >= start_date,
-        KioskSession.created_at <= end_date,
-    )
-    ac_row = (await db.execute(ac_stmt)).one()
-    ac_tx = ac_row.tx_count or 0
-    ac_rev = int(ac_row.total or 0)
-
-    total_transactions = payment_tx + ac_tx
-    total_revenue = payment_rev + ac_rev
-    avg_transaction = int(total_revenue / total_transactions) if total_transactions > 0 else 0
-
-    summary = RevenueAnalyticsSummary(
-        total_revenue=total_revenue,
-        total_transactions=total_transactions,
-        avg_transaction_amount=avg_transaction,
-        currency='IDR',
-        refund_count=0,
-        refund_total=0,
-        payment_revenue=payment_rev,
-        payment_transactions=payment_tx,
-        access_code_revenue=ac_rev,
-        access_code_transactions=ac_tx,
-    )
+    span = end_date - start_date
+    prev_summary = await _revenue_summary(db, start_date - span, start_date)
 
     # Revenue filter for timeseries (same combined logic)
     revenue_filter = or_(
@@ -280,13 +299,18 @@ async def get_revenue_analytics(
     ]
 
     by_entry_method: dict[str, EntryMethodStats] = {}
-    if payment_tx > 0:
-        by_entry_method['payment'] = EntryMethodStats(transactions=payment_tx, revenue=payment_rev)
-    if ac_tx > 0:
-        by_entry_method['access_code'] = EntryMethodStats(transactions=ac_tx, revenue=ac_rev)
+    if summary.payment_transactions > 0:
+        by_entry_method['payment'] = EntryMethodStats(
+            transactions=summary.payment_transactions, revenue=summary.payment_revenue,
+        )
+    if summary.access_code_transactions > 0:
+        by_entry_method['access_code'] = EntryMethodStats(
+            transactions=summary.access_code_transactions, revenue=summary.access_code_revenue,
+        )
 
     return RevenueAnalyticsResponse(
         summary=summary,
+        previous_summary=prev_summary,
         timeseries=timeseries,
         by_entry_method=by_entry_method,
     )

@@ -249,6 +249,26 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
   );
 }
 
+function Delta({ current, previous, invert = false }: { current: number; previous: number; invert?: boolean }) {
+  if (previous === 0) return null;
+  const pct = ((current - previous) / previous) * 100;
+  if (pct === 0) return null;
+  const positive = pct > 0;
+  const good = invert ? !positive : positive;
+  return (
+    <span
+      style={{
+        fontSize: '11px',
+        fontWeight: 600,
+        color: good ? 'rgba(34,197,94,0.8)' : 'rgba(239,68,68,0.8)',
+        marginLeft: '0.5rem',
+      }}
+    >
+      {positive ? '+' : ''}{pct.toFixed(0)}%
+    </span>
+  );
+}
+
 interface Props {
   mode?: 'summary' | 'full';
 }
@@ -374,9 +394,12 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
           <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Total Sessions</p>
-          <p className="text-2xl font-bold font-display text-white tabular-nums">
-            {sessions?.summary.total_sessions ?? 0}
-          </p>
+          <div className="flex items-baseline">
+            <p className="text-2xl font-bold font-display text-white tabular-nums">
+              {sessions?.summary.total_sessions ?? 0}
+            </p>
+            <Delta current={sessions?.summary.total_sessions ?? 0} previous={sessions?.previous_summary?.total_sessions ?? 0} />
+          </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             All photo sessions started, including abandoned ones.
             {mode === 'summary' && ' (last 30 days)'}
@@ -385,9 +408,12 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
           <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Completion Rate</p>
-          <p className="text-2xl font-bold font-display text-white">
-            {formatPercent(sessions?.summary.completion_rate ?? 0)}
-          </p>
+          <div className="flex items-baseline">
+            <p className="text-2xl font-bold font-display text-white">
+              {formatPercent(sessions?.summary.completion_rate ?? 0)}
+            </p>
+            <Delta current={sessions?.summary.completion_rate ?? 0} previous={sessions?.previous_summary?.completion_rate ?? 0} />
+          </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             <span style={{ color: 'rgba(34,197,94,0.7)' }}>{sessions?.summary.completed_sessions ?? 0} completed</span>
             {' / '}
@@ -397,17 +423,23 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
           <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Avg Duration</p>
-          <p className="text-2xl font-bold font-display text-white">
-            {formatDuration(sessions?.summary.avg_duration_seconds ?? 0)}
-          </p>
+          <div className="flex items-baseline">
+            <p className="text-2xl font-bold font-display text-white">
+              {formatDuration(sessions?.summary.avg_duration_seconds ?? 0)}
+            </p>
+            <Delta current={sessions?.summary.avg_duration_seconds ?? 0} previous={sessions?.previous_summary?.avg_duration_seconds ?? 0} invert />
+          </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>Average time from session start to completion.</p>
         </Card>
 
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
           <p className="text-sm font-medium text-white/40" style={{ marginBottom: '0.75rem' }}>Revenue</p>
-          <p className="text-2xl font-bold font-display text-white">
-            {formatIDR(revenue?.summary.total_revenue ?? 0)}
-          </p>
+          <div className="flex items-baseline">
+            <p className="text-2xl font-bold font-display text-white">
+              {formatIDR(revenue?.summary.total_revenue ?? 0)}
+            </p>
+            <Delta current={revenue?.summary.total_revenue ?? 0} previous={revenue?.previous_summary?.total_revenue ?? 0} />
+          </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             Avg per paid session: <span className="text-white/50">{formatIDR(revenue?.summary.avg_transaction_amount ?? 0)}</span>
           </p>

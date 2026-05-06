@@ -82,6 +82,7 @@ class SessionAnalyticsResponse(BaseModel):
     """Response for GET /api/v1/admin/analytics/sessions."""
 
     summary: SessionAnalyticsSummary
+    previous_summary: SessionAnalyticsSummary | None = None
     state_distribution: dict[str, int]
     timeseries: list[SessionTimeseriesPoint]
     page: int
@@ -128,6 +129,7 @@ class RevenueAnalyticsResponse(BaseModel):
     """Response for GET /api/v1/admin/analytics/revenue."""
 
     summary: RevenueAnalyticsSummary
+    previous_summary: RevenueAnalyticsSummary | None = None
     timeseries: list[RevenueTimeseriesPoint]
     by_entry_method: dict[str, EntryMethodStats] = Field(default_factory=dict)
 

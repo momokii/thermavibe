@@ -254,6 +254,7 @@ export interface SessionTimeseriesPoint {
 
 export interface SessionAnalyticsResponse {
   summary: SessionAnalyticsSummary;
+  previous_summary: SessionAnalyticsSummary | null;
   state_distribution: Record<string, number>;
   timeseries: SessionTimeseriesPoint[];
   page: number;
@@ -292,6 +293,7 @@ export interface EntryMethodStats {
 
 export interface RevenueAnalyticsResponse {
   summary: RevenueAnalyticsSummary;
+  previous_summary: RevenueAnalyticsSummary | null;
   timeseries: RevenueTimeseriesPoint[];
   by_entry_method: Record<string, EntryMethodStats>;
 }
