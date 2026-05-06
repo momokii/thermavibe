@@ -152,6 +152,20 @@ class FeatureBreakdownResponse(BaseModel):
     features: list[FeatureBreakdownItem]
 
 
+class PeakHourSlot(BaseModel):
+    """Session count for a specific day-of-week and hour combination."""
+
+    day_of_week: int
+    hour: int
+    sessions: int
+
+
+class PeakHoursResponse(BaseModel):
+    """Response for GET /api/v1/admin/analytics/peak-hours."""
+
+    slots: list[PeakHourSlot]
+
+
 # --- Hardware ---
 
 class CameraDeviceInfo(BaseModel):

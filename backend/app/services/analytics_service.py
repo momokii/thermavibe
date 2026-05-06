@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from sqlalchemy import and_, case, func, or_, select, text
+from sqlalchemy import Integer, and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.analytics import AnalyticsEvent
@@ -19,6 +19,8 @@ from app.schemas.admin import (
     EntryMethodStats,
     FeatureBreakdownItem,
     FeatureBreakdownResponse,
+    PeakHourSlot,
+    PeakHoursResponse,
     RevenueAnalyticsResponse,
     RevenueAnalyticsSummary,
     RevenueTimeseriesPoint,
@@ -390,3 +392,44 @@ async def get_feature_breakdown(
         ))
 
     return FeatureBreakdownResponse(features=features)
+
+
+async def get_peak_hours(
+    db: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> PeakHoursResponse:
+    """Get session distribution by day-of-week and hour.
+
+    Returns a slot for every (day, hour) combination within business
+    hours (6–23) that has at least one session.
+    """
+    now = datetime.now(timezone.utc)
+    if start_date is None:
+        start_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_date = start_date.replace(day=max(1, now.day - 30))
+    if end_date is None:
+        end_date = now
+
+    # PostgreSQL DOW: 0=Sunday, 6=Saturday.  Convert to ISO: 1=Mon..7=Sun.
+    stmt = (
+        select(
+            ((func.extract('dow', KioskSession.created_at).cast(Integer) + 6) % 7).label('dow'),
+            func.extract('hour', KioskSession.created_at).cast(Integer).label('hour'),
+            func.count().label('sessions'),
+        )
+        .where(
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+        .group_by(text('dow'), text('hour'))
+        .order_by(text('dow'), text('hour'))
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    slots = [
+        PeakHourSlot(day_of_week=row.dow, hour=row.hour, sessions=row.sessions)
+        for row in rows
+    ]
+    return PeakHoursResponse(slots=slots)

@@ -18,6 +18,7 @@ from app.schemas.admin import (
     HardwareStatusResponse,
     LoginRequest,
     LoginResponse,
+    PeakHoursResponse,
     RevenueAnalyticsResponse,
     SessionAnalyticsResponse,
 )
@@ -176,6 +177,21 @@ async def feature_breakdown(
 ) -> FeatureBreakdownResponse:
     """Get per-feature analytics breakdown (vibe_check vs photobooth)."""
     return await analytics_service.get_feature_breakdown(
+        db=db,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@router.get('/analytics/peak-hours', response_model=PeakHoursResponse)
+async def peak_hours(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> PeakHoursResponse:
+    """Get session distribution by day-of-week and hour."""
+    return await analytics_service.get_peak_hours(
         db=db,
         start_date=start_date,
         end_date=end_date,

@@ -93,6 +93,106 @@ const chartTooltipStyle = {
   fontSize: '13px',
 };
 
+interface PeakHourSlot {
+  day_of_week: number;
+  hour: number;
+  sessions: number;
+}
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const HOUR_START = 6;
+const HOUR_END = 23;
+
+function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
+  const lookup = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of slots) map.set(`${s.day_of_week}-${s.hour}`, s.sessions);
+    return map;
+  }, [slots]);
+
+  const maxSessions = useMemo(
+    () => Math.max(1, ...slots.map((s) => s.sessions)),
+    [slots],
+  );
+
+  const hours = useMemo(() => {
+    const h: number[] = [];
+    for (let i = HOUR_START; i <= HOUR_END; i++) h.push(i);
+    return h;
+  }, []);
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      {/* Hour header */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `3.5rem repeat(${hours.length}, 1fr)`,
+          gap: '2px',
+          marginBottom: '2px',
+        }}
+      >
+        <div />
+        {hours.map((h) => (
+          <div
+            key={h}
+            className="text-center tabular-nums"
+            style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}
+          >
+            {h % 12 || 12}{h < 12 ? 'a' : 'p'}
+          </div>
+        ))}
+      </div>
+
+      {/* Day rows */}
+      {DAY_LABELS.map((day, dow) => (
+        <div
+          key={day}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `3.5rem repeat(${hours.length}, 1fr)`,
+            gap: '2px',
+            marginBottom: '2px',
+          }}
+        >
+          <div
+            className="flex items-center justify-end"
+            style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', paddingRight: '0.5rem' }}
+          >
+            {day}
+          </div>
+          {hours.map((hour) => {
+            const count = lookup.get(`${dow}-${hour}`) ?? 0;
+            const intensity = count / maxSessions;
+            return (
+              <div
+                key={hour}
+                title={`${day} ${hour}:00 — ${count} session${count !== 1 ? 's' : ''}`}
+                style={{
+                  height: '28px',
+                  borderRadius: '3px',
+                  backgroundColor:
+                    count === 0
+                      ? 'rgba(255,255,255,0.03)'
+                      : `rgba(34,197,94,${0.15 + intensity * 0.75})`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  color: intensity > 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
+                  cursor: 'default',
+                }}
+              >
+                {count > 0 ? count : ''}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   mode?: 'summary' | 'full';
 }
@@ -116,6 +216,11 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const { data: features } = useQuery({
     queryKey: ['analytics-features', params],
     queryFn: () => adminApi.getFeatureBreakdown(params).then((r) => r.data),
+  });
+
+  const { data: peakHours } = useQuery({
+    queryKey: ['analytics-peak-hours', params],
+    queryFn: () => adminApi.getPeakHours(params).then((r) => r.data),
   });
 
   if (sessionsLoading || revenueLoading) {
@@ -247,7 +352,10 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           <p className="text-2xl font-bold font-display text-white">
             {formatIDR(revenue?.summary.total_revenue ?? 0)}
           </p>
-          <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
+            Avg per session: <span className="text-white/50">{formatIDR(revenue?.summary.avg_transaction_amount ?? 0)}</span>
+          </p>
+          <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span className="text-xs text-white/30">
               <span style={{ color: COLORS.payment }}>Payment:</span>{' '}
               {formatIDR(revenue?.summary.payment_revenue ?? 0)}
@@ -430,6 +538,19 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                     </Badge>
                   ))}
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Peak Hours Heatmap */}
+          {peakHours && peakHours.slots.length > 0 && (
+            <Card className="card-surface border-0">
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Peak Hours</h3>
+                <p className="text-xs text-white/25" style={{ marginBottom: '1.25rem' }}>
+                  When your kiosk gets the most traffic. Brighter cells = more sessions.
+                </p>
+                <PeakHoursHeatmap slots={peakHours.slots} />
               </div>
             </Card>
           )}

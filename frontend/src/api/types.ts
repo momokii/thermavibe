@@ -314,6 +314,16 @@ export interface FeatureBreakdownResponse {
   features: FeatureBreakdownItem[];
 }
 
+export interface PeakHourSlot {
+  day_of_week: number;
+  hour: number;
+  sessions: number;
+}
+
+export interface PeakHoursResponse {
+  slots: PeakHourSlot[];
+}
+
 // --- Admin Hardware ---
 
 export interface CameraDeviceInfo {
