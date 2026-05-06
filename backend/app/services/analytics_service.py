@@ -383,7 +383,7 @@ async def get_feature_breakdown(
 
         # Revenue: payment (cashless) — exclude access-code sessions
         payment_rev_stmt = select(
-            func.coalesce(func.sum(KioskSession.payment_amount), 0),
+            func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
             func.count().label('tx'),
         ).where(
             *base,
@@ -391,12 +391,12 @@ async def get_feature_breakdown(
             KioskSession.access_code_id.is_(None),
         )
         payment_row = (await db.execute(payment_rev_stmt)).one()
-        payment_revenue = int(payment_row[0] or 0)
+        payment_revenue = int(payment_row.total or 0)
         payment_tx = payment_row.tx or 0
 
         # Revenue: access code — only positive amounts
         ac_rev_stmt = select(
-            func.coalesce(func.sum(KioskSession.payment_amount), 0),
+            func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
             func.count().label('tx'),
         ).where(
             *base,
@@ -404,7 +404,7 @@ async def get_feature_breakdown(
             KioskSession.payment_amount > 0,
         )
         ac_row = (await db.execute(ac_rev_stmt)).one()
-        access_code_revenue = int(ac_row[0] or 0)
+        access_code_revenue = int(ac_row.total or 0)
         ac_tx = ac_row.tx or 0
 
         revenue = payment_revenue + access_code_revenue

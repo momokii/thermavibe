@@ -134,19 +134,8 @@ class TestGetSessionAnalytics:
         """get_session_analytics with no sessions returns zero for all totals."""
         db = _make_mock_db()
 
-        call_idx = 0
-
         def execute_side_effect(stmt):
-            nonlocal call_idx
-            call_idx += 1
-            if call_idx <= 3:
-                # total count, completed count, avg duration
-                return _mock_scalar(0)
-            if call_idx == 4:
-                # state distribution
-                return _mock_all([])
-            # timeseries
-            return _mock_all([])
+            return _mock_scalar(0)
 
         db.execute.side_effect = execute_side_effect
 
@@ -158,6 +147,7 @@ class TestGetSessionAnalytics:
         assert result.summary.completed_sessions == 0
         assert result.summary.completion_rate == 0.0
         assert result.summary.avg_duration_seconds == 0.0
+        assert result.previous_summary is not None
 
     async def test_with_sessions(self):
         """get_session_analytics with sessions returns correct metrics."""
@@ -168,13 +158,13 @@ class TestGetSessionAnalytics:
         def execute_side_effect(stmt):
             nonlocal call_idx
             call_idx += 1
-            if call_idx == 1:
-                return _mock_scalar(10)  # total
-            if call_idx == 2:
-                return _mock_scalar(8)  # completed
-            if call_idx == 3:
-                return _mock_scalar(15.5)  # avg duration
-            if call_idx == 4:
+            if call_idx <= 3:
+                # current summary: total, completed, avg duration
+                return _mock_scalar([10, 8, 15.5][call_idx - 1])
+            if call_idx <= 6:
+                # previous summary: total, completed, avg duration
+                return _mock_scalar([5, 4, 12.0][call_idx - 4])
+            if call_idx == 7:
                 return _mock_all([('idle', 3), ('reset', 7)])  # state dist
             # timeseries
             return _mock_all([])
@@ -191,6 +181,7 @@ class TestGetSessionAnalytics:
         assert result.summary.completion_rate == 0.8
         assert result.summary.avg_duration_seconds == 15.5
         assert result.state_distribution == {'idle': 3, 'reset': 7}
+        assert result.previous_summary.total_sessions == 5
 
 
 # ---------------------------------------------------------------------------
@@ -205,19 +196,8 @@ class TestGetRevenueAnalytics:
         """get_revenue_analytics with no transactions returns zero for all fields."""
         db = _make_mock_db()
 
-        call_idx = 0
-
         def execute_side_effect(stmt):
-            nonlocal call_idx
-            call_idx += 1
-            if call_idx == 1:
-                # payment summary
-                return _mock_one(tx_count=0, total=0)
-            if call_idx == 2:
-                # access code summary
-                return _mock_one(tx_count=0, total=0)
-            # timeseries
-            return _mock_all([])
+            return _mock_one(tx_count=0, total=0)
 
         db.execute.side_effect = execute_side_effect
 
@@ -229,6 +209,7 @@ class TestGetRevenueAnalytics:
         assert result.summary.total_transactions == 0
         assert result.summary.payment_revenue == 0
         assert result.summary.access_code_revenue == 0
+        assert result.previous_summary is not None
 
     async def test_with_payment_and_access_code_revenue(self):
         """get_revenue_analytics correctly separates payment and access code revenue."""
@@ -239,12 +220,14 @@ class TestGetRevenueAnalytics:
         def execute_side_effect(stmt):
             nonlocal call_idx
             call_idx += 1
-            if call_idx == 1:
-                # payment summary: 3 transactions, 15000 total
-                return _mock_one(tx_count=3, total=15000)
-            if call_idx == 2:
-                # access code summary: 2 transactions, 10000 total
-                return _mock_one(tx_count=2, total=10000)
+            if call_idx <= 2:
+                # current summary: payment, access code
+                data = [(3, 15000), (2, 10000)]
+                return _mock_one(tx_count=data[call_idx - 1][0], total=data[call_idx - 1][1])
+            if call_idx <= 4:
+                # previous summary: payment, access code
+                data = [(1, 5000), (0, 0)]
+                return _mock_one(tx_count=data[call_idx - 3][0], total=data[call_idx - 3][1])
             # timeseries
             return _mock_all([])
 
@@ -266,6 +249,7 @@ class TestGetRevenueAnalytics:
         assert result.by_entry_method['payment'].revenue == 15000
         assert 'access_code' in result.by_entry_method
         assert result.by_entry_method['access_code'].revenue == 10000
+        assert result.previous_summary.total_revenue == 5000
 
     async def test_payment_only(self):
         """get_revenue_analytics with only payment revenue, no access codes."""
@@ -276,9 +260,12 @@ class TestGetRevenueAnalytics:
         def execute_side_effect(stmt):
             nonlocal call_idx
             call_idx += 1
-            if call_idx == 1:
-                return _mock_one(tx_count=4, total=20000)
-            if call_idx == 2:
+            if call_idx <= 2:
+                # current summary
+                data = [(4, 20000), (0, 0)]
+                return _mock_one(tx_count=data[call_idx - 1][0], total=data[call_idx - 1][1])
+            if call_idx <= 4:
+                # previous summary
                 return _mock_one(tx_count=0, total=0)
             return _mock_all([])
 
@@ -306,16 +293,15 @@ class TestGetFeatureBreakdown:
         """Returns both vibe_check and photobooth even with no sessions."""
         db = _make_mock_db()
 
-        # For each session_type: total, completed, avg, payment_revenue, access_code_revenue
-        # = 5 calls per type, 10 total
         call_idx = 0
 
         def execute_side_effect(stmt):
             nonlocal call_idx
             call_idx += 1
             if call_idx in (3, 8):
-                # avg duration returns None when no sessions
                 return _mock_scalar(None)
+            if call_idx in (4, 5, 9, 10):
+                return _mock_one(total=0, tx=0)
             return _mock_scalar(0)
 
         db.execute.side_effect = execute_side_effect
@@ -338,19 +324,23 @@ class TestGetFeatureBreakdown:
         """Correctly separates vibe_check and photobooth metrics with entry method revenue."""
         db = _make_mock_db()
 
-        # vibe_check: total=5, completed=4, avg=12.0, payment_rev=8000, ac_rev=2000
-        # photobooth: total=3, completed=2, avg=25.0, payment_rev=4000, ac_rev=2000
-        values = [
-            5, 4, 12.0, 8000, 2000,   # vibe_check: total, completed, avg, payment_rev, ac_rev
-            3, 2, 25.0, 4000, 2000,   # photobooth: total, completed, avg, payment_rev, ac_rev
-        ]
+        scalars = iter([
+            5, 4, 12.0,
+            3, 2, 25.0,
+        ])
+        ones = iter([
+            (8000, 2), (2000, 1),
+            (4000, 1), (2000, 1),
+        ])
         call_idx = 0
 
         def execute_side_effect(stmt):
             nonlocal call_idx
-            val = values[call_idx]
             call_idx += 1
-            return _mock_scalar(val)
+            if call_idx in (4, 5, 9, 10):
+                total, tx = next(ones)
+                return _mock_one(total=total, tx=tx)
+            return _mock_scalar(next(scalars))
 
         db.execute.side_effect = execute_side_effect
 
@@ -368,6 +358,7 @@ class TestGetFeatureBreakdown:
         assert vc.revenue == 10000
         assert vc.payment_revenue == 8000
         assert vc.access_code_revenue == 2000
+        assert vc.paid_sessions == 3
 
         pb = result.features[1]
         assert pb.feature == 'photobooth'
