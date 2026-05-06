@@ -306,6 +306,7 @@ export interface FeatureBreakdownItem {
   completion_rate: number;
   avg_duration_seconds: number;
   revenue: number;
+  paid_sessions: number;
   payment_revenue: number;
   access_code_revenue: number;
 }

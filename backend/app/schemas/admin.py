@@ -142,6 +142,7 @@ class FeatureBreakdownItem(BaseModel):
     completion_rate: float
     avg_duration_seconds: float
     revenue: int
+    paid_sessions: int = 0
     payment_revenue: int = 0
     access_code_revenue: int = 0
 

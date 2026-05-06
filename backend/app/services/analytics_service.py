@@ -360,24 +360,31 @@ async def get_feature_breakdown(
         # Revenue: payment (cashless) — exclude access-code sessions
         payment_rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
+            func.count().label('tx'),
         ).where(
             *base,
             KioskSession.payment_status == PaymentStatus.CONFIRMED,
             KioskSession.access_code_id.is_(None),
         )
-        payment_revenue = int((await db.execute(payment_rev_stmt)).scalar() or 0)
+        payment_row = (await db.execute(payment_rev_stmt)).one()
+        payment_revenue = int(payment_row[0] or 0)
+        payment_tx = payment_row.tx or 0
 
         # Revenue: access code — only positive amounts
         ac_rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
+            func.count().label('tx'),
         ).where(
             *base,
             KioskSession.access_code_id.isnot(None),
             KioskSession.payment_amount > 0,
         )
-        access_code_revenue = int((await db.execute(ac_rev_stmt)).scalar() or 0)
+        ac_row = (await db.execute(ac_rev_stmt)).one()
+        access_code_revenue = int(ac_row[0] or 0)
+        ac_tx = ac_row.tx or 0
 
         revenue = payment_revenue + access_code_revenue
+        paid_sessions = payment_tx + ac_tx
 
         features.append(FeatureBreakdownItem(
             feature=session_type.value,
@@ -387,6 +394,7 @@ async def get_feature_breakdown(
             completion_rate=round(completion_rate, 2),
             avg_duration_seconds=round(avg_duration, 2),
             revenue=revenue,
+            paid_sessions=paid_sessions,
             payment_revenue=payment_revenue,
             access_code_revenue=access_code_revenue,
         ))
