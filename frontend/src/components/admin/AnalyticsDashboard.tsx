@@ -162,7 +162,11 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           <p className="text-2xl font-bold font-display text-white">
             {formatPercent(sessions?.summary.completion_rate ?? 0)}
           </p>
-          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>Sessions that reached the reveal/print stage.</p>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
+            <span style={{ color: 'rgba(34,197,94,0.7)' }}>{sessions?.summary.completed_sessions ?? 0} completed</span>
+            {' / '}
+            <span style={{ color: 'rgba(239,68,68,0.7)' }}>{sessions?.summary.abandoned_sessions ?? 0} abandoned</span>
+          </p>
         </Card>
 
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
@@ -217,6 +221,11 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                     <div>
                       <p className="text-xs text-white/30">Completion</p>
                       <p className="text-lg font-display font-bold text-white">{formatPercent(f.completion_rate)}</p>
+                      <p className="text-xs text-white/25" style={{ marginTop: '0.15rem' }}>
+                        <span style={{ color: 'rgba(34,197,94,0.7)' }}>{f.completed_sessions}</span>
+                        {' / '}
+                        <span style={{ color: 'rgba(239,68,68,0.7)' }}>{f.abandoned_sessions}</span>
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-white/30">Avg Duration</p>
