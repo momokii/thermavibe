@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -125,6 +125,13 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
 
   const [tooltip, setTooltip] = useState<{ day: string; hour: number; slot: PeakHourSlot; x: number; y: number } | null>(null);
 
+  useEffect(() => {
+    if (!tooltip) return;
+    const handler = () => setTooltip(null);
+    window.addEventListener('scroll', handler, true);
+    return () => window.removeEventListener('scroll', handler, true);
+  }, [tooltip]);
+
   return (
     <div data-heatmap-container style={{ position: 'relative', overflowX: 'auto' }} onMouseLeave={() => setTooltip(null)}>
       {/* Hour header */}
@@ -175,14 +182,12 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
                 onMouseEnter={(e) => {
                   if (count === 0) return;
                   const rect = e.currentTarget.getBoundingClientRect();
-                  const parent = e.currentTarget.closest('[data-heatmap-container]');
-                  const parentRect = parent ? parent.getBoundingClientRect() : rect;
                   setTooltip({
                     day,
                     hour,
                     slot: slot!,
-                    x: rect.left - parentRect.left + rect.width / 2,
-                    y: rect.top - parentRect.top,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top,
                   });
                 }}
                 onMouseLeave={() => setTooltip(null)}
@@ -213,7 +218,7 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
       {tooltip && (
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             left: tooltip.x,
             top: tooltip.y - 8,
             transform: 'translate(-50%, -100%)',
@@ -224,7 +229,7 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
             fontSize: '12px',
             color: 'white',
             pointerEvents: 'none',
-            zIndex: 10,
+            zIndex: 9999,
             whiteSpace: 'nowrap',
           }}
         >
