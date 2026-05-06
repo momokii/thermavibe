@@ -119,9 +119,14 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
-        <h2 className="text-2xl font-display font-bold text-white">Analytics</h2>
+        <h2 className="text-2xl font-display font-bold text-white">
+          {mode === 'summary' ? 'Dashboard' : 'Analytics'}
+        </h2>
         <p className="text-sm text-white/30" style={{ marginTop: '0.25rem' }}>
           Session activity and revenue performance for your kiosk.
+          {mode === 'summary' && (
+            <> Last 30 days.</>
+          )}
         </p>
       </div>
 
@@ -154,7 +159,10 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           <p className="text-2xl font-bold font-display text-white tabular-nums">
             {sessions?.summary.total_sessions ?? 0}
           </p>
-          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>All photo sessions started, including abandoned ones.</p>
+          <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
+            All photo sessions started, including abandoned ones.
+            {mode === 'summary' && ' (last 30 days)'}
+          </p>
         </Card>
 
         <Card className="card-surface border-0" style={{ padding: '1.25rem' }}>
