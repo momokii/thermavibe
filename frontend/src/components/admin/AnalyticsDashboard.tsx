@@ -166,20 +166,46 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
       {/* Custom date range inputs */}
       {mode === 'full' && range === 'custom' && (
-        <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={customStart}
-            onChange={(e) => setCustomStart(e.target.value)}
-            className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/80 outline-none focus:border-white/20"
-          />
-          <span className="text-sm text-white/30">to</span>
-          <input
-            type="date"
-            value={customEnd}
-            onChange={(e) => setCustomEnd(e.target.value)}
-            className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/80 outline-none focus:border-white/20"
-          />
+        <div
+          className="flex items-center gap-3"
+          style={{ colorScheme: 'dark' }}
+        >
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-white/30">From</label>
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '0.375rem',
+                padding: '0.5rem 0.75rem',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.875rem',
+                outline: 'none',
+                minWidth: '150px',
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-white/30">To</label>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '0.375rem',
+                padding: '0.5rem 0.75rem',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: '0.875rem',
+                outline: 'none',
+                minWidth: '150px',
+              }}
+            />
+          </div>
         </div>
       )}
 
