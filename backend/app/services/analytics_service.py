@@ -157,12 +157,13 @@ async def get_revenue_analytics(
     if end_date is None:
         end_date = now
 
-    # Payment revenue (QRIS/cashless)
+    # Payment revenue (QRIS/cashless) — exclude access-code sessions
     payment_stmt = select(
         func.count().label('tx_count'),
         func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
     ).where(
         KioskSession.payment_status == PaymentStatus.CONFIRMED,
+        KioskSession.access_code_id.is_(None),
         KioskSession.created_at >= start_date,
         KioskSession.created_at <= end_date,
     )
@@ -170,13 +171,13 @@ async def get_revenue_analytics(
     payment_tx = payment_row.tx_count or 0
     payment_rev = int(payment_row.total or 0)
 
-    # Access code revenue (priced codes)
+    # Access code revenue (priced codes) — only positive amounts
     ac_stmt = select(
         func.count().label('tx_count'),
         func.coalesce(func.sum(KioskSession.payment_amount), 0).label('total'),
     ).where(
         KioskSession.access_code_id.isnot(None),
-        KioskSession.payment_amount.isnot(None),
+        KioskSession.payment_amount > 0,
         KioskSession.created_at >= start_date,
         KioskSession.created_at <= end_date,
     )
@@ -220,11 +221,17 @@ async def get_revenue_analytics(
             func.coalesce(func.sum(KioskSession.payment_amount), 0).label('revenue'),
             func.count().label('transactions'),
             func.coalesce(func.sum(case(
-                (KioskSession.payment_status == PaymentStatus.CONFIRMED, KioskSession.payment_amount),
+                (and_(
+                    KioskSession.payment_status == PaymentStatus.CONFIRMED,
+                    KioskSession.access_code_id.is_(None),
+                ), KioskSession.payment_amount),
                 else_=0,
             )), 0).label('payment_revenue'),
             func.sum(case(
-                (KioskSession.payment_status == PaymentStatus.CONFIRMED, 1),
+                (and_(
+                    KioskSession.payment_status == PaymentStatus.CONFIRMED,
+                    KioskSession.access_code_id.is_(None),
+                ), 1),
                 else_=0,
             )).label('payment_tx'),
             func.coalesce(func.sum(case(
@@ -348,22 +355,23 @@ async def get_feature_breakdown(
         ).where(*base, KioskSession.completed_at.isnot(None))
         avg_duration = float((await db.execute(avg_stmt)).scalar() or 0)
 
-        # Revenue: payment (cashless)
+        # Revenue: payment (cashless) — exclude access-code sessions
         payment_rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
         ).where(
             *base,
             KioskSession.payment_status == PaymentStatus.CONFIRMED,
+            KioskSession.access_code_id.is_(None),
         )
         payment_revenue = int((await db.execute(payment_rev_stmt)).scalar() or 0)
 
-        # Revenue: access code
+        # Revenue: access code — only positive amounts
         ac_rev_stmt = select(
             func.coalesce(func.sum(KioskSession.payment_amount), 0),
         ).where(
             *base,
             KioskSession.access_code_id.isnot(None),
-            KioskSession.payment_amount.isnot(None),
+            KioskSession.payment_amount > 0,
         )
         access_code_revenue = int((await db.execute(ac_rev_stmt)).scalar() or 0)
 

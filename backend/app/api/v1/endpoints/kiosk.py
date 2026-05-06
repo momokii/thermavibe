@@ -791,6 +791,7 @@ async def redeem_access_code(
     session.access_code_id = validation['access_code_id']
     if redeemed_code.price is not None:
         session.payment_amount = redeemed_code.price
+    await db.flush()
     session = await session_service.transition_state(db, session_id, session_service.KioskState.CAPTURE)
 
     return _session_to_response(session, settings)
