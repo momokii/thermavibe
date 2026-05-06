@@ -38,16 +38,17 @@ const COLORS = {
 
 const MAX_CHART_POINTS = 30;
 
-type Range = '7d' | '30d' | '90d' | 'all';
+type Range = '7d' | '30d' | '90d' | 'all' | 'custom';
 
 const RANGES: { key: Range; label: string }[] = [
   { key: '7d', label: '7 Days' },
   { key: '30d', label: '30 Days' },
   { key: '90d', label: '90 Days' },
   { key: 'all', label: 'All Time' },
+  { key: 'custom', label: 'Custom' },
 ];
 
-function getRangeParams(range: Range) {
+function getRangeParams(range: Range, customStart?: string, customEnd?: string) {
   const now = new Date();
   const end = now.toISOString();
   let start: string;
@@ -70,6 +71,15 @@ function getRangeParams(range: Range) {
       start = '2000-01-01T00:00:00Z';
       group_by = 'month';
       break;
+    case 'custom': {
+      const s = customStart || new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString().slice(0, 10);
+      const e = customEnd || now.toISOString().slice(0, 10);
+      start = `${s}T00:00:00Z`;
+      const endDate = `${e}T23:59:59Z`;
+      const daysDiff = (new Date(endDate).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24);
+      group_by = daysDiff <= 31 ? 'day' : daysDiff <= 180 ? 'week' : 'month';
+      return { start_date: start, end_date: endDate, group_by };
+    }
   }
 
   return { start_date: start, end_date: end, group_by };
@@ -89,7 +99,9 @@ interface Props {
 
 export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const [range, setRange] = useState<Range>('30d');
-  const params = useMemo(() => getRangeParams(range), [range]);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const params = useMemo(() => getRangeParams(range, customStart, customEnd), [range, customStart, customEnd]);
 
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['analytics-sessions', params],
@@ -149,6 +161,25 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
               {r.label}
             </Button>
           ))}
+        </div>
+      )}
+
+      {/* Custom date range inputs */}
+      {mode === 'full' && range === 'custom' && (
+        <div className="flex items-center gap-3">
+          <input
+            type="date"
+            value={customStart}
+            onChange={(e) => setCustomStart(e.target.value)}
+            className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/80 outline-none focus:border-white/20"
+          />
+          <span className="text-sm text-white/30">to</span>
+          <input
+            type="date"
+            value={customEnd}
+            onChange={(e) => setCustomEnd(e.target.value)}
+            className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm text-white/80 outline-none focus:border-white/20"
+          />
         </div>
       )}
 
