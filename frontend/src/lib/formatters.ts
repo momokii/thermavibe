@@ -49,9 +49,20 @@ export function formatPeriod(period: string): string {
     const d = new Date(period + 'T00:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
-  // Weekly: "2026-W15" → "Week 15, 2026"
+  // Weekly: "2026-W15" → "Apr 7 – Apr 13"
   const weekMatch = period.match(/^(\d{4})-W(\d{2})$/);
-  if (weekMatch) return `Week ${Number(weekMatch[2])}, ${weekMatch[1]}`;
+  if (weekMatch) {
+    const year = Number(weekMatch[1]);
+    const week = Number(weekMatch[2]);
+    // Calculate the Monday of that ISO week
+    const jan4 = new Date(year, 0, 4);
+    const dayOfWeek = jan4.getDay() || 7; // Mon=1..Sun=7
+    const monday = new Date(year, 0, 4 - dayOfWeek + (week - 1) * 7 + 1);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(monday)} – ${fmt(sunday)}`;
+  }
   // Monthly: "2026-04" → "Apr 2026"
   const monthMatch = period.match(/^(\d{4})-(\d{2})$/);
   if (monthMatch) {
