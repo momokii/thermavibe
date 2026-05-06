@@ -464,9 +464,9 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                       <p className="text-sm font-display font-semibold text-white/80">{formatDuration(f.avg_duration_seconds)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-white/30">Avg / Session</p>
+                      <p className="text-xs text-white/30">Avg / Completed</p>
                       <p className="text-sm font-display font-semibold text-white/80">
-                        {formatIDR(f.total_sessions > 0 ? Math.round(f.revenue / f.total_sessions) : 0)}
+                        {formatIDR(f.completed_sessions > 0 ? Math.round(f.revenue / f.completed_sessions) : 0)}
                       </p>
                     </div>
                     <div>
