@@ -318,6 +318,8 @@ export interface PeakHourSlot {
   day_of_week: number;
   hour: number;
   sessions: number;
+  vibe_check_sessions: number;
+  photobooth_sessions: number;
 }
 
 export interface PeakHoursResponse {

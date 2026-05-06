@@ -158,6 +158,8 @@ class PeakHourSlot(BaseModel):
     day_of_week: int
     hour: int
     sessions: int
+    vibe_check_sessions: int = 0
+    photobooth_sessions: int = 0
 
 
 class PeakHoursResponse(BaseModel):

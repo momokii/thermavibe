@@ -417,6 +417,14 @@ async def get_peak_hours(
             ((func.extract('dow', KioskSession.created_at).cast(Integer) + 6) % 7).label('dow'),
             func.extract('hour', KioskSession.created_at).cast(Integer).label('hour'),
             func.count().label('sessions'),
+            func.sum(case(
+                (KioskSession.session_type == SessionType.VIBE_CHECK, 1),
+                else_=0,
+            )).label('vibe_check'),
+            func.sum(case(
+                (KioskSession.session_type == SessionType.PHOTOBOOTH, 1),
+                else_=0,
+            )).label('photobooth'),
         )
         .where(
             KioskSession.created_at >= start_date,
@@ -429,7 +437,13 @@ async def get_peak_hours(
     rows = result.all()
 
     slots = [
-        PeakHourSlot(day_of_week=row.dow, hour=row.hour, sessions=row.sessions)
+        PeakHourSlot(
+            day_of_week=row.dow,
+            hour=row.hour,
+            sessions=row.sessions,
+            vibe_check_sessions=int(row.vibe_check or 0),
+            photobooth_sessions=int(row.photobooth or 0),
+        )
         for row in rows
     ]
     return PeakHoursResponse(slots=slots)

@@ -97,6 +97,8 @@ interface PeakHourSlot {
   day_of_week: number;
   hour: number;
   sessions: number;
+  vibe_check_sessions: number;
+  photobooth_sessions: number;
 }
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -105,8 +107,8 @@ const HOUR_END = 23;
 
 function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
   const lookup = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const s of slots) map.set(`${s.day_of_week}-${s.hour}`, s.sessions);
+    const map = new Map<string, PeakHourSlot>();
+    for (const s of slots) map.set(`${s.day_of_week}-${s.hour}`, s);
     return map;
   }, [slots]);
 
@@ -121,8 +123,10 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
     return h;
   }, []);
 
+  const [tooltip, setTooltip] = useState<{ day: string; hour: number; slot: PeakHourSlot; x: number; y: number } | null>(null);
+
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div data-heatmap-container style={{ position: 'relative', overflowX: 'auto' }} onMouseLeave={() => setTooltip(null)}>
       {/* Hour header */}
       <div
         style={{
@@ -162,12 +166,26 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
             {day}
           </div>
           {hours.map((hour) => {
-            const count = lookup.get(`${dow}-${hour}`) ?? 0;
+            const slot = lookup.get(`${dow}-${hour}`);
+            const count = slot?.sessions ?? 0;
             const intensity = count / maxSessions;
             return (
               <div
                 key={hour}
-                title={`${day} ${hour}:00 — ${count} session${count !== 1 ? 's' : ''}`}
+                onMouseEnter={(e) => {
+                  if (count === 0) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const parent = e.currentTarget.closest('[data-heatmap-container]');
+                  const parentRect = parent ? parent.getBoundingClientRect() : rect;
+                  setTooltip({
+                    day,
+                    hour,
+                    slot: slot!,
+                    x: rect.left - parentRect.left + rect.width / 2,
+                    y: rect.top - parentRect.top,
+                  });
+                }}
+                onMouseLeave={() => setTooltip(null)}
                 style={{
                   height: '28px',
                   borderRadius: '3px',
@@ -180,7 +198,8 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
                   justifyContent: 'center',
                   fontSize: '10px',
                   color: intensity > 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
-                  cursor: 'default',
+                  cursor: count > 0 ? 'pointer' : 'default',
+                  transition: 'background-color 0.15s',
                 }}
               >
                 {count > 0 ? count : ''}
@@ -189,6 +208,38 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
           })}
         </div>
       ))}
+
+      {/* Hover tooltip */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: tooltip.x,
+            top: tooltip.y - 8,
+            transform: 'translate(-50%, -100%)',
+            background: 'rgba(15,15,20,0.95)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '8px',
+            padding: '0.5rem 0.75rem',
+            fontSize: '12px',
+            color: 'white',
+            pointerEvents: 'none',
+            zIndex: 10,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <p style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+            {tooltip.day} {tooltip.hour}:00
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.5)' }}>
+            {tooltip.slot.sessions} session{tooltip.slot.sessions !== 1 ? 's' : ''}
+          </p>
+          <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem' }}>
+            <span style={{ color: COLORS.completed }}>Vibe Check: {tooltip.slot.vibe_check_sessions}</span>
+            <span style={{ color: COLORS.payment }}>Photobooth: {tooltip.slot.photobooth_sessions}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -353,7 +404,10 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             {formatIDR(revenue?.summary.total_revenue ?? 0)}
           </p>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
-            Avg per session: <span className="text-white/50">{formatIDR(revenue?.summary.avg_transaction_amount ?? 0)}</span>
+            Avg per paid session: <span className="text-white/50">{formatIDR(revenue?.summary.avg_transaction_amount ?? 0)}</span>
+          </p>
+          <p className="text-xs text-white/20" style={{ marginTop: '0.15rem' }}>
+            Average revenue from each session that had a payment or priced access code.
           </p>
           <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span className="text-xs text-white/30">
@@ -403,6 +457,12 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
                     <div>
                       <p className="text-xs text-white/30">Avg Duration</p>
                       <p className="text-sm font-display font-semibold text-white/80">{formatDuration(f.avg_duration_seconds)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/30">Avg / Session</p>
+                      <p className="text-sm font-display font-semibold text-white/80">
+                        {formatIDR(f.total_sessions > 0 ? Math.round(f.revenue / f.total_sessions) : 0)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-white/30">Revenue</p>
