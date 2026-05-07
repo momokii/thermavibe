@@ -323,10 +323,29 @@ export interface PeakHourSlot {
   sessions: number;
   vibe_check_sessions: number;
   photobooth_sessions: number;
+  revenue: number;
 }
 
 export interface PeakHoursResponse {
   slots: PeakHourSlot[];
+}
+
+export interface DropoffStage {
+  state: string;
+  count: number;
+  percentage: number;
+}
+
+export interface DropoffFunnelResponse {
+  total_abandoned: number;
+  stages: DropoffStage[];
+}
+
+export interface PrintStatsResponse {
+  total_prints: number;
+  successful: number;
+  failed: number;
+  success_rate: number;
 }
 
 // --- Admin Hardware ---

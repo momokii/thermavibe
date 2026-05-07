@@ -163,12 +163,37 @@ class PeakHourSlot(BaseModel):
     sessions: int
     vibe_check_sessions: int = 0
     photobooth_sessions: int = 0
+    revenue: int = 0
 
 
 class PeakHoursResponse(BaseModel):
     """Response for GET /api/v1/admin/analytics/peak-hours."""
 
     slots: list[PeakHourSlot]
+
+
+class DropoffStage(BaseModel):
+    """A single stage in the drop-off funnel."""
+
+    state: str
+    count: int
+    percentage: float
+
+
+class DropoffFunnelResponse(BaseModel):
+    """Response for GET /api/v1/admin/analytics/dropoff."""
+
+    total_abandoned: int
+    stages: list[DropoffStage]
+
+
+class PrintStatsResponse(BaseModel):
+    """Response for GET /api/v1/admin/analytics/print-stats."""
+
+    total_prints: int
+    successful: int
+    failed: int
+    success_rate: float
 
 
 # --- Hardware ---

@@ -99,13 +99,14 @@ interface PeakHourSlot {
   sessions: number;
   vibe_check_sessions: number;
   photobooth_sessions: number;
+  revenue: number;
 }
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOUR_START = 6;
 const HOUR_END = 23;
 
-function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
+function PeakHoursHeatmap({ slots, mode }: { slots: PeakHourSlot[]; mode: 'sessions' | 'revenue' }) {
   const lookup = useMemo(() => {
     const map = new Map<string, PeakHourSlot>();
     for (const s of slots) map.set(`${s.day_of_week}-${s.hour}`, s);
@@ -114,6 +115,11 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
 
   const maxSessions = useMemo(
     () => Math.max(1, ...slots.map((s) => s.sessions)),
+    [slots],
+  );
+
+  const maxRevenue = useMemo(
+    () => Math.max(1, ...slots.map((s) => s.revenue)),
     [slots],
   );
 
@@ -175,12 +181,18 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
           {hours.map((hour) => {
             const slot = lookup.get(`${dow}-${hour}`);
             const count = slot?.sessions ?? 0;
-            const intensity = count / maxSessions;
+            const revenue = slot?.revenue ?? 0;
+            const value = mode === 'sessions' ? count : revenue;
+            const max = mode === 'sessions' ? maxSessions : maxRevenue;
+            const intensity = value / max;
+            const display = mode === 'sessions'
+              ? (count > 0 ? count : '')
+              : (revenue > 0 ? `${(revenue / 1000).toFixed(0)}k` : '');
             return (
               <div
                 key={hour}
                 onMouseEnter={(e) => {
-                  if (count === 0) return;
+                  if (count === 0 && revenue === 0) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   setTooltip({
                     day,
@@ -195,19 +207,21 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
                   height: '28px',
                   borderRadius: '3px',
                   backgroundColor:
-                    count === 0
+                    value === 0
                       ? 'rgba(255,255,255,0.03)'
-                      : `rgba(34,197,94,${0.15 + intensity * 0.75})`,
+                      : mode === 'sessions'
+                        ? `rgba(34,197,94,${0.15 + intensity * 0.75})`
+                        : `rgba(139,92,246,${0.15 + intensity * 0.75})`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '10px',
                   color: intensity > 0.5 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
-                  cursor: count > 0 ? 'pointer' : 'default',
+                  cursor: (count > 0 || revenue > 0) ? 'pointer' : 'default',
                   transition: 'background-color 0.15s',
                 }}
               >
-                {count > 0 ? count : ''}
+                {display}
               </div>
             );
           })}
@@ -238,6 +252,7 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
           </p>
           <p style={{ color: 'rgba(255,255,255,0.5)' }}>
             {tooltip.slot.sessions} session{tooltip.slot.sessions !== 1 ? 's' : ''}
+            {tooltip.slot.revenue > 0 && ` · ${formatIDR(tooltip.slot.revenue)}`}
           </p>
           <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem' }}>
             <span style={{ color: COLORS.completed }}>Vibe Check: {tooltip.slot.vibe_check_sessions}</span>
@@ -277,6 +292,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const [range, setRange] = useState<Range>('30d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [heatmapMode, setHeatmapMode] = useState<'sessions' | 'revenue'>('sessions');
   const params = useMemo(() => getRangeParams(range, customStart, customEnd), [range, customStart, customEnd]);
   const rangeLabel = range === 'custom' ? 'period' : RANGES.find((r) => r.key === range)?.label.toLowerCase() ?? 'period';
 
@@ -298,6 +314,16 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const { data: peakHours } = useQuery({
     queryKey: ['analytics-peak-hours', params],
     queryFn: () => adminApi.getPeakHours(params).then((r) => r.data),
+  });
+
+  const { data: dropoff } = useQuery({
+    queryKey: ['analytics-dropoff', params],
+    queryFn: () => adminApi.getDropoffFunnel(params).then((r) => r.data),
+  });
+
+  const { data: printStats } = useQuery({
+    queryKey: ['analytics-print-stats', params],
+    queryFn: () => adminApi.getPrintStats(params).then((r) => r.data),
   });
 
   if (sessionsLoading || revenueLoading) {
@@ -644,11 +670,122 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           {peakHours && peakHours.slots.length > 0 && (
             <Card className="card-surface border-0">
               <div style={{ padding: '1.25rem 1.5rem' }}>
-                <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Peak Hours</h3>
+                <div className="flex items-center justify-between" style={{ marginBottom: '0.25rem' }}>
+                  <h3 className="text-lg font-display text-white">Peak Hours</h3>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setHeatmapMode('sessions')}
+                      style={{
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: heatmapMode === 'sessions' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: heatmapMode === 'sessions' ? 'rgba(34,197,94,0.9)' : 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      Sessions
+                    </button>
+                    <button
+                      onClick={() => setHeatmapMode('revenue')}
+                      style={{
+                        padding: '0.25rem 0.6rem',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: heatmapMode === 'revenue' ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)',
+                        color: heatmapMode === 'revenue' ? 'rgba(139,92,246,0.9)' : 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      Revenue
+                    </button>
+                  </div>
+                </div>
                 <p className="text-xs text-white/25" style={{ marginBottom: '1.25rem' }}>
-                  When your kiosk gets the most traffic. Brighter cells = more sessions.
+                  {heatmapMode === 'sessions'
+                    ? 'When your kiosk gets the most traffic. Brighter cells = more sessions.'
+                    : 'When your kiosk earns the most revenue. Brighter cells = more revenue.'}
                 </p>
-                <PeakHoursHeatmap slots={peakHours.slots} />
+                <PeakHoursHeatmap slots={peakHours.slots} mode={heatmapMode} />
+              </div>
+            </Card>
+          )}
+
+          {/* Drop-off Funnel */}
+          {dropoff && dropoff.total_abandoned > 0 && (
+            <Card className="card-surface border-0">
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Drop-off Funnel</h3>
+                <p className="text-xs text-white/25" style={{ marginBottom: '1.25rem' }}>
+                  Where {dropoff.total_abandoned} abandoned session{dropoff.total_abandoned !== 1 ? 's' : ''} got stuck before completing.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {dropoff.stages.map((stage) => (
+                    <div key={stage.state} className="flex items-center gap-3">
+                      <span
+                        className="text-xs text-white/50"
+                        style={{ width: '7rem', textAlign: 'right', flexShrink: 0 }}
+                      >
+                        {STATE_LABELS[stage.state] ?? stage.state}
+                      </span>
+                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: '4px', height: '24px', position: 'relative', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${stage.percentage * 100}%`,
+                            background: `rgba(239,68,68,${0.3 + stage.percentage * 0.5})`,
+                            borderRadius: '4px',
+                            minWidth: stage.count > 0 ? '2px' : '0',
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs tabular-nums" style={{ width: '4rem', color: 'rgba(255,255,255,0.6)' }}>
+                        {stage.count} ({(stage.percentage * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Print Stats */}
+          {printStats && printStats.total_prints > 0 && (
+            <Card className="card-surface border-0">
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Print Reliability</h3>
+                <p className="text-xs text-white/25" style={{ marginBottom: '1rem' }}>
+                  Print job success rate across all sessions.
+                </p>
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-2xl font-bold font-display text-white tabular-nums">
+                      {formatPercent(printStats.success_rate)}
+                    </p>
+                    <p className="text-xs text-white/25" style={{ marginTop: '0.25rem' }}>Success rate</p>
+                  </div>
+                  <div style={{ width: '1px', height: '2.5rem', background: 'rgba(255,255,255,0.08)' }} />
+                  <div>
+                    <p className="text-lg font-display font-semibold text-white tabular-nums">
+                      {printStats.total_prints}
+                    </p>
+                    <p className="text-xs text-white/25">Total prints</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-display font-semibold tabular-nums" style={{ color: 'rgba(34,197,94,0.8)' }}>
+                      {printStats.successful}
+                    </p>
+                    <p className="text-xs text-white/25">Successful</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-display font-semibold tabular-nums" style={{ color: 'rgba(239,68,68,0.8)' }}>
+                      {printStats.failed}
+                    </p>
+                    <p className="text-xs text-white/25">Failed</p>
+                  </div>
+                </div>
               </div>
             </Card>
           )}

@@ -16,11 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.analytics import AnalyticsEvent
 from app.models.session import KioskSession, PaymentStatus, SessionType
 from app.schemas.admin import (
+    DropoffFunnelResponse,
+    DropoffStage,
     EntryMethodStats,
     FeatureBreakdownItem,
     FeatureBreakdownResponse,
     PeakHourSlot,
     PeakHoursResponse,
+    PrintStatsResponse,
     RevenueAnalyticsResponse,
     RevenueAnalyticsSummary,
     RevenueTimeseriesPoint,
@@ -457,6 +460,16 @@ async def get_peak_hours(
                 (KioskSession.session_type == SessionType.PHOTOBOOTH, 1),
                 else_=0,
             )).label('photobooth'),
+            func.coalesce(func.sum(case(
+                (or_(
+                    KioskSession.payment_status == PaymentStatus.CONFIRMED,
+                    and_(
+                        KioskSession.access_code_id.isnot(None),
+                        KioskSession.payment_amount.isnot(None),
+                    ),
+                ), KioskSession.payment_amount),
+                else_=0,
+            )), 0).label('revenue'),
         )
         .where(
             KioskSession.created_at >= start_date,
@@ -475,7 +488,80 @@ async def get_peak_hours(
             sessions=row.sessions,
             vibe_check_sessions=int(row.vibe_check or 0),
             photobooth_sessions=int(row.photobooth or 0),
+            revenue=int(row.revenue or 0),
         )
         for row in rows
     ]
     return PeakHoursResponse(slots=slots)
+
+
+async def get_dropoff_funnel(
+    db: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> DropoffFunnelResponse:
+    """Get drop-off funnel showing where abandoned sessions ended up."""
+    now = datetime.now(timezone.utc)
+    if start_date is None:
+        start_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_date = start_date.replace(day=max(1, now.day - 30))
+    if end_date is None:
+        end_date = now
+
+    stmt = (
+        select(KioskSession.state, func.count().label('count'))
+        .where(
+            KioskSession.completed_at.is_(None),
+            KioskSession.created_at >= start_date,
+            KioskSession.created_at <= end_date,
+        )
+        .group_by(KioskSession.state)
+        .order_by(text('count DESC'))
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    total = sum(r.count for r in rows)
+    stages = [
+        DropoffStage(state=r.state, count=r.count, percentage=round(r.count / total, 2) if total > 0 else 0)
+        for r in rows
+    ]
+    return DropoffFunnelResponse(total_abandoned=total, stages=stages)
+
+
+async def get_print_stats(
+    db: AsyncSession,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+) -> PrintStatsResponse:
+    """Get print success/failure statistics."""
+    now = datetime.now(timezone.utc)
+    if start_date is None:
+        start_date = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        start_date = start_date.replace(day=max(1, now.day - 30))
+    if end_date is None:
+        end_date = now
+
+    stmt = (
+        select(AnalyticsEvent.event_type, func.count().label('count'))
+        .where(
+            AnalyticsEvent.event_type.in_(['PRINT_COMPLETE', 'PRINT_FAILED']),
+            AnalyticsEvent.timestamp >= start_date,
+            AnalyticsEvent.timestamp <= end_date,
+        )
+        .group_by(AnalyticsEvent.event_type)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    counts = {r.event_type: r.count for r in rows}
+    successful = counts.get('PRINT_COMPLETE', 0)
+    failed = counts.get('PRINT_FAILED', 0)
+    total = successful + failed
+
+    return PrintStatsResponse(
+        total_prints=total,
+        successful=successful,
+        failed=failed,
+        success_rate=round(successful / total, 2) if total > 0 else 0,
+    )

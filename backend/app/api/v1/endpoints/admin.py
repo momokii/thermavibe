@@ -14,11 +14,13 @@ from app.schemas.admin import (
     ConfigAllResponse,
     ConfigUpdateRequest,
     ConfigUpdateResponse,
+    DropoffFunnelResponse,
     FeatureBreakdownResponse,
     HardwareStatusResponse,
     LoginRequest,
     LoginResponse,
     PeakHoursResponse,
+    PrintStatsResponse,
     RevenueAnalyticsResponse,
     SessionAnalyticsResponse,
 )
@@ -192,6 +194,36 @@ async def peak_hours(
 ) -> PeakHoursResponse:
     """Get session distribution by day-of-week and hour."""
     return await analytics_service.get_peak_hours(
+        db=db,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@router.get('/analytics/dropoff', response_model=DropoffFunnelResponse)
+async def dropoff_funnel(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> DropoffFunnelResponse:
+    """Get drop-off funnel showing where abandoned sessions ended up."""
+    return await analytics_service.get_dropoff_funnel(
+        db=db,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+@router.get('/analytics/print-stats', response_model=PrintStatsResponse)
+async def print_stats(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> PrintStatsResponse:
+    """Get print success/failure statistics."""
+    return await analytics_service.get_print_stats(
         db=db,
         start_date=start_date,
         end_date=end_date,
