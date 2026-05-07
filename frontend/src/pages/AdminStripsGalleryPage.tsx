@@ -394,7 +394,7 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedStrip && (
-            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-lg">
+            <div className="absolute inset-0 bg-[#0d0d14]/95 flex items-center justify-center z-20 rounded-lg">
               <ConfirmOverlay
                 confirmAction={confirmAction}
                 onCancel={() => setConfirmAction(null)}
@@ -518,7 +518,7 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedResult && (
-            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-lg">
+            <div className="absolute inset-0 bg-[#0d0d14]/95 flex items-center justify-center z-20 rounded-lg">
               <ConfirmOverlay
                 confirmAction={confirmAction}
                 onCancel={() => setConfirmAction(null)}
