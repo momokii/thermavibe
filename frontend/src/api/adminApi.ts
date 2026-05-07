@@ -24,6 +24,7 @@ import type {
   AccessCodeListResponse,
   AccessCodeCreateRequest,
   AccessCodeResponse,
+  AccessCodeSummaryResponse,
 } from './types';
 
 export const adminApi = {
@@ -83,6 +84,9 @@ export const adminApi = {
 
   // --- Access Codes ---
 
+  getAccessCodeSummary: () =>
+    apiClient.get<AccessCodeSummaryResponse>('/admin/access-codes/summary'),
+
   listAccessCodes: (params?: { status?: string; code_type?: string; limit?: number; offset?: number }) =>
     apiClient.get<AccessCodeListResponse>('/admin/access-codes', { params }),
 
@@ -97,4 +101,12 @@ export const adminApi = {
 
   getAccessCodeQr: (codeId: number) =>
     apiClient.get(`/admin/access-codes/${codeId}/qr`, { responseType: 'blob' }),
+
+  // --- Gallery actions ---
+
+  deleteGalleryItem: (sessionId: string) =>
+    apiClient.delete<{ message: string }>(`/admin/gallery/${sessionId}`),
+
+  printGalleryItem: (sessionId: string) =>
+    apiClient.post<{ message: string }>(`/admin/gallery/${sessionId}/print`),
 };

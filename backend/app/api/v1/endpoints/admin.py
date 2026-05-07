@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -28,6 +29,7 @@ from app.schemas.access_code import (
     AccessCodeCreateRequest,
     AccessCodeListResponse,
     AccessCodeResponse,
+    AccessCodeSummaryResponse,
 )
 from app.schemas.photobooth import (
     ThemeCreateRequest,
@@ -39,6 +41,7 @@ from app.schemas.photobooth import (
     VibeCheckResultItem,
 )
 from app.schemas.print import PrintTestResponse
+from app.schemas.common import SuccessMessage
 from app.services import analytics_service, config_service
 from app.services.hardware_service import get_full_hardware_status, test_camera_capture
 
@@ -556,8 +559,125 @@ async def list_vibe_check_results(
 
 
 # ---------------------------------------------------------------------------
+# Gallery item actions (delete / print)
+# ---------------------------------------------------------------------------
+
+
+@router.delete('/gallery/{session_id}', response_model=SuccessMessage)
+async def delete_gallery_item(
+    session_id: str,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> SuccessMessage:
+    """Permanently delete image files and clear DB references for a session.
+
+    Uses the same purge logic as the retention service.
+    """
+    from sqlalchemy import select
+
+    from app.models.session import KioskSession, SessionType
+    from app.services.retention_service import _find_thumbnail, _safe_remove
+
+    stmt = select(KioskSession).where(KioskSession.id == session_id)
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found')
+
+    purged = False
+
+    if session.composite_image_path:
+        _safe_remove(session.composite_image_path)
+        thumb = _find_thumbnail(session.composite_image_path)
+        if thumb:
+            _safe_remove(thumb)
+        session.composite_image_path = None
+        purged = True
+
+    if session.photo_path:
+        _safe_remove(session.photo_path)
+        thumb = _find_thumbnail(session.photo_path)
+        if thumb:
+            _safe_remove(thumb)
+        session.photo_path = None
+        session.ai_response_text = None
+        session.ai_provider_used = None
+        purged = True
+
+    if not purged:
+        raise HTTPException(status_code=400, detail='No image data to delete')
+
+    await db.commit()
+    return SuccessMessage(message='Image deleted permanently')
+
+
+@router.post('/gallery/{session_id}/print', response_model=SuccessMessage)
+async def print_gallery_item(
+    session_id: str,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> SuccessMessage:
+    """Manually print a gallery item (photobooth strip or vibe check receipt)."""
+    from sqlalchemy import select
+
+    from app.models.session import KioskSession, SessionType
+
+    stmt = select(KioskSession).where(KioskSession.id == session_id)
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+
+    if session is None:
+        raise HTTPException(status_code=404, detail='Session not found')
+
+    if session.session_type == SessionType.PHOTOBOOTH:
+        if not session.composite_image_path or not os.path.exists(session.composite_image_path):
+            raise HTTPException(status_code=400, detail='No composite image to print')
+        try:
+            from app.services.printer_service import print_photobooth_strip
+
+            res = print_photobooth_strip(session.composite_image_path)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
+    elif session.session_type == SessionType.VIBE_CHECK:
+        if not session.ai_response_text:
+            raise HTTPException(status_code=400, detail='No AI reading to print')
+        try:
+            from app.services.printer_service import print_receipt
+
+            photo_bytes = None
+            if session.photo_path and os.path.exists(session.photo_path):
+                with open(session.photo_path, 'rb') as f:
+                    photo_bytes = f.read()
+
+            res = print_receipt(
+                ai_text=session.ai_response_text,
+                photo_bytes=photo_bytes,
+                include_photo=True,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
+    else:
+        raise HTTPException(status_code=400, detail='Unknown session type')
+
+    return SuccessMessage(message=res.get('message', 'Print sent'))
+
+
+# ---------------------------------------------------------------------------
 # Access code management
 # ---------------------------------------------------------------------------
+
+
+@router.get('/access-codes/summary', response_model=AccessCodeSummaryResponse)
+async def access_code_summary(
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> AccessCodeSummaryResponse:
+    """Pre-computed aggregate stats across all access codes."""
+    from app.services import access_code_service
+
+    stats = await access_code_service.get_summary(db)
+    return AccessCodeSummaryResponse(**stats)
 
 
 @router.get('/access-codes', response_model=AccessCodeListResponse)

@@ -1,16 +1,23 @@
 import { useState, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createPortal } from 'react-dom';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { adminApi } from '@/api/adminApi';
 import type { StripGalleryItem, VibeCheckResultItem } from '@/api/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download, Copy } from 'lucide-react';
+import { ImageIcon, X, Loader2, ChevronLeft, ChevronRight, Camera, Sparkles, Download, Copy, Trash2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
 const PAGE_SIZE = 24;
 
 type GalleryTab = 'photobooth' | 'vibe_check';
+
+type ConfirmState = {
+  type: 'delete' | 'print';
+  sessionId: string;
+  label: string;
+};
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -29,6 +36,8 @@ export default function AdminStripsGalleryPage() {
   const [selectedStrip, setSelectedStrip] = useState<StripGalleryItem | null>(null);
   const [selectedResult, setSelectedResult] = useState<VibeCheckResultItem | null>(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<ConfirmState | null>(null);
+  const [printingIds, setPrintingIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   const offset = (page - 1) * PAGE_SIZE;
@@ -80,6 +89,45 @@ export default function AdminStripsGalleryPage() {
 
   const handleImageError = useCallback((id: string) => {
     setFailedImages((prev) => new Set(prev).add(id));
+  }, []);
+
+  const deleteMutation = useMutation({
+    mutationFn: (sessionId: string) => adminApi.deleteGalleryItem(sessionId),
+    onSuccess: () => {
+      toast.success('Photo deleted permanently');
+      if (selectedStrip?.session_id === confirmAction?.sessionId) setSelectedStrip(null);
+      if (selectedResult?.session_id === confirmAction?.sessionId) setSelectedResult(null);
+      setConfirmAction(null);
+      refresh();
+    },
+    onError: () => {
+      toast.error('Failed to delete photo');
+    },
+  });
+
+  const handlePrint = useCallback(async (sessionId: string) => {
+    setPrintingIds((prev) => new Set(prev).add(sessionId));
+    setConfirmAction(null);
+    try {
+      const res = await adminApi.printGalleryItem(sessionId);
+      toast.success(res.data.message || 'Print sent');
+    } catch {
+      toast.error('Print failed — is the printer connected?');
+    } finally {
+      setPrintingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  }, []);
+
+  const requestDelete = useCallback((sessionId: string, label: string) => {
+    setConfirmAction({ type: 'delete', sessionId, label });
+  }, []);
+
+  const requestPrint = useCallback((sessionId: string, label: string) => {
+    setConfirmAction({ type: 'print', sessionId, label });
   }, []);
 
   return (
@@ -171,6 +219,9 @@ export default function AdminStripsGalleryPage() {
           failedImages={failedImages}
           onImageError={handleImageError}
           onSelect={(strip) => setSelectedStrip(strip)}
+          onDelete={(item) => requestDelete(item.session_id, `strip from ${formatDate(item.created_at)}`)}
+          onPrint={(item) => requestPrint(item.session_id, `strip from ${formatDate(item.created_at)}`)}
+          printingIds={printingIds}
           renderInfo={(strip) => (
             <>
               <p className="text-xs text-white/50 truncate">{formatDate(strip.created_at)}</p>
@@ -191,6 +242,9 @@ export default function AdminStripsGalleryPage() {
           failedImages={failedImages}
           onImageError={handleImageError}
           onSelect={(result) => setSelectedResult(result)}
+          onDelete={(item) => requestDelete(item.session_id, `vibe check from ${formatDate(item.created_at)}`)}
+          onPrint={(item) => requestPrint(item.session_id, `vibe check from ${formatDate(item.created_at)}`)}
+          printingIds={printingIds}
           renderInfo={(result) => (
             <>
               <p className="text-xs text-white/50 truncate">{formatDate(result.created_at)}</p>
@@ -301,15 +355,40 @@ export default function AdminStripsGalleryPage() {
                     <p className="text-sm text-white/40">{selectedStrip.theme_name}</p>
                   )}
                 </div>
-                <a
-                  href={selectedStrip.composite_url}
-                  download
-                  className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                  style={{ padding: '0.5rem 1rem' }}
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => requestPrint(selectedStrip.session_id, `strip from ${formatDate(selectedStrip.created_at)}`)}
+                    disabled={printingIds.has(selectedStrip.session_id)}
+                    className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors disabled:opacity-40"
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    {printingIds.has(selectedStrip.session_id) ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="h-4 w-4" />
+                    )}
+                    Print
+                  </button>
+                  <a
+                    href={selectedStrip.composite_url}
+                    download
+                    className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => requestDelete(selectedStrip.session_id, `strip from ${formatDate(selectedStrip.created_at)}`)}
+                    className="flex items-center gap-2 rounded-lg text-sm font-medium text-red-400/60 hover:text-red-400 bg-red-500/[0.06] hover:bg-red-500/[0.12] transition-colors"
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -373,6 +452,20 @@ export default function AdminStripsGalleryPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
+                          onClick={() => requestPrint(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
+                          disabled={printingIds.has(selectedResult.session_id)}
+                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors disabled:opacity-40"
+                          style={{ padding: '0.5rem 0.75rem' }}
+                        >
+                          {printingIds.has(selectedResult.session_id) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Printer className="h-4 w-4" />
+                          )}
+                          Print
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => {
                             if (selectedResult.analysis_text) {
                               navigator.clipboard.writeText(selectedResult.analysis_text);
@@ -380,7 +473,7 @@ export default function AdminStripsGalleryPage() {
                             }
                           }}
                           className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                          style={{ padding: '0.5rem 1rem' }}
+                          style={{ padding: '0.5rem 0.75rem' }}
                         >
                           <Copy className="h-4 w-4" />
                           Copy
@@ -389,11 +482,20 @@ export default function AdminStripsGalleryPage() {
                           href={selectedResult.photo_url}
                           download
                           className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                          style={{ padding: '0.5rem 1rem' }}
+                          style={{ padding: '0.5rem 0.75rem' }}
                         >
                           <Download className="h-4 w-4" />
                           Download
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
+                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-red-400/60 hover:text-red-400 bg-red-500/[0.06] hover:bg-red-500/[0.12] transition-colors"
+                          style={{ padding: '0.5rem 0.75rem' }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -403,6 +505,82 @@ export default function AdminStripsGalleryPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation modal */}
+      {confirmAction && createPortal(
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
+          <div
+            className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
+            style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
+          >
+            {confirmAction.type === 'delete' ? (
+              <>
+                <h3 className="text-lg font-semibold text-white">Delete Photo</h3>
+                <p className="text-sm text-white/50 mt-2">
+                  This will permanently delete the <span className="text-white/70">{confirmAction.label}</span> and cannot be undone.
+                </p>
+                <div className="flex items-center justify-end gap-3 mt-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmAction(null)}
+                    disabled={deleteMutation.isPending}
+                    className="border-white/10 text-white/60 hover:text-white !px-6"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => deleteMutation.mutate(confirmAction.sessionId)}
+                    disabled={deleteMutation.isPending}
+                    className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30 !px-6"
+                  >
+                    {deleteMutation.isPending ? (
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting...</>
+                    ) : (
+                      'Delete permanently'
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-semibold text-white">Print Photo</h3>
+                <p className="text-sm text-white/50 mt-2">
+                  Send the <span className="text-white/70">{confirmAction.label}</span> to the thermal printer?
+                </p>
+                <div className="flex items-center justify-end gap-3 mt-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmAction(null)}
+                    disabled={printingIds.has(confirmAction.sessionId)}
+                    className="border-white/10 text-white/60 hover:text-white !px-6"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handlePrint(confirmAction.sessionId)}
+                    disabled={printingIds.has(confirmAction.sessionId)}
+                    className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30 !px-6"
+                  >
+                    {printingIds.has(confirmAction.sessionId) ? (
+                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Printing...</>
+                    ) : (
+                      <>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print now
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -413,12 +591,18 @@ function GalleryGrid<T extends { session_id: string; thumbnail_url: string }>({
   failedImages,
   onImageError,
   onSelect,
+  onDelete,
+  onPrint,
+  printingIds,
   renderInfo,
 }: {
   items: T[];
   failedImages: Set<string>;
   onImageError: (id: string) => void;
   onSelect: (item: T) => void;
+  onDelete: (item: T) => void;
+  onPrint: (item: T) => void;
+  printingIds: Set<string>;
   renderInfo: (item: T) => React.ReactNode;
 }) {
   return (
@@ -431,37 +615,72 @@ function GalleryGrid<T extends { session_id: string; thumbnail_url: string }>({
     >
       {items.map((item) => {
         const isFailed = failedImages.has(item.session_id);
+        const isPrinting = printingIds.has(item.session_id);
         return (
-          <button
+          <div
             key={item.session_id}
-            type="button"
-            onClick={() => !isFailed && onSelect(item)}
-            disabled={isFailed}
-            className="group rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden transition-all hover:border-white/[0.12] hover:bg-white/[0.04] text-left disabled:opacity-40 disabled:cursor-default"
+            className="group rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden transition-all hover:border-white/[0.12] hover:bg-white/[0.04]"
           >
-            <div
-              className="relative bg-white/[0.03]"
-              style={{ aspectRatio: '3/4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            <button
+              type="button"
+              onClick={() => !isFailed && onSelect(item)}
+              disabled={isFailed}
+              className="w-full text-left disabled:opacity-40 disabled:cursor-default"
             >
-              {isFailed ? (
-                <div className="flex flex-col items-center gap-2">
-                  <ImageIcon className="h-8 w-8 text-white/15" />
-                  <span className="text-[10px] text-white/20">Image expired</span>
-                </div>
-              ) : (
-                <img
-                  src={item.thumbnail_url}
-                  alt={`Item ${item.session_id}`}
-                  className="w-full h-full object-contain"
-                  loading="lazy"
-                  onError={() => onImageError(item.session_id)}
-                />
-              )}
-            </div>
-            <div style={{ padding: '0.625rem 0.75rem' }}>
-              {renderInfo(item)}
-            </div>
-          </button>
+              <div
+                className="relative bg-white/[0.03]"
+                style={{ aspectRatio: '3/4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {isFailed ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <ImageIcon className="h-8 w-8 text-white/15" />
+                    <span className="text-[10px] text-white/20">Image expired</span>
+                  </div>
+                ) : (
+                  <img
+                    src={item.thumbnail_url}
+                    alt={`Item ${item.session_id}`}
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                    onError={() => onImageError(item.session_id)}
+                  />
+                )}
+              </div>
+              <div style={{ padding: '0.625rem 0.75rem' }}>
+                {renderInfo(item)}
+              </div>
+            </button>
+            {/* Action row */}
+            {!isFailed && (
+              <div
+                className="flex items-center border-t border-white/[0.04]"
+                style={{ padding: '0.375rem 0.5rem' }}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onPrint(item); }}
+                  disabled={isPrinting}
+                  className="flex items-center gap-1.5 rounded-md text-xs text-white/40 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-40"
+                  style={{ padding: '0.3rem 0.6rem' }}
+                  title="Print"
+                >
+                  {isPrinting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Printer className="h-3 w-3" />}
+                  Print
+                </button>
+                <div className="flex-1" />
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDelete(item); }}
+                  className="flex items-center gap-1.5 rounded-md text-xs text-red-400/50 hover:text-red-400 bg-red-500/[0.04] hover:bg-red-500/[0.1] transition-colors"
+                  style={{ padding: '0.3rem 0.6rem' }}
+                  title="Delete permanently"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
