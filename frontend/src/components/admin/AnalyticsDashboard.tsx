@@ -24,6 +24,20 @@ const STATE_LABELS: Record<string, string> = {
   reset: 'Reset',
 };
 
+const STATE_DESCRIPTIONS: Record<string, string> = {
+  idle: 'Session started but the user walked away before interacting. Often means the attract screen wasn\'t engaging enough.',
+  payment: 'User reached the payment screen but didn\'t pay. The price may be too high or the payment flow confusing.',
+  capture: 'Camera capture was started but didn\'t complete. Could indicate camera issues or the user left mid-capture.',
+  review: 'Photo was captured but the user didn\'t proceed. They may not have liked the result.',
+  processing: 'AI analysis started but didn\'t finish. Could indicate AI provider issues or a timeout.',
+  reveal: 'User saw their result but the session didn\'t fully complete. Usually auto-completes — may indicate a bug.',
+  frame_select: 'User was choosing a photobooth frame but didn\'t pick one. Consider simplifying frame options.',
+  arrange: 'User was arranging their photobooth layout but didn\'t finish. The layout editor may be too complex.',
+  compositing: 'Photobooth composite was being generated but failed. Check printer/composite service health.',
+  photobooth_reveal: 'Photobooth result was shown but session didn\'t complete. Similar to reveal — may indicate a bug.',
+  reset: 'Session was resetting for the next user. These are usually timed-out sessions that never started.',
+};
+
 const FEATURE_LABELS: Record<string, string> = {
   vibe_check: 'Vibe Check',
   photobooth: 'Photobooth',
@@ -293,6 +307,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [heatmapMode, setHeatmapMode] = useState<'sessions' | 'revenue'>('sessions');
+  const [funnelFilter, setFunnelFilter] = useState<string>('');
   const params = useMemo(() => getRangeParams(range, customStart, customEnd), [range, customStart, customEnd]);
   const rangeLabel = range === 'custom' ? 'period' : RANGES.find((r) => r.key === range)?.label.toLowerCase() ?? 'period';
 
@@ -317,8 +332,11 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   });
 
   const { data: dropoff } = useQuery({
-    queryKey: ['analytics-dropoff', params],
-    queryFn: () => adminApi.getDropoffFunnel(params).then((r) => r.data),
+    queryKey: ['analytics-dropoff', params, funnelFilter],
+    queryFn: () => adminApi.getDropoffFunnel({
+      ...params,
+      ...(funnelFilter ? { session_type: funnelFilter } : {}),
+    }).then((r) => r.data),
   });
 
   const { data: printStats } = useQuery({
@@ -717,33 +735,90 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
           {dropoff && dropoff.total_abandoned > 0 && (
             <Card className="card-surface border-0">
               <div style={{ padding: '1.25rem 1.5rem' }}>
-                <h3 className="text-lg font-display text-white" style={{ marginBottom: '0.25rem' }}>Drop-off Funnel</h3>
+                <div className="flex items-center justify-between" style={{ marginBottom: '0.25rem' }}>
+                  <h3 className="text-lg font-display text-white">Drop-off Funnel</h3>
+                  <div className="flex gap-1">
+                    {[
+                      { value: '', label: 'All' },
+                      { value: 'vibe_check', label: 'Vibe Check' },
+                      { value: 'photobooth', label: 'Photobooth' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setFunnelFilter(opt.value)}
+                        style={{
+                          padding: '0.25rem 0.6rem',
+                          fontSize: '11px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: funnelFilter === opt.value ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.04)',
+                          color: funnelFilter === opt.value ? 'rgba(239,68,68,0.9)' : 'rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <p className="text-xs text-white/25" style={{ marginBottom: '1.25rem' }}>
                   Where {dropoff.total_abandoned} abandoned session{dropoff.total_abandoned !== 1 ? 's' : ''} got stuck before completing.
+                  Hover a row for details.
                 </p>
                 <div className="flex flex-col gap-2">
                   {dropoff.stages.map((stage) => (
-                    <div key={stage.state} className="flex items-center gap-3">
-                      <span
-                        className="text-xs text-white/50"
-                        style={{ width: '7rem', textAlign: 'right', flexShrink: 0 }}
-                      >
-                        {STATE_LABELS[stage.state] ?? stage.state}
-                      </span>
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: '4px', height: '24px', position: 'relative', overflow: 'hidden' }}>
+                    <div
+                      key={stage.state}
+                      className="group"
+                      style={{ position: 'relative' }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="text-xs text-white/50"
+                          style={{ width: '7rem', textAlign: 'right', flexShrink: 0 }}
+                        >
+                          {STATE_LABELS[stage.state] ?? stage.state}
+                        </span>
+                        <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: '4px', height: '24px', position: 'relative', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              height: '100%',
+                              width: `${stage.percentage * 100}%`,
+                              background: `rgba(239,68,68,${0.3 + stage.percentage * 0.5})`,
+                              borderRadius: '4px',
+                              minWidth: stage.count > 0 ? '2px' : '0',
+                              transition: 'opacity 0.15s',
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs tabular-nums" style={{ width: '4rem', color: 'rgba(255,255,255,0.6)' }}>
+                          {stage.count} ({(stage.percentage * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                      {/* Hover explanation */}
+                      {STATE_DESCRIPTIONS[stage.state] && (
                         <div
                           style={{
-                            height: '100%',
-                            width: `${stage.percentage * 100}%`,
-                            background: `rgba(239,68,68,${0.3 + stage.percentage * 0.5})`,
-                            borderRadius: '4px',
-                            minWidth: stage.count > 0 ? '2px' : '0',
+                            position: 'absolute',
+                            left: '7.5rem',
+                            bottom: 'calc(100% + 6px)',
+                            background: 'rgba(15,15,20,0.95)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            borderRadius: '8px',
+                            padding: '0.5rem 0.75rem',
+                            fontSize: '12px',
+                            color: 'rgba(255,255,255,0.7)',
+                            maxWidth: '320px',
+                            pointerEvents: 'none',
+                            opacity: 0,
+                            zIndex: 20,
+                            transition: 'opacity 0.15s',
                           }}
-                        />
-                      </div>
-                      <span className="text-xs tabular-nums" style={{ width: '4rem', color: 'rgba(255,255,255,0.6)' }}>
-                        {stage.count} ({(stage.percentage * 100).toFixed(0)}%)
-                      </span>
+                          className="group-hover:!opacity-100"
+                        >
+                          {STATE_DESCRIPTIONS[stage.state]}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

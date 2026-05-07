@@ -499,6 +499,7 @@ async def get_dropoff_funnel(
     db: AsyncSession,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    session_type: str | None = None,
 ) -> DropoffFunnelResponse:
     """Get drop-off funnel showing where abandoned sessions ended up."""
     now = datetime.now(timezone.utc)
@@ -508,13 +509,17 @@ async def get_dropoff_funnel(
     if end_date is None:
         end_date = now
 
+    filters = [
+        KioskSession.completed_at.is_(None),
+        KioskSession.created_at >= start_date,
+        KioskSession.created_at <= end_date,
+    ]
+    if session_type:
+        filters.append(KioskSession.session_type == session_type)
+
     stmt = (
         select(KioskSession.state, func.count().label('count'))
-        .where(
-            KioskSession.completed_at.is_(None),
-            KioskSession.created_at >= start_date,
-            KioskSession.created_at <= end_date,
-        )
+        .where(*filters)
         .group_by(KioskSession.state)
         .order_by(text('count DESC'))
     )

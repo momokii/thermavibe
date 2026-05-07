@@ -204,6 +204,7 @@ async def peak_hours(
 async def dropoff_funnel(
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    session_type: str | None = None,
     _admin: dict = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db_session),
 ) -> DropoffFunnelResponse:
@@ -212,6 +213,7 @@ async def dropoff_funnel(
         db=db,
         start_date=start_date,
         end_date=end_date,
+        session_type=session_type,
     )
 
 

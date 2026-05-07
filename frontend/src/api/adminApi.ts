@@ -48,7 +48,7 @@ export const adminApi = {
   getPeakHours: (params?: { start_date?: string; end_date?: string }) =>
     apiClient.get<PeakHoursResponse>('/admin/analytics/peak-hours', { params }),
 
-  getDropoffFunnel: (params?: { start_date?: string; end_date?: string }) =>
+  getDropoffFunnel: (params?: { start_date?: string; end_date?: string; session_type?: string }) =>
     apiClient.get<DropoffFunnelResponse>('/admin/analytics/dropoff', { params }),
 
   getPrintStats: (params?: { start_date?: string; end_date?: string }) =>
