@@ -460,7 +460,7 @@ export default function AdminStripsGalleryPage() {
                   </div>
                   {/* Footer */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-4">
                       <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
                       {selectedResult.analysis_provider && (
                         <>
