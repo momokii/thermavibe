@@ -40,17 +40,14 @@ export default function RevealScreen() {
   // Print + auto-reset
   useEffect(() => {
     if (!fullText) return;
-    const printTimer = setTimeout(() => {
-      if (!printTriggeredRef.current) {
-        printTriggeredRef.current = true;
-        triggerPrint();
-      }
-    }, 1000);
+    if (!printTriggeredRef.current) {
+      printTriggeredRef.current = true;
+      triggerPrint();
+    }
     const resetTimer = setTimeout(() => {
       finishSession();
     }, REVEAL_DURATION_SECONDS * 1000);
     return () => {
-      clearTimeout(printTimer);
       clearTimeout(resetTimer);
     };
   }, [fullText, triggerPrint, finishSession]);

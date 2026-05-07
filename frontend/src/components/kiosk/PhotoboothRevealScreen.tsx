@@ -57,10 +57,6 @@ export default function PhotoboothRevealScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handlePrintAgain = () => {
-    printStrip();
-    setPrinted(true);
-  };
   const handleStartOver = () => finishPhotobooth();
 
   const compositeSrc = photoboothCompositeUrl || (sessionId ? `/api/v1/kiosk/session/${sessionId}/photobooth/composite` : null);
@@ -173,18 +169,6 @@ export default function PhotoboothRevealScreen() {
         >
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={handlePrintAgain}
-            disabled={isPrinting}
-            className={`flex-1 py-4 rounded-xl text-lg font-display font-semibold transition-all duration-150 ${
-              isPrinting
-                ? 'text-white/40 btn-secondary opacity-60'
-                : 'text-white/70 btn-secondary'
-            }`}
-          >
-            {isPrinting ? 'Printing...' : 'Print Again'}
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
             onClick={handleStartOver}
             className="flex-1 py-4 rounded-xl text-white text-lg font-display font-bold transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
           >
@@ -202,7 +186,7 @@ export default function PhotoboothRevealScreen() {
         }}
       >
         <p className="text-base text-white/70 font-display font-semibold">
-          {printError ? 'Print failed — tap Print Again to retry'
+          {printError ? 'Print failed'
             : isPrinting ? 'Your strip is printing...'
             : printed ? 'Print sent!'
             : 'Preparing print...'}
