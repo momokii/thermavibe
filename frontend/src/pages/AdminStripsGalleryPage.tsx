@@ -394,15 +394,20 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedStrip && (
-            <div className="absolute inset-0 bg-[#0d0d14]/95 flex items-center justify-center z-20 rounded-lg">
-              <ConfirmOverlay
-                confirmAction={confirmAction}
-                onCancel={() => setConfirmAction(null)}
-                onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
-                onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
-                isDeleting={deleteMutation.isPending}
-                isPrinting={printingIds.has(confirmAction.sessionId)}
-              />
+            <div className="absolute inset-0 bg-[#0d0d14] flex items-center justify-center z-20 rounded-lg">
+              <div
+                className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
+                style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
+              >
+                <ConfirmOverlay
+                  confirmAction={confirmAction}
+                  onCancel={() => setConfirmAction(null)}
+                  onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
+                  onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
+                  isDeleting={deleteMutation.isPending}
+                  isPrinting={printingIds.has(confirmAction.sessionId)}
+                />
+              </div>
             </div>
           )}
         </DialogContent>
@@ -518,15 +523,20 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedResult && (
-            <div className="absolute inset-0 bg-[#0d0d14]/95 flex items-center justify-center z-20 rounded-lg">
-              <ConfirmOverlay
-                confirmAction={confirmAction}
-                onCancel={() => setConfirmAction(null)}
-                onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
-                onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
-                isDeleting={deleteMutation.isPending}
-                isPrinting={printingIds.has(confirmAction.sessionId)}
-              />
+            <div className="absolute inset-0 bg-[#0d0d14] flex items-center justify-center z-20 rounded-lg">
+              <div
+                className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
+                style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
+              >
+                <ConfirmOverlay
+                  confirmAction={confirmAction}
+                  onCancel={() => setConfirmAction(null)}
+                  onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
+                  onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
+                  isDeleting={deleteMutation.isPending}
+                  isPrinting={printingIds.has(confirmAction.sessionId)}
+                />
+              </div>
             </div>
           )}
         </DialogContent>
