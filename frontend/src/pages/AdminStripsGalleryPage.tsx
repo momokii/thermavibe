@@ -394,7 +394,7 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedStrip && (
-            <div className="absolute inset-0 bg-[#0d0d14] flex items-center justify-center z-20 rounded-lg">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 rounded-lg">
               <div
                 className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
                 style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
@@ -523,7 +523,7 @@ export default function AdminStripsGalleryPage() {
           )}
           {/* In-dialog confirmation overlay */}
           {confirmAction && selectedResult && (
-            <div className="absolute inset-0 bg-[#0d0d14] flex items-center justify-center z-20 rounded-lg">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 rounded-lg">
               <div
                 className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
                 style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
