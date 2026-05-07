@@ -87,3 +87,34 @@ Before implementing any feature:
 - `frontend/src/stores/kioskStore.ts` — Frontend kiosk state mirror
 - `docs/technical/api-contract.md` — Complete API specification
 - `docs/technical/multi-kiosk-architecture.md` — Future multi-room architecture plan
+
+## .claude/ Reference System
+
+The `.claude/` folder contains operational reference material that supplements this file. Always consult these before starting work.
+
+### Read Every Session
+
+| File | Purpose |
+|------|---------|
+| `.claude/AGENT_RULES.md` | 36 non-negotiable behavioral rules (workflow, safety, security, session management) |
+| `.claude/CODING_STANDARDS.md` | Detailed Python/TypeScript/React conventions, naming, error handling, forbidden patterns |
+| `.claude/SECURITY_STANDARDS.md` | Security audit findings, secrets management, input validation, auth rules |
+| `.claude/ENVIRONMENT_GUIDE.md` | Environment definitions (dev/staging/prod), verified commands, Docker patterns |
+| `.claude/HOW_TO_RESUME.md` | Full session startup protocol (11 steps to orient before touching code) |
+
+### Read for State Awareness
+
+| File | Purpose |
+|------|---------|
+| `.claude/state/CURRENT_STATUS.md` | Project completion status, known gaps, blocked items |
+| `.claude/state/TASK_QUEUE.md` | Prioritized implementation backlog with acceptance criteria |
+| `.claude/state/DECISIONS_LOG.md` | Architectural and implementation decisions (what, why, alternatives rejected) |
+
+### Read for Task Templates
+
+| File | When to Use |
+|------|-------------|
+| `.claude/templates/bug_fix.md` | Investigating and fixing a bug (7-step protocol) |
+| `.claude/templates/new_endpoint.md` | Adding a new API endpoint (checklist) |
+| `.claude/templates/new_feature.md` | Implementing a new feature (full checklist) |
+| `.claude/templates/new_test.md` | Writing backend or frontend tests (checklist) |
