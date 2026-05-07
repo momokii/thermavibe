@@ -460,7 +460,7 @@ export default function AdminStripsGalleryPage() {
                   </div>
                   {/* Footer */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
                       <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
                       {selectedResult.analysis_provider && (
                         <>
@@ -469,7 +469,7 @@ export default function AdminStripsGalleryPage() {
                         </>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2" style={{paddingTop: '1rem'}}>
                       <button
                         type="button"
                         onClick={() => requestPrint(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
