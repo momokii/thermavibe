@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { adminApi } from '@/api/adminApi';
@@ -22,8 +22,48 @@ import {
   X,
 } from 'lucide-react';
 import type { AccessCodeResponse } from '@/api/types';
+import { formatIDR } from '@/lib/formatters';
 
 type EntryMethod = 'free' | 'payment' | 'access_code';
+
+function AccessCodeSummary({ codes }: { codes: AccessCodeResponse[] }) {
+  const stats = useMemo(() => {
+    const total = codes.length;
+    const active = codes.filter((c) => c.status === 'active').length;
+    const used = codes.filter((c) => c.status === 'used').length;
+    const totalRedemptions = codes.reduce((sum, c) => sum + c.use_count, 0);
+    const totalMaxUses = codes.reduce((sum, c) => sum + c.max_uses, 0);
+    const redemptionRate = totalMaxUses > 0 ? totalRedemptions / totalMaxUses : 0;
+    const pricedCodes = codes.filter((c) => c.price !== null && c.price > 0);
+    const revenue = pricedCodes.reduce((sum, c) => sum + c.use_count * (c.price ?? 0), 0);
+    return { total, active, used, totalRedemptions, redemptionRate, revenue };
+  }, [codes]);
+
+  return (
+    <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02]" style={{ padding: '0.75rem 1rem' }}>
+        <p className="text-xs text-white/30">Total Codes</p>
+        <p className="text-lg font-display font-bold text-white tabular-nums">{stats.total}</p>
+        <p className="text-xs text-white/20">{stats.active} active · {stats.used} fully used</p>
+      </div>
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02]" style={{ padding: '0.75rem 1rem' }}>
+        <p className="text-xs text-white/30">Total Redemptions</p>
+        <p className="text-lg font-display font-bold text-white tabular-nums">{stats.totalRedemptions}</p>
+        <p className="text-xs text-white/20">Across all codes in current view</p>
+      </div>
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02]" style={{ padding: '0.75rem 1rem' }}>
+        <p className="text-xs text-white/30">Redemption Rate</p>
+        <p className="text-lg font-display font-bold text-white">{(stats.redemptionRate * 100).toFixed(1)}%</p>
+        <p className="text-xs text-white/20">Uses vs max allowed uses</p>
+      </div>
+      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02]" style={{ padding: '0.75rem 1rem' }}>
+        <p className="text-xs text-white/30">Est. Revenue</p>
+        <p className="text-lg font-display font-bold text-white">{formatIDR(stats.revenue)}</p>
+        <p className="text-xs text-white/20">From priced codes × redemptions</p>
+      </div>
+    </div>
+  );
+}
 
 export default function PaymentAccessConfig() {
   const queryClient = useQueryClient();
@@ -629,6 +669,11 @@ export default function PaymentAccessConfig() {
                 </Button>
               </div>
             </div>
+
+            {/* Redemption Summary */}
+            {codesData && codesData.total > 0 && (
+              <AccessCodeSummary codes={codesData.codes} />
+            )}
 
             {/* Filter + Refresh */}
             <div className="flex items-center justify-between">
