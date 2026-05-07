@@ -157,24 +157,6 @@ export default function PhotoboothRevealScreen() {
             )}
           </motion.div>
         </div>
-
-        {/* Action buttons — kiosk-sized touch targets */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="flex gap-4 w-full max-w-md px-6"
-          onClick={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleStartOver}
-            className="flex-1 py-4 rounded-xl text-white text-lg font-display font-bold transition-all duration-150 bg-pink-500 hover:bg-pink-600 active:bg-pink-700"
-          >
-            Start Over
-          </motion.button>
-        </motion.div>
       </div>
 
       {/* Fixed bottom hint */}
@@ -188,7 +170,7 @@ export default function PhotoboothRevealScreen() {
         <p className="text-base text-white/70 font-display font-semibold">
           {printError ? 'Print failed'
             : isPrinting ? 'Your strip is printing...'
-            : printed ? 'Print sent!'
+            : printed ? 'Print sent! Touch to continue'
             : 'Preparing print...'}
         </p>
         <p className="text-sm text-white/40 mt-1">
