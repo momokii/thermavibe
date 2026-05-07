@@ -249,7 +249,7 @@ function PeakHoursHeatmap({ slots }: { slots: PeakHourSlot[] }) {
   );
 }
 
-function Delta({ current, previous, invert = false }: { current: number; previous: number; invert?: boolean }) {
+function Delta({ current, previous, invert = false, rangeLabel }: { current: number; previous: number; invert?: boolean; rangeLabel: string }) {
   if (previous === 0) return null;
   const pct = ((current - previous) / previous) * 100;
   if (pct === 0) return null;
@@ -264,7 +264,7 @@ function Delta({ current, previous, invert = false }: { current: number; previou
         marginLeft: '0.5rem',
       }}
     >
-      {positive ? '+' : ''}{pct.toFixed(0)}%
+      {positive ? '+' : ''}{pct.toFixed(0)}% <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.3)' }}>vs prev. {rangeLabel}</span>
     </span>
   );
 }
@@ -278,6 +278,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const params = useMemo(() => getRangeParams(range, customStart, customEnd), [range, customStart, customEnd]);
+  const rangeLabel = range === 'custom' ? 'period' : RANGES.find((r) => r.key === range)?.label.toLowerCase() ?? 'period';
 
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['analytics-sessions', params],
@@ -398,7 +399,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             <p className="text-2xl font-bold font-display text-white tabular-nums">
               {sessions?.summary.total_sessions ?? 0}
             </p>
-            <Delta current={sessions?.summary.total_sessions ?? 0} previous={sessions?.previous_summary?.total_sessions ?? 0} />
+            <Delta current={sessions?.summary.total_sessions ?? 0} previous={sessions?.previous_summary?.total_sessions ?? 0} rangeLabel={rangeLabel} />
           </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             All photo sessions started, including abandoned ones.
@@ -412,7 +413,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             <p className="text-2xl font-bold font-display text-white">
               {formatPercent(sessions?.summary.completion_rate ?? 0)}
             </p>
-            <Delta current={sessions?.summary.completion_rate ?? 0} previous={sessions?.previous_summary?.completion_rate ?? 0} />
+            <Delta current={sessions?.summary.completion_rate ?? 0} previous={sessions?.previous_summary?.completion_rate ?? 0} rangeLabel={rangeLabel} />
           </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             <span style={{ color: 'rgba(34,197,94,0.7)' }}>{sessions?.summary.completed_sessions ?? 0} completed</span>
@@ -427,7 +428,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             <p className="text-2xl font-bold font-display text-white">
               {formatDuration(sessions?.summary.avg_duration_seconds ?? 0)}
             </p>
-            <Delta current={sessions?.summary.avg_duration_seconds ?? 0} previous={sessions?.previous_summary?.avg_duration_seconds ?? 0} invert />
+            <Delta current={sessions?.summary.avg_duration_seconds ?? 0} previous={sessions?.previous_summary?.avg_duration_seconds ?? 0} invert rangeLabel={rangeLabel} />
           </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>Average time from session start to completion.</p>
         </Card>
@@ -438,7 +439,7 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
             <p className="text-2xl font-bold font-display text-white">
               {formatIDR(revenue?.summary.total_revenue ?? 0)}
             </p>
-            <Delta current={revenue?.summary.total_revenue ?? 0} previous={revenue?.previous_summary?.total_revenue ?? 0} />
+            <Delta current={revenue?.summary.total_revenue ?? 0} previous={revenue?.previous_summary?.total_revenue ?? 0} rangeLabel={rangeLabel} />
           </div>
           <p className="text-xs text-white/25" style={{ marginTop: '0.5rem' }}>
             Avg per paid session: <span className="text-white/50">{formatIDR(revenue?.summary.avg_transaction_amount ?? 0)}</span>
