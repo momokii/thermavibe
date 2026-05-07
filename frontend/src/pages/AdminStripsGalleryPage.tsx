@@ -321,7 +321,7 @@ export default function AdminStripsGalleryPage() {
       )}
 
       {/* Photobooth lightbox */}
-      <Dialog open={!!selectedStrip} onOpenChange={(open) => !open && setSelectedStrip(null)}>
+      <Dialog open={!!selectedStrip} onOpenChange={(open) => { if (!open && !confirmAction) setSelectedStrip(null); }}>
         <DialogContent className="max-w-lg bg-surface-0 border-white/[0.08] p-0 overflow-hidden">
           <DialogTitle className="sr-only">Strip Detail</DialogTitle>
           {selectedStrip && (
@@ -392,11 +392,24 @@ export default function AdminStripsGalleryPage() {
               </div>
             </div>
           )}
+          {/* In-dialog confirmation overlay */}
+          {confirmAction && selectedStrip && (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-lg">
+              <ConfirmOverlay
+                confirmAction={confirmAction}
+                onCancel={() => setConfirmAction(null)}
+                onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
+                onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
+                isDeleting={deleteMutation.isPending}
+                isPrinting={printingIds.has(confirmAction.sessionId)}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Vibe Check lightbox */}
-      <Dialog open={!!selectedResult} onOpenChange={(open) => !open && setSelectedResult(null)}>
+      <Dialog open={!!selectedResult} onOpenChange={(open) => { if (!open && !confirmAction) setSelectedResult(null); }}>
         <DialogContent className="max-w-2xl bg-surface-0 border-white/[0.08] p-0 overflow-hidden">
           <DialogTitle className="sr-only">Vibe Check Result</DialogTitle>
           {selectedResult && (
@@ -503,85 +516,125 @@ export default function AdminStripsGalleryPage() {
               </div>
             </div>
           )}
+          {/* In-dialog confirmation overlay */}
+          {confirmAction && selectedResult && (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 rounded-lg">
+              <ConfirmOverlay
+                confirmAction={confirmAction}
+                onCancel={() => setConfirmAction(null)}
+                onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
+                onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
+                isDeleting={deleteMutation.isPending}
+                isPrinting={printingIds.has(confirmAction.sessionId)}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation modal */}
-      {confirmAction && createPortal(
+      {/* Standalone confirmation modal (from grid cards, no lightbox open) */}
+      {confirmAction && !selectedStrip && !selectedResult && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
           <div
             className="bg-surface-1 rounded-2xl border border-white/[0.06] shadow-2xl"
             style={{ width: '100%', maxWidth: '400px', padding: '1.5rem' }}
           >
-            {confirmAction.type === 'delete' ? (
-              <>
-                <h3 className="text-lg font-semibold text-white">Delete Photo</h3>
-                <p className="text-sm text-white/50 mt-2">
-                  This will permanently delete the <span className="text-white/70">{confirmAction.label}</span> and cannot be undone.
-                </p>
-                <div className="flex items-center justify-end gap-3 mt-8">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConfirmAction(null)}
-                    disabled={deleteMutation.isPending}
-                    className="border-white/10 text-white/60 hover:text-white !px-6"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => deleteMutation.mutate(confirmAction.sessionId)}
-                    disabled={deleteMutation.isPending}
-                    className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30 !px-6"
-                  >
-                    {deleteMutation.isPending ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting...</>
-                    ) : (
-                      'Delete permanently'
-                    )}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-lg font-semibold text-white">Print Photo</h3>
-                <p className="text-sm text-white/50 mt-2">
-                  Send the <span className="text-white/70">{confirmAction.label}</span> to the thermal printer?
-                </p>
-                <div className="flex items-center justify-end gap-3 mt-8">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setConfirmAction(null)}
-                    disabled={printingIds.has(confirmAction.sessionId)}
-                    className="border-white/10 text-white/60 hover:text-white !px-6"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handlePrint(confirmAction.sessionId)}
-                    disabled={printingIds.has(confirmAction.sessionId)}
-                    className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30 !px-6"
-                  >
-                    {printingIds.has(confirmAction.sessionId) ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Printing...</>
-                    ) : (
-                      <>
-                        <Printer className="h-4 w-4 mr-2" />
-                        Print now
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
+            <ConfirmOverlay
+              confirmAction={confirmAction}
+              onCancel={() => setConfirmAction(null)}
+              onConfirmDelete={() => deleteMutation.mutate(confirmAction.sessionId)}
+              onConfirmPrint={() => handlePrint(confirmAction.sessionId)}
+              isDeleting={deleteMutation.isPending}
+              isPrinting={printingIds.has(confirmAction.sessionId)}
+            />
           </div>
         </div>,
         document.body,
       )}
     </div>
+  );
+}
+
+/** Reusable confirmation overlay content for delete/print actions. */
+function ConfirmOverlay({
+  confirmAction,
+  onCancel,
+  onConfirmDelete,
+  onConfirmPrint,
+  isDeleting,
+  isPrinting,
+}: {
+  confirmAction: ConfirmState;
+  onCancel: () => void;
+  onConfirmDelete: () => void;
+  onConfirmPrint: () => void;
+  isDeleting: boolean;
+  isPrinting: boolean;
+}) {
+  if (confirmAction.type === 'delete') {
+    return (
+      <>
+        <h3 className="text-lg font-semibold text-white">Delete Photo</h3>
+        <p className="text-sm text-white/50 mt-2">
+          This will permanently delete the <span className="text-white/70">{confirmAction.label}</span> and cannot be undone.
+        </p>
+        <div className="flex items-center justify-end gap-3 mt-8">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="border-white/10 text-white/60 hover:text-white !px-6"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={onConfirmDelete}
+            disabled={isDeleting}
+            className="bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30 !px-6"
+          >
+            {isDeleting ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting...</>
+            ) : (
+              'Delete permanently'
+            )}
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h3 className="text-lg font-semibold text-white">Print Photo</h3>
+      <p className="text-sm text-white/50 mt-2">
+        Send the <span className="text-white/70">{confirmAction.label}</span> to the thermal printer?
+      </p>
+      <div className="flex items-center justify-end gap-3 mt-8">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+          disabled={isPrinting}
+          className="border-white/10 text-white/60 hover:text-white !px-6"
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={onConfirmPrint}
+          disabled={isPrinting}
+          className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30 !px-6"
+        >
+          {isPrinting ? (
+            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Printing...</>
+          ) : (
+            <><Printer className="h-4 w-4 mr-2" /> Print now</>
+          )}
+        </Button>
+      </div>
+    </>
   );
 }
 
