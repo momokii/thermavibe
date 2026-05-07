@@ -348,7 +348,7 @@ export default function AdminStripsGalleryPage() {
                   }}
                 />
               </div>
-              <div className="flex items-center justify-between" style={{ padding: '0.75rem 1.5rem' }}>
+              <div className="flex items-center justify-between flex-wrap gap-2" style={{ padding: '0.75rem 1.5rem' }}>
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-white/60">{formatDate(selectedStrip.created_at)}</p>
                   {selectedStrip.theme_name && (
@@ -458,63 +458,64 @@ export default function AdminStripsGalleryPage() {
                       <p className="text-sm text-white/30 italic">No analysis available</p>
                     )}
                   </div>
-                  {/* Footer with separator */}
+                  {/* Footer */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem' }}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
-                        {selectedResult.analysis_provider && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <p className="text-xs text-white/30">{formatDate(selectedResult.created_at)}</p>
+                      {selectedResult.analysis_provider && (
+                        <>
+                          <span className="text-xs text-white/15">·</span>
                           <p className="text-xs text-white/20">via {selectedResult.analysis_provider}</p>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => requestPrint(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
+                        disabled={printingIds.has(selectedResult.session_id)}
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors disabled:opacity-40"
+                        style={{ padding: '0.5rem 0.75rem' }}
+                      >
+                        {printingIds.has(selectedResult.session_id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Printer className="h-4 w-4" />
                         )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => requestPrint(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
-                          disabled={printingIds.has(selectedResult.session_id)}
-                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors disabled:opacity-40"
-                          style={{ padding: '0.5rem 0.75rem' }}
-                        >
-                          {printingIds.has(selectedResult.session_id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Printer className="h-4 w-4" />
-                          )}
-                          Print
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedResult.analysis_text) {
-                              navigator.clipboard.writeText(selectedResult.analysis_text);
-                              toast.success('Vibe reading copied to clipboard');
-                            }
-                          }}
-                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                          style={{ padding: '0.5rem 0.75rem' }}
-                        >
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </button>
-                        <a
-                          href={selectedResult.photo_url}
-                          download
-                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
-                          style={{ padding: '0.5rem 0.75rem' }}
-                        >
-                          <Download className="h-4 w-4" />
-                          Download
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => requestDelete(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
-                          className="flex items-center gap-2 rounded-lg text-sm font-medium text-red-400/60 hover:text-red-400 bg-red-500/[0.06] hover:bg-red-500/[0.12] transition-colors"
-                          style={{ padding: '0.5rem 0.75rem' }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </button>
-                      </div>
+                        Print
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedResult.analysis_text) {
+                            navigator.clipboard.writeText(selectedResult.analysis_text);
+                            toast.success('Vibe reading copied to clipboard');
+                          }
+                        }}
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                        style={{ padding: '0.5rem 0.75rem' }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy
+                      </button>
+                      <a
+                        href={selectedResult.photo_url}
+                        download
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-white/50 hover:text-white bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+                        style={{ padding: '0.5rem 0.75rem' }}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => requestDelete(selectedResult.session_id, `vibe check from ${formatDate(selectedResult.created_at)}`)}
+                        className="flex items-center gap-2 rounded-lg text-sm font-medium text-red-400/60 hover:text-red-400 bg-red-500/[0.06] hover:bg-red-500/[0.12] transition-colors"
+                        style={{ padding: '0.5rem 0.75rem' }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>
