@@ -582,6 +582,16 @@ export interface AccessCodeListResponse {
   total: number;
 }
 
+export interface AccessCodeSummaryResponse {
+  total_codes: number;
+  active_codes: number;
+  used_codes: number;
+  total_redemptions: number;
+  total_max_uses: number;
+  redemption_rate: number;
+  estimated_revenue: number;
+}
+
 export interface AccessCodeCreateRequest {
   code_type: 'vibe_check' | 'photobooth' | 'universal';
   count: number;

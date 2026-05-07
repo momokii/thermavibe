@@ -12,7 +12,7 @@ import string
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.access_code import AccessCode, AccessCodeStatus, AccessCodeType
@@ -234,6 +234,62 @@ async def redeem_code(
         price=access_code.price,
     )
     return access_code
+
+
+async def get_summary(db: AsyncSession) -> dict:
+    """Compute aggregate access code statistics via a single SQL query.
+
+    Returns a dict matching AccessCodeSummaryResponse fields.
+    """
+    # Auto-expire before computing stats
+    now = datetime.now(timezone.utc)
+    expired_stmt = (
+        select(AccessCode)
+        .where(
+            AccessCode.status == AccessCodeStatus.ACTIVE,
+            AccessCode.expires_at.isnot(None),
+            AccessCode.expires_at <= now,
+        )
+    )
+    expired_result = await db.execute(expired_stmt)
+    expired_codes = list(expired_result.scalars().all())
+    for code in expired_codes:
+        code.status = AccessCodeStatus.EXPIRED
+    if expired_codes:
+        await db.commit()
+
+    stmt = select(
+        func.count().label('total'),
+        func.sum(case(
+            (AccessCode.status == AccessCodeStatus.ACTIVE, 1),
+            else_=0,
+        )).label('active'),
+        func.sum(case(
+            (AccessCode.status == AccessCodeStatus.USED, 1),
+            else_=0,
+        )).label('used'),
+        func.coalesce(func.sum(AccessCode.use_count), 0).label('total_redemptions'),
+        func.coalesce(func.sum(AccessCode.max_uses), 0).label('total_max_uses'),
+        func.coalesce(func.sum(
+            AccessCode.use_count * AccessCode.price,
+        ), 0).label('estimated_revenue'),
+    )
+    result = await db.execute(stmt)
+    row = result.one()
+
+    total = row.total or 0
+    total_max = int(row.total_max_uses or 0)
+    redemption_rate = round(int(row.total_redemptions or 0) / total_max, 4) if total_max > 0 else 0.0
+
+    return {
+        'total_codes': total,
+        'active_codes': int(row.active or 0),
+        'used_codes': int(row.used or 0),
+        'total_redemptions': int(row.total_redemptions or 0),
+        'total_max_uses': total_max,
+        'redemption_rate': redemption_rate,
+        'estimated_revenue': int(row.estimated_revenue or 0),
+    }
 
 
 async def list_codes(

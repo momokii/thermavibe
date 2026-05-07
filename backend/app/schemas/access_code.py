@@ -73,6 +73,18 @@ class AccessCodeValidateResponse(BaseModel):
     access_code_id: int | None = None
 
 
+class AccessCodeSummaryResponse(BaseModel):
+    """Pre-computed access code summary statistics."""
+
+    total_codes: int
+    active_codes: int
+    used_codes: int
+    total_redemptions: int
+    total_max_uses: int
+    redemption_rate: float
+    estimated_revenue: int
+
+
 class RedeemCodeRequest(BaseModel):
     """Request body for redeeming an access code against a session."""
 

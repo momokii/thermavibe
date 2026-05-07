@@ -433,11 +433,18 @@ async def print_receipt(
         return SuccessMessage(message='No AI response to print')
 
     try:
+        import os
+
         from app.services.printer_service import print_receipt as do_print
+
+        photo_bytes = None
+        if body.include_photo and session.photo_path and os.path.exists(session.photo_path):
+            with open(session.photo_path, 'rb') as f:
+                photo_bytes = f.read()
 
         result = do_print(
             ai_text=session.ai_response_text,
-            photo_bytes=None,
+            photo_bytes=photo_bytes,
             include_photo=body.include_photo,
         )
         return SuccessMessage(message=result.get('message', 'Print sent'))

@@ -11,6 +11,7 @@ export default function RevealScreen() {
   const fullText = sessionData?.analysis_text ?? '';
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingDoneRef = useRef(false);
+  const printTriggeredRef = useRef(false);
 
   // Typewriter effect
   useEffect(() => {
@@ -40,7 +41,10 @@ export default function RevealScreen() {
   useEffect(() => {
     if (!fullText) return;
     const printTimer = setTimeout(() => {
-      triggerPrint();
+      if (!printTriggeredRef.current) {
+        printTriggeredRef.current = true;
+        triggerPrint();
+      }
     }, 1000);
     const resetTimer = setTimeout(() => {
       finishSession();

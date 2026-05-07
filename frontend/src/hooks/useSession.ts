@@ -48,6 +48,7 @@ export function usePrint() {
   return useMutation({
     mutationFn: ({ id, includePhoto }: { id: string; includePhoto?: boolean }) =>
       kioskApi.print(id, includePhoto),
+    retry: false,
   });
 }
 
