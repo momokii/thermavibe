@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatDuration, formatIDR, formatPercent, formatPeriod } from '@/lib/formatters';
+import AnalyticsExportButton from './AnalyticsExportButton';
+import type { ExportDataBundle } from '@/lib/export';
 
 const STATE_LABELS: Record<string, string> = {
   idle: 'Idle',
@@ -344,6 +346,18 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
     queryFn: () => adminApi.getPrintStats(params).then((r) => r.data),
   });
 
+  const exportData = useMemo<ExportDataBundle>(() => ({
+    rangeLabel: rangeLabel,
+    startDate: params.start_date,
+    endDate: params.end_date,
+    sessions,
+    revenue,
+    features,
+    peakHours,
+    dropoff,
+    printStats,
+  }), [rangeLabel, params, sessions, revenue, features, peakHours, dropoff, printStats]);
+
   if (sessionsLoading || revenueLoading) {
     return <p className="text-white/40">Loading analytics...</p>;
   }
@@ -356,16 +370,19 @@ export default function AnalyticsDashboard({ mode = 'full' }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div>
-        <h2 className="text-2xl font-display font-bold text-white">
-          {mode === 'summary' ? 'Dashboard' : 'Analytics'}
-        </h2>
-        <p className="text-sm text-white/30" style={{ marginTop: '0.25rem' }}>
-          Session activity and revenue performance for your kiosk.
-          {mode === 'summary' && (
-            <> Last 30 days.</>
-          )}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-white">
+            {mode === 'summary' ? 'Dashboard' : 'Analytics'}
+          </h2>
+          <p className="text-sm text-white/30" style={{ marginTop: '0.25rem' }}>
+            Session activity and revenue performance for your kiosk.
+            {mode === 'summary' && (
+              <> Last 30 days.</>
+            )}
+          </p>
+        </div>
+        {mode === 'full' && <AnalyticsExportButton data={exportData} />}
       </div>
 
       {/* Range filter */}
