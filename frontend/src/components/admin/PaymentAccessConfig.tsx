@@ -693,88 +693,95 @@ export default function PaymentAccessConfig() {
             )}
 
             {/* Search + Filters + Refresh */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Search row */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
-                  <input
-                    type="text"
-                    placeholder="Search code..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-surface text-white text-sm w-full pl-9"
-                    style={{ padding: '0.5rem 0.75rem 0.5rem 2.25rem' }}
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => { setSearchQuery(''); setDebouncedSearch(''); }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02]" style={{ padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                {/* Top row: search + refresh */}
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
+                    <input
+                      type="text"
+                      placeholder="Search codes..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="input-surface text-white text-sm w-full"
+                      style={{ padding: '0.5rem 2rem 0.5rem 2.25rem' }}
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => { setSearchQuery(''); setDebouncedSearch(''); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => refetchCodes()}
+                    className="text-white/40 hover:text-white/70 gap-1.5 shrink-0"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refresh
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => refetchCodes()}
-                  className="text-white/40 hover:text-white/70 gap-1.5"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
-                </Button>
-              </div>
-              {/* Status filter */}
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Status</Label>
-                {['active', 'used', 'expired', 'revoked', ''].map((s) => (
-                  <button
-                    key={s || 'all'}
-                    onClick={() => {
-                      setStatusFilter(s);
-                      setPage(0);
-                    }}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors border ${
-                      statusFilter === s
-                        ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
-                        : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
-                    }`}
-                  >
-                    {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
-                  </button>
-                ))}
-              </div>
-              {/* Type filter */}
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Type</Label>
-                {[
-                  { value: '', label: 'All' },
-                  { value: 'universal', label: 'Universal' },
-                  { value: 'vibe_check', label: 'Vibe Check' },
-                  { value: 'photobooth', label: 'Photobooth' },
-                ].map((t) => (
-                  <button
-                    key={t.value || 'all'}
-                    onClick={() => {
-                      setTypeFilter(t.value);
-                      setPage(0);
-                    }}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors border ${
-                      typeFilter === t.value
-                        ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
-                        : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+                {/* Filter rows */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {/* Status */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-white/50 font-semibold uppercase tracking-wider mr-0.5">Status</span>
+                    {['active', 'used', 'expired', 'revoked', ''].map((s) => (
+                      <button
+                        key={s || 'all'}
+                        onClick={() => {
+                          setStatusFilter(s);
+                          setPage(0);
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          statusFilter === s
+                            ? 'bg-violet-500/15 text-violet-300'
+                            : 'text-white/25 hover:text-white/50 hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Divider */}
+                  <div className="w-px h-4 bg-white/[0.08]" />
+                  {/* Type */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-white/50 font-semibold uppercase tracking-wider mr-0.5">Type</span>
+                    {[
+                      { value: '', label: 'All' },
+                      { value: 'universal', label: 'Universal' },
+                      { value: 'vibe_check', label: 'Vibe Check' },
+                      { value: 'photobooth', label: 'Photobooth' },
+                    ].map((t) => (
+                      <button
+                        key={t.value || 'all'}
+                        onClick={() => {
+                          setTypeFilter(t.value);
+                          setPage(0);
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          typeFilter === t.value
+                            ? 'bg-cyan-500/15 text-cyan-300'
+                            : 'text-white/25 hover:text-white/50 hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Codes table */}
-            <div className="rounded-xl bg-white/[0.03] overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="rounded-xl bg-white/[0.03] overflow-x-auto custom-scrollbar">
+              <table className="w-full text-sm" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr className="text-left text-xs text-white/30 uppercase tracking-wider border-b border-white/[0.06]">
                     <th style={{ padding: '0.75rem 1rem' }}>Code</th>
