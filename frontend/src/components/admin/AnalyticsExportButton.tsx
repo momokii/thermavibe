@@ -41,18 +41,18 @@ export default function AnalyticsExportButton({ data }: { data: ExportDataBundle
           variant="outline"
           size="sm"
           disabled={!hasData || isExporting}
-          className="border-white/10 text-white/60 hover:text-white gap-2"
+          className="!px-6 border-white/10 text-white/60 hover:text-white gap-2"
         >
           {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Export
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-surface-1 border-white/10">
-        <DropdownMenuItem onClick={exportCsv} disabled={isExporting} className="text-white/70 focus:text-white focus:bg-white/[0.06] cursor-pointer">
+      <DropdownMenuContent className="bg-surface-1 border-white/10 min-w-[180px] p-1.5">
+        <DropdownMenuItem onClick={exportCsv} disabled={isExporting} className="text-white/70 focus:text-white focus:bg-white/[0.06] cursor-pointer rounded-md !px-3 !py-2">
           <Table2 className="h-4 w-4 mr-2" />
           Export as CSV
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportPdf} disabled={isExporting} className="text-white/70 focus:text-white focus:bg-white/[0.06] cursor-pointer">
+        <DropdownMenuItem onClick={exportPdf} disabled={isExporting} className="text-white/70 focus:text-white focus:bg-white/[0.06] cursor-pointer rounded-md !px-3 !py-2">
           <FileText className="h-4 w-4 mr-2" />
           Export as PDF Report
         </DropdownMenuItem>
