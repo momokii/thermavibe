@@ -19,7 +19,10 @@ import {
   Copy,
   Plus,
   RefreshCw,
+  Search,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import type { AccessCodeResponse, AccessCodeSummaryResponse } from '@/api/types';
 import { formatIDR } from '@/lib/formatters';
@@ -214,8 +217,17 @@ export default function PaymentAccessConfig() {
 
   // ── Access code: list ─────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [page, setPage] = useState(0);
-  const limit = 25;
+  const [limit, setLimit] = useState(25);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Summary stats from backend aggregation
   const { data: summaryStats } = useQuery({
@@ -225,15 +237,25 @@ export default function PaymentAccessConfig() {
 
   // Filtered + paginated query for the table
   const { data: codesData, refetch: refetchCodes } = useQuery({
-    queryKey: ['access-codes', statusFilter, page],
+    queryKey: ['access-codes', statusFilter, typeFilter, page, limit],
     queryFn: () =>
       adminApi
-        .listAccessCodes({ status: statusFilter || undefined, limit, offset: page * limit })
+        .listAccessCodes({
+          status: statusFilter || undefined,
+          code_type: typeFilter || undefined,
+          limit,
+          offset: page * limit,
+        })
         .then((r) => r.data),
   });
 
   const codes = codesData?.codes ?? [];
   const total = codesData?.total ?? 0;
+
+  // Client-side search filter on current page
+  const filteredCodes = debouncedSearch
+    ? codes.filter((c) => c.code.toLowerCase().includes(debouncedSearch.toLowerCase()))
+    : codes;
 
   // ── Access code: revoke / delete ──────────────────────────────
   const revokeMutation = useMutation({
@@ -670,10 +692,42 @@ export default function PaymentAccessConfig() {
               <AccessCodeSummary stats={summaryStats} />
             )}
 
-            {/* Filter + Refresh */}
-            <div className="flex items-center justify-between">
+            {/* Search + Filters + Refresh */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {/* Search row */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25" />
+                  <input
+                    type="text"
+                    placeholder="Search code..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="input-surface text-white text-sm w-full pl-9"
+                    style={{ padding: '0.5rem 0.75rem 0.5rem 2.25rem' }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setDebouncedSearch(''); }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refetchCodes()}
+                  className="text-white/40 hover:text-white/70 gap-1.5"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Refresh
+                </Button>
+              </div>
+              {/* Status filter */}
               <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Filter</Label>
+                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Status</Label>
                 {['active', 'used', 'expired', 'revoked', ''].map((s) => (
                   <button
                     key={s || 'all'}
@@ -687,19 +741,35 @@ export default function PaymentAccessConfig() {
                         : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
                     }`}
                   >
-                    {s || 'All'}
+                    {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
                   </button>
                 ))}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => refetchCodes()}
-                className="text-white/40 hover:text-white/70 gap-1.5"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Refresh
-              </Button>
+              {/* Type filter */}
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-white/40 uppercase tracking-wider mr-1">Type</Label>
+                {[
+                  { value: '', label: 'All' },
+                  { value: 'universal', label: 'Universal' },
+                  { value: 'vibe_check', label: 'Vibe Check' },
+                  { value: 'photobooth', label: 'Photobooth' },
+                ].map((t) => (
+                  <button
+                    key={t.value || 'all'}
+                    onClick={() => {
+                      setTypeFilter(t.value);
+                      setPage(0);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-medium tracking-wide transition-colors border ${
+                      typeFilter === t.value
+                        ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                        : 'text-white/30 border-white/[0.06] hover:text-white/50 hover:bg-white/[0.03] hover:border-white/10'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Codes table */}
@@ -718,7 +788,7 @@ export default function PaymentAccessConfig() {
                   </tr>
                 </thead>
                 <tbody>
-                  {codes.map((code: AccessCodeResponse) => (
+                  {filteredCodes.map((code: AccessCodeResponse) => (
                     <tr
                       key={code.id}
                       className="border-b border-white/[0.03] hover:bg-white/[0.02]"
@@ -802,7 +872,7 @@ export default function PaymentAccessConfig() {
                       </td>
                     </tr>
                   ))}
-                  {codes.length === 0 && (
+                  {filteredCodes.length === 0 && (
                     <tr>
                       <td
                         colSpan={8}
@@ -818,30 +888,76 @@ export default function PaymentAccessConfig() {
             </div>
 
             {/* Pagination */}
-            {total > limit && (
+            {total > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-xs text-white/30">
-                  {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white/30">
+                    {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-white/25">Per page</span>
+                    {[10, 25, 50].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => { setLimit(n); setPage(0); }}
+                        className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                          limit === n
+                            ? 'bg-white/[0.08] text-white/70'
+                            : 'text-white/25 hover:text-white/50'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
                     disabled={page === 0}
                     onClick={() => setPage(page - 1)}
-                    className="text-white/40"
+                    className="p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/[0.04] disabled:opacity-30 disabled:pointer-events-none"
                   >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {(() => {
+                    const totalPages = Math.ceil(total / limit);
+                    const pages: (number | '...')[] = [];
+                    if (totalPages <= 7) {
+                      for (let i = 0; i < totalPages; i++) pages.push(i);
+                    } else {
+                      pages.push(0);
+                      if (page > 2) pages.push('...');
+                      const start = Math.max(1, page - 1);
+                      const end = Math.min(totalPages - 2, page + 1);
+                      for (let i = start; i <= end; i++) pages.push(i);
+                      if (page < totalPages - 3) pages.push('...');
+                      pages.push(totalPages - 1);
+                    }
+                    return pages.map((p, i) =>
+                      p === '...' ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-xs text-white/20">...</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`min-w-[28px] h-7 rounded-lg text-xs font-medium transition-colors ${
+                            page === p
+                              ? 'bg-violet-500/15 text-violet-300'
+                              : 'text-white/30 hover:text-white/60 hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          {p + 1}
+                        </button>
+                      ),
+                    );
+                  })()}
+                  <button
                     disabled={(page + 1) * limit >= total}
                     onClick={() => setPage(page + 1)}
-                    className="text-white/40"
+                    className="p-1.5 rounded-lg text-white/30 hover:text-white/60 hover:bg-white/[0.04] disabled:opacity-30 disabled:pointer-events-none"
                   >
-                    Next
-                  </Button>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             )}

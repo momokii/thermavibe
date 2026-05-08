@@ -102,7 +102,7 @@ export function generateAnalyticsPdf(data: ExportDataBundle): jsPDF {
       startY: y,
       head: [['Feature', 'Sessions', 'Completed', 'Completion Rate', 'Avg Duration', 'Revenue']],
       body: features.features.map((f) => [
-        f.session_type === 'vibe_check' ? 'Vibe Check' : 'Photobooth',
+        f.feature === 'vibe_check' ? 'Vibe Check' : 'Photobooth',
         String(f.total_sessions),
         String(f.completed_sessions),
         formatPercent(f.completion_rate),

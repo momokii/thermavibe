@@ -79,7 +79,7 @@ export function generateAnalyticsCsv(data: ExportDataBundle): string {
     lines.push(row('Feature', 'Sessions', 'Completed', 'Abandoned', 'Completion Rate', 'Avg Duration (s)', 'Revenue (IDR)', 'Paid Sessions', 'Payment Revenue (IDR)', 'Access Code Revenue (IDR)'));
     for (const f of features.features) {
       lines.push(row(
-        f.session_type,
+        f.feature,
         f.total_sessions,
         f.completed_sessions,
         f.abandoned_sessions,
