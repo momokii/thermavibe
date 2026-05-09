@@ -359,7 +359,11 @@ def _dispose_all_for(vendor_id: int, product_id: int) -> None:
 
 
 def _connect_usb_printer_inner(vendor_id: int, product_id: int):
-    """Inner connection logic — called by _connect_usb_printer with guard."""
+    """Inner connection logic — called by _connect_usb_printer with guard.
+
+    The USB-to-parallel bridge chip (0fe6:811e) needs significant time to
+    stabilize after power cycle. Retry with progressive waits up to 20 seconds.
+    """
     import time
 
     import usb.core
@@ -368,15 +372,37 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int):
     # Clear any stale pyusb resources
     _dispose_all_for(vendor_id, product_id)
 
-    # Simple connection attempt - let python-escpos handle the USB setup
-    try:
-        printer = _SafeUsbPrinter(vendor_id, product_id)
-        printer.open()
-        logger.info('printer_connected_successfully')
-        return printer
-    except Exception as exc:
-        logger.warning('printer_connect_failed', error=str(exc), error_type=type(exc).__name__)
-        raise PrinterOfflineError() from exc
+    # Progressive retry with increasing waits for power cycle recovery
+    # The bridge chip can take 10-20 seconds to become responsive
+    wait_times = [0, 5, 10, 15]  # Wait times before each attempt
+
+    for attempt, wait_sec in enumerate(wait_times, 1):
+        if attempt > 1:
+            logger.info('printer_retry_waiting', attempt=attempt, wait_seconds=wait_sec)
+            time.sleep(wait_sec)
+
+        # Clear stale resources before each attempt
+        _dispose_all_for(vendor_id, product_id)
+
+        try:
+            printer = _SafeUsbPrinter(vendor_id, product_id)
+            printer.open()
+            logger.info('printer_connected_successfully', attempt=attempt)
+            return printer
+        except Exception as exc:
+            logger.warning(
+                'printer_connect_attempt_failed',
+                attempt=attempt,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+
+            # Last attempt failed, give up
+            if attempt >= len(wait_times):
+                break
+
+    logger.info('printer_all_connection_attempts_failed')
+    raise PrinterOfflineError()
 
 
 def _reset_usb_port_sysfs(vid_hex: str, pid_hex: str) -> bool:
@@ -436,10 +462,10 @@ def _get_printer():
         _printer = None
 
         # Power cycle detected: device physically present but old handle not usable
-        # Wait for device to stabilize before reconnecting
+        # The USB-to-parallel bridge chip needs 10-20 seconds to stabilize
         if present and not usable:
-            logger.info('power_cycle_detected_waiting_for_stabilization')
-            time.sleep(5)
+            logger.info('power_cycle_detected_waiting_for_stabilization', wait_seconds=15)
+            time.sleep(15)
 
     # Try to connect with current IDs
     if _active_vendor_id and _active_product_id:
