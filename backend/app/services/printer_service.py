@@ -423,8 +423,30 @@ def _dispose_all_for(vendor_id: int, product_id: int) -> None:
     gc.collect()
 
 
+def _test_device_communication(dev) -> bool:
+    """Test if a USB device can actually communicate.
+
+    Does a simple control transfer to verify the device is responsive.
+    Returns True if device responds, False otherwise.
+    """
+    import usb.core
+
+    try:
+        # Try to read the device configuration - this is a simple control transfer
+        # that should work if the device is responsive
+        cfg = dev.get_active_configuration()
+        return cfg is not None
+    except (usb.core.USBError, Exception):
+        return False
+
+
 def _connect_usb_printer_inner(vendor_id: int, product_id: int):
-    """Inner connection logic — called by _connect_usb_printer with guard."""
+    """Inner connection logic — called by _connect_usb_printer with guard.
+
+    After power cycle, the USB device needs time to stabilize. The key is
+    to wait longer between retries and avoid aggressive USB operations that
+    can put the device in a worse state.
+    """
     import time
 
     import usb.core
@@ -435,90 +457,49 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int):
     # gone /dev/bus/usb paths. Clearing them forces a fresh enumerate.
     _dispose_all_for(vendor_id, product_id)
 
-    # Attempt 1: Direct open with kernel driver detach
-    try:
-        printer = _SafeUsbPrinter(vendor_id, product_id)
-        printer.open()
-        usable = _is_printer_usable(printer)
-        logger.info('connect_attempt_1', usable=usable, device_type=type(printer._device).__name__)
-        if usable:
-            return printer
-        _close_printer(printer)
-    except Exception as exc:
-        logger.warning('connect_attempt_1_failed', error=str(exc), error_type=type(exc).__name__)
+    # After power cycle, the device needs significant time to re-enumerate and stabilize.
+    # The USB-to-parallel bridge chip (0fe6:811e) is especially slow to recover.
+    wait_times = [2, 3, 5, 8]  # Progressive wait times
 
-    # Dispose again — attempt 1 may have left stale handles
-    _dispose_all_for(vendor_id, product_id)
-    time.sleep(1)  # Increased from 0.5s - USB needs time to stabilize
+    for attempt, wait_time in enumerate(wait_times, 1):
+        # Wait before attempting connection (except first attempt)
+        if attempt > 1:
+            logger.info(f'connect_attempt_{attempt}_waiting', wait_seconds=wait_time)
+            time.sleep(wait_time)
 
-    # Attempt 2: Explicit pyusb reset to force re-enumeration, then open.
-    # We find the raw device, detach kernel driver, reset it (new address),
-    # dispose resources, then let _SafeUsbPrinter open the fresh device.
-    dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
-    if dev is None:
-        logger.info('connect_attempt_2_device_not_found')
-        raise PrinterOfflineError()
-
-    logger.info('connect_attempt_2_reset', bus=dev.bus, address=dev.address)
-
-    # Detach kernel driver before reset
-    try:
-        if dev.is_kernel_driver_active(0):
-            dev.detach_kernel_driver(0)
-    except (usb.core.USBError, NotImplementedError):
-        pass
-
-    # Reset forces re-enumeration (new bus address, clean device state)
-    with contextlib.suppress(Exception):
-        dev.reset()
-
-    usb.util.dispose_resources(dev)
-    time.sleep(3)  # Increased from 2s - device needs full re-enumeration time
-
-    # Dispose again — reset creates a new device instance
-    _dispose_all_for(vendor_id, product_id)
-
-    try:
-        printer = _SafeUsbPrinter(vendor_id, product_id)
-        printer.open()
-        usable = _is_printer_usable(printer)
-        logger.info('connect_attempt_2_after_reset', usable=usable, device_type=type(printer._device).__name__)
-        if usable:
-            return printer
-        _close_printer(printer)
-    except Exception as exc:
-        logger.warning('connect_attempt_2_after_reset_failed', error=str(exc), error_type=type(exc).__name__)
-
-    # Attempt 3: sysfs authorized reset (kernel-level, no USB I/O needed)
-    vid_hex = f'{vendor_id:04x}'
-    pid_hex = f'{product_id:04x}'
-    if _reset_usb_port_sysfs(vid_hex, pid_hex):
-        time.sleep(4)  # Increased from 3s - sysfs reset needs more time
+        # Dispose stale resources before each attempt
         _dispose_all_for(vendor_id, product_id)
+
+        # Find the device
+        dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
+        if dev is None:
+            logger.info(f'connect_attempt_{attempt}_device_not_found')
+            continue
+
+        logger.info(f'connect_attempt_{attempt}_device_found', bus=dev.bus, address=dev.address)
+
+        # Test if device can actually communicate
+        if not _test_device_communication(dev):
+            logger.warning(f'connect_attempt_{attempt}_device_not_responsive')
+            continue
+
+        # Device is responsive, try to create printer and open it
         try:
             printer = _SafeUsbPrinter(vendor_id, product_id)
             printer.open()
-            usable = _is_printer_usable(printer)
-            logger.info('connect_attempt_3_sysfs', usable=usable)
-            if usable:
+
+            # Verify the connection is actually usable
+            if _is_printer_usable(printer):
+                logger.info(f'connect_attempt_{attempt}_success', bus=dev.bus, address=dev.address)
                 return printer
+            else:
+                logger.warning(f'connect_attempt_{attempt}_not_usable')
+                _close_printer(printer)
         except Exception as exc:
-            logger.warning('connect_attempt_3_sysfs_failed', error=str(exc), error_type=type(exc).__name__)
+            logger.warning(f'connect_attempt_{attempt}_failed', error=str(exc), error_type=type(exc).__name__)
 
-    # Attempt 4: Final attempt with extended wait - sometimes device just needs more time
-    logger.info('connect_attempt_4_extended_wait', wait_seconds=5)
-    time.sleep(5)
-    _dispose_all_for(vendor_id, product_id)
-    try:
-        printer = _SafeUsbPrinter(vendor_id, product_id)
-        printer.open()
-        usable = _is_printer_usable(printer)
-        logger.info('connect_attempt_4_final', usable=usable)
-        if usable:
-            return printer
-    except Exception as exc:
-        logger.warning('connect_attempt_4_final_failed', error=str(exc), error_type=type(exc).__name__)
-
+    # All attempts failed
+    logger.info('connect_all_attempts_failed')
     raise PrinterOfflineError()
 
 
@@ -562,6 +543,8 @@ def _reset_usb_port_sysfs(vid_hex: str, pid_hex: str) -> bool:
 
 def _get_printer():
     """Get or initialize the ESC/POS printer connection."""
+    import time
+
     global _printer
 
     if _printer is not None:
@@ -578,6 +561,12 @@ def _get_printer():
         if _active_vendor_id and _active_product_id:
             with contextlib.suppress(Exception):
                 _dispose_all_for(int(_active_vendor_id, 16), int(_active_product_id, 16))
+
+        # Power cycle detected: device present but handle not usable.
+        # The USB-to-parallel bridge needs time to stabilize after power cycle.
+        if present and not usable:
+            logger.info('power_cycle_detected_waiting', wait_seconds=3)
+            time.sleep(3)
 
     # Try to reconnect with current IDs
     if _active_vendor_id and _active_product_id:
