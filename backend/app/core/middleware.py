@@ -239,7 +239,15 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 def setup_cors(app: FastAPI) -> None:
-    """Add CORS middleware with origins from settings."""
+    """Add CORS middleware with origins from settings.
+
+    In production the frontend is served from the same origin as the API,
+    so CORS is not needed.  In development the Vite dev server runs on a
+    different port and requires cross-origin access.
+    """
+    if settings.app_env == 'production':
+        return
+
     origins_str = getattr(settings, 'cors_allowed_origins', '')
     origins = [o.strip() for o in origins_str.split(',') if o.strip()]
     if not origins:

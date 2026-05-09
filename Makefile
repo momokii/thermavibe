@@ -11,6 +11,24 @@ dev: ## Start the full development environment (auto-detects cameras)
 prod: ## Start production mode (auto-detects cameras)
 	./scripts/start-docker.sh prod
 
+.PHONY: deploy
+deploy: ## Validate env, build, start production, and verify health
+	@test -f .env || (echo "ERROR: .env not found. Run: cp .env.production .env" && exit 1)
+	@grep -q 'change-me-in-production' .env 2>/dev/null && echo "WARNING: APP_SECRET_KEY is still the default!" || true
+	@echo "Starting production..."
+	./scripts/start-docker.sh prod
+	@echo "Waiting for application to become healthy..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if curl -sf http://localhost:8000/health > /dev/null 2>&1; then \
+			echo "Health check passed."; \
+			docker compose ps; \
+			exit 0; \
+		fi; \
+		echo "  Attempt $$i/10 - waiting..."; \
+		sleep 3; \
+	done; \
+	echo "WARNING: Health check did not pass within 30 seconds. Check logs: make logs"
+
 .PHONY: dev-down
 dev-down: ## Stop all containers
 	./scripts/start-docker.sh down

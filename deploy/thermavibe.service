@@ -1,0 +1,16 @@
+[Unit]
+Description=VibePrint OS Kiosk Application
+After=docker.service
+Requires=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/thermavibe
+ExecStart=/usr/bin/make prod
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
