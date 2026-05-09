@@ -25,8 +25,10 @@ VibePrint OS turns a basic computer, a USB webcam, and a thermal receipt printer
 - **Dual features**: Vibe Check (single photo + AI reading) and Photobooth (multi-photo strip with themes)
 - **5 AI providers** with automatic fallback chain (OpenAI, Anthropic, Google, Ollama, Mock)
 - **3 payment providers** (Midtrans, Xendit, Mock) — toggle-able, default OFF
-- **Admin dashboard**: PIN-protected, real-time analytics, feature breakdown (Vibe Check vs Photobooth), config management, hardware testing, photo/strips gallery
-- **Gallery**: Admin can browse, view, and download Vibe Check results and Photobooth strips with pagination
+- **Access code system**: Generate codes for event-hosted kiosks (vibe check, photobooth, or universal), with pricing, batch generation, QR codes, and revocation
+- **Admin dashboard**: PIN-protected with real-time analytics (sessions, revenue, feature breakdown, peak hours heatmap, drop-off funnel, print reliability), config management, hardware testing, theme editor, photo/strips gallery
+- **Print template**: Configurable receipt footer (brand name, timezone, per-element toggles) applied consistently across all print types
+- **Gallery**: Browse, view, and manually reprint Vibe Check results and Photobooth strips
 - **Retention enforcement**: Configurable per-feature retention periods with automatic background cleanup
 - **Privacy-first**: photos retained only for the configured retention period, then automatically purged
 - **Hardware-agnostic**: any UVC webcam + any ESC/POS thermal printer
@@ -317,12 +319,12 @@ thermavibe/
 ├── backend/                  # FastAPI Python application
 │   ├── app/
 │   │   ├── ai/              # AI provider adapters (OpenAI, Anthropic, Google, Ollama, Mock)
-│   │   ├── api/v1/endpoints/# REST API route handlers (6 modules, 24+ endpoints)
+│   │   ├── api/v1/endpoints/# REST API route handlers (7 modules, 40+ endpoints)
 │   │   ├── core/            # Config, database, security, middleware, exceptions
-│   │   ├── models/          # SQLAlchemy ORM models (5 tables)
+│   │   ├── models/          # SQLAlchemy ORM models (8 tables)
 │   │   ├── payment/         # Payment provider adapters (Midtrans, Xendit, Mock)
-│   │   ├── schemas/         # Pydantic request/response schemas (9 modules)
-│   │   ├── services/        # Business logic (9 services)
+│   │   ├── schemas/         # Pydantic request/response schemas (11 modules)
+│   │   ├── services/        # Business logic (15 services)
 │   │   └── utils/           # Utilities (dithering, ESC/POS, image processing, validators)
 │   ├── alembic/             # Database migrations
 │   ├── tests/               # Unit + integration tests (249 tests)
@@ -339,7 +341,7 @@ thermavibe/
 │   └── vite.config.ts
 ├── docs/                     # Documentation
 │   ├── prd/                 # Product requirements (9 documents)
-│   └── technical/           # Technical specs (8 documents)
+│   └── technical/           # Technical specs (9 documents)
 ├── scripts/                  # Operational scripts
 ├── config/                   # Static configuration and fallback templates
 ├── docker-compose.yml        # Production Docker Compose
@@ -379,10 +381,9 @@ Full documentation is in the [`docs/`](docs/) directory:
 
 ## Known Limitations
 
-- **PaymentScreen**: The kiosk payment screen is a stub (empty `<div>`). Payment is disabled by default (`PAYMENT_ENABLED=false`), so this does not affect the core flow. Implementing the payment screen is the next priority.
 - **No CI/CD pipeline**: No automated build/test/deploy pipeline yet.
-- **No real hardware testing**: Camera and printer services are implemented but untested with actual hardware.
-- **Test coverage**: Backend is well-tested (249 tests). Frontend has basic coverage (32 tests) — admin components and most hooks lack tests.
+- **Test coverage**: Backend is well-tested (250+ tests). Frontend has basic coverage (32 tests) — admin components and most hooks lack tests.
+- **Single kiosk**: Currently supports one kiosk instance per deployment. Multi-kiosk architecture is planned (see `docs/technical/multi-kiosk-architecture.md`).
 
 ---
 

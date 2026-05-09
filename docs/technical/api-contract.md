@@ -18,6 +18,13 @@
 8. [Print](#8-print)
 9. [Admin](#9-admin)
 10. [Access Codes (Admin)](#10-access-codes-admin)
+11. [Photobooth Themes (Admin)](#11-photobooth-themes-admin)
+12. [Gallery Management (Admin)](#12-gallery-management-admin)
+13. [Photobooth Flow (Kiosk)](#13-photobooth-flow-kiosk)
+14. [Multi-Photo Capture (Kiosk)](#14-multi-photo-capture-kiosk)
+15. [Photo Serving (Kiosk)](#15-photo-serving-kiosk)
+16. [Sharing (Kiosk)](#16-sharing-kiosk)
+17. [Public Photobooth Themes](#17-public-photobooth-themes)
 
 ---
 
@@ -123,9 +130,11 @@ Paginated responses follow this structure:
 
 ## 2. Health Check
 
-### `GET /api/v1/health`
+### `GET /health`
 
 Returns the health status of the application and its dependencies.
+
+> **Note:** This endpoint is mounted at the root level, not under `/api/v1/`.
 
 **Authentication:** None
 
@@ -183,7 +192,9 @@ Returns enabled features and photobooth configuration for kiosk initialization. 
   "photobooth_min_photos": 2,
   "photobooth_capture_time_limit_seconds": 30,
   "photobooth_default_layout_rows": 4,
-  "access_code_mode_enabled": false
+  "photobooth_snap_countdown_enabled": false,
+  "access_code_mode_enabled": false,
+  "ai_timeout_minutes": 5
 }
 ```
 
@@ -195,7 +206,9 @@ Returns enabled features and photobooth configuration for kiosk initialization. 
 | `photobooth_min_photos` | integer | Minimum photos before "Done" button appears |
 | `photobooth_capture_time_limit_seconds` | integer | Capture timer duration in seconds |
 | `photobooth_default_layout_rows` | integer | Default photo slots in strip (1-4) |
+| `photobooth_snap_countdown_enabled` | boolean | Whether a 3-second countdown plays before each snap |
 | `access_code_mode_enabled` | boolean | Whether access code mode is active. When true, the kiosk requires a valid access code to proceed. Mutually exclusive with payment: setting this to `true` automatically sets `payment_enabled` to `false`, and vice versa. |
+| `ai_timeout_minutes` | integer | Timeout in minutes for AI analysis requests |
 
 > **Mutual exclusivity note:** `access_code_mode_enabled` and payment are mutually exclusive. When `access_code_mode_enabled` is set to `true` via the admin config, `payment_enabled` is automatically forced to `false`. Likewise, enabling payment disables access code mode. This ensures the kiosk only presents one gating mechanism at a time.
 
@@ -205,7 +218,7 @@ Returns enabled features and photobooth configuration for kiosk initialization. 
 
 ### `POST /api/v1/kiosk/session`
 
-Create a new kiosk session. This initializes the state machine in the IDLE state and returns the session object.
+Create a new kiosk session. This initializes the state machine in the IDLE state and returns the session object. If `payment_enabled` is true or `access_code_mode` is true, the session is auto-transitioned past IDLE.
 
 **Authentication:** None
 
@@ -214,7 +227,8 @@ Create a new kiosk session. This initializes the state machine in the IDLE state
 ```json
 {
   "payment_enabled": false,
-  "access_code_mode": false
+  "access_code_mode": false,
+  "session_type": "vibe_check"
 }
 ```
 
@@ -222,25 +236,47 @@ Create a new kiosk session. This initializes the state machine in the IDLE state
 |-------|------|----------|---------|-------------|
 | `payment_enabled` | boolean | No | `false` | Whether the payment step is enabled for this session |
 | `access_code_mode` | boolean | No | `false` | Whether access code gating is enabled for this session. Mutually exclusive with `payment_enabled`; if both are `true`, the request is rejected with `400 CONFIG_INVALID`. |
+| `session_type` | string | No | `"vibe_check"` | Session type: `"vibe_check"` or `"photobooth"` |
 
 **Response (201 Created):**
 
 ```json
 {
-  "id": "sess_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "state": "IDLE",
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "state": "idle",
   "payment_enabled": false,
-  "access_code_mode": false,
   "payment_status": null,
   "captured_at": null,
+  "capture_image_url": null,
   "analysis_text": null,
   "analysis_provider": null,
   "printed_at": null,
+  "print_success": null,
   "created_at": "2025-06-15T10:30:00Z",
-  "updated_at": "2025-06-15T10:30:00Z",
-  "expires_at": "2025-06-15T11:30:00Z"
+  "updated_at": null,
+  "expires_at": null,
+  "photos": [],
+  "capture_time_limit": 30
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string (UUID) | Session ID |
+| `state` | string | Current state machine state |
+| `payment_enabled` | boolean | Whether payment is enabled |
+| `payment_status` | string or null | Payment status if applicable |
+| `captured_at` | string or null | Timestamp of photo capture |
+| `capture_image_url` | string or null | URL to captured photo |
+| `analysis_text` | string or null | AI analysis result text |
+| `analysis_provider` | string or null | AI provider used |
+| `printed_at` | string or null | Timestamp of print |
+| `print_success` | boolean or null | Whether print succeeded |
+| `created_at` | string | Session creation timestamp |
+| `updated_at` | string or null | Last update timestamp |
+| `expires_at` | string or null | Session expiry timestamp |
+| `photos` | array | All photos taken this session (empty initially) |
+| `capture_time_limit` | integer or null | Capture timer in seconds (varies by session type) |
 
 **Error Responses:**
 
@@ -360,18 +396,7 @@ Trigger printing of the session receipt. The backend assembles the ESC/POS recei
 
 ```json
 {
-  "id": "sess_a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "state": "REVEAL",
-  "payment_enabled": false,
-  "payment_status": null,
-  "captured_at": "2025-06-15T10:30:15Z",
-  "analysis_text": "Your energy today radiates confidence and warmth...",
-  "analysis_provider": "openai",
-  "printed_at": "2025-06-15T10:31:30Z",
-  "print_success": true,
-  "created_at": "2025-06-15T10:30:00Z",
-  "updated_at": "2025-06-15T10:31:30Z",
-  "expires_at": "2025-06-15T11:30:00Z"
+  "message": "Print sent"
 }
 ```
 
@@ -380,8 +405,7 @@ Trigger printing of the session receipt. The backend assembles the ESC/POS recei
 | Status | Code | Description |
 |--------|------|-------------|
 | 404 | `NOT_FOUND` | No session exists with the given ID |
-| 409 | `INVALID_STATE` | Session is not in REVEAL state |
-| 503 | `PRINTER_ERROR` | Printer is not available or print job failed |
+| 502 | `PRINTER_ERROR` | Printer is not available or print job failed |
 
 ---
 
@@ -1031,7 +1055,7 @@ Update configuration values for a specific category. Only the provided fields ar
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `category` | string | Configuration category (`general`, `ai`, `payment`, `camera`, `printer`) |
+| `category` | string | Configuration category (`general`, `ai`, `payment`, `camera`, `printer`, `print`, `photobooth`, `vibe_check`, `access_code`) |
 
 **Request Body:**
 
@@ -1071,10 +1095,13 @@ A JSON object where keys are configuration field names and values are the new va
 | 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
 | 400 | `CONFIG_INVALID` | One or more configuration values are invalid |
 | 404 | `NOT_FOUND` | Configuration category does not exist |
+| 422 | `VALIDATION_ERROR` | Category-specific validation failed (see below) |
 
----
-
-### `GET /api/v1/admin/analytics/features`
+> **Validation guards:**
+> - At least one feature (Vibe Check or Photobooth) must stay enabled. Disabling the last one returns 422.
+> - `access_code` and `payment` categories are mutually exclusive. Enabling one automatically disables the other.
+> - `ai` category: `ai_timeout_minutes` must be between 1 and 30.
+> - `print` category: `print_footer_name` must be 24 characters or fewer. `print_timezone_offset` must be a number between -14 and +14.
 
 Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth session performance. Returns total sessions, completion rate, average duration, and revenue (split by payment and access code) for each feature independently.
 
@@ -1100,6 +1127,7 @@ Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth se
       "completion_rate": 0.875,
       "avg_duration_seconds": 45.2,
       "revenue": 1050000,
+      "paid_sessions": 80,
       "payment_revenue": 800000,
       "access_code_revenue": 250000
     },
@@ -1111,6 +1139,7 @@ Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth se
       "completion_rate": 0.847,
       "avg_duration_seconds": 95.8,
       "revenue": 720000,
+      "paid_sessions": 50,
       "payment_revenue": 500000,
       "access_code_revenue": 220000
     }
@@ -1272,6 +1301,164 @@ GET /api/v1/admin/analytics/revenue?start_date=2025-06-01&end_date=2025-06-15&gr
   }
 }
 ```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid date format or date range |
+
+---
+
+### `GET /api/v1/admin/analytics/peak-hours`
+
+Retrieve session distribution by day-of-week and hour. Useful for visualizing peak operating times.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string (ISO 8601 date) | No | 7 days ago | Start of date range |
+| `end_date` | string (ISO 8601 date) | No | Today | End of date range |
+
+**Response (200 OK):**
+
+```json
+{
+  "slots": [
+    {
+      "day_of_week": 5,
+      "hour": 14,
+      "sessions": 12,
+      "vibe_check_sessions": 7,
+      "photobooth_sessions": 5,
+      "revenue": 120000
+    },
+    {
+      "day_of_week": 5,
+      "hour": 15,
+      "sessions": 18,
+      "vibe_check_sessions": 10,
+      "photobooth_sessions": 8,
+      "revenue": 180000
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `slots` | array | Array of `PeakHourSlot` objects, one per unique (day_of_week, hour) combination |
+| `slots[].day_of_week` | integer | ISO day of week (1=Monday, 7=Sunday) |
+| `slots[].hour` | integer | Hour of day (0-23) |
+| `slots[].sessions` | integer | Total sessions in this slot |
+| `slots[].vibe_check_sessions` | integer | Vibe Check sessions in this slot |
+| `slots[].photobooth_sessions` | integer | Photobooth sessions in this slot |
+| `slots[].revenue` | integer | Revenue in IDR for this slot |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid date format or date range |
+
+---
+
+### `GET /api/v1/admin/analytics/dropoff`
+
+Retrieve drop-off funnel showing where abandoned sessions ended up. Helps identify which stage loses the most users.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string (ISO 8601 date) | No | 7 days ago | Start of date range |
+| `end_date` | string (ISO 8601 date) | No | Today | End of date range |
+| `session_type` | string | No | All | Filter by session type (`"vibe_check"` or `"photobooth"`) |
+
+**Response (200 OK):**
+
+```json
+{
+  "total_abandoned": 32,
+  "stages": [
+    {
+      "state": "idle",
+      "count": 0,
+      "percentage": 0.0
+    },
+    {
+      "state": "payment",
+      "count": 5,
+      "percentage": 15.6
+    },
+    {
+      "state": "capture",
+      "count": 12,
+      "percentage": 37.5
+    },
+    {
+      "state": "processing",
+      "count": 8,
+      "percentage": 25.0
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_abandoned` | integer | Total number of abandoned sessions in the period |
+| `stages` | array | Array of `DropoffStage` objects |
+| `stages[].state` | string | State machine state where the session was abandoned |
+| `stages[].count` | integer | Number of sessions abandoned at this state |
+| `stages[].percentage` | float | Percentage of total abandoned sessions at this state |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid date format or date range |
+
+---
+
+### `GET /api/v1/admin/analytics/print-stats`
+
+Retrieve print success/failure statistics across all sessions.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `start_date` | string (ISO 8601 date) | No | 7 days ago | Start of date range |
+| `end_date` | string (ISO 8601 date) | No | Today | End of date range |
+
+**Response (200 OK):**
+
+```json
+{
+  "total_prints": 310,
+  "successful": 298,
+  "failed": 12,
+  "success_rate": 0.961
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_prints` | integer | Total print attempts in the period |
+| `successful` | integer | Successfully completed prints |
+| `failed` | integer | Failed print attempts |
+| `success_rate` | float | Ratio of successful to total prints (0.0-1.0) |
 
 **Error Responses:**
 
@@ -1800,3 +1987,1007 @@ The response is a PNG image (`Content-Type: image/png`), not JSON.
 |--------|------|-------------|
 | 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
 | 404 | `NOT_FOUND` | Access code does not exist |
+
+---
+
+### `GET /api/v1/admin/access-codes/summary`
+
+Retrieve pre-computed aggregate statistics across all access codes.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "total_codes": 85,
+  "active_codes": 60,
+  "used_codes": 20,
+  "total_redemptions": 150,
+  "total_max_uses": 500,
+  "redemption_rate": 0.3,
+  "estimated_revenue": 1500000
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_codes` | integer | Total number of access codes |
+| `active_codes` | integer | Number of active (usable) codes |
+| `used_codes` | integer | Number of codes that have been used at least once |
+| `total_redemptions` | integer | Total redemption count across all codes |
+| `total_max_uses` | integer | Sum of max_uses across all codes |
+| `redemption_rate` | float | Ratio of total_redemptions to total_max_uses (0.0-1.0) |
+| `estimated_revenue` | integer | Estimated revenue from access code redemptions in IDR |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+
+---
+
+### `POST /api/v1/admin/access-codes/{id}/print`
+
+Print an access code receipt to the thermal printer. Only active codes can be printed.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | integer | Access code ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Print sent"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Access code does not exist |
+| 400 | `CONFIG_INVALID` | Code is not active (only active codes can be printed) |
+| 502 | `PRINTER_ERROR` | Printer not available or print job failed |
+
+---
+
+## 11. Photobooth Themes (Admin)
+
+> Photobooth themes control the visual appearance of the printed strip: background, photo slot borders, decorative elements, fonts, and watermarks. Built-in themes cannot be deleted but can be disabled. Custom themes can be fully managed.
+
+### Common Schema: `ThemeResponse`
+
+All theme endpoints return this shape:
+
+```json
+{
+  "id": 1,
+  "name": "classic_dark",
+  "display_name": "Classic Dark",
+  "config": {
+    "background": {
+      "type": "solid",
+      "color": "#000000",
+      "gradient_start": "#1a1a2e",
+      "gradient_end": "#16213e"
+    },
+    "photo_slot": {
+      "border_width": 4,
+      "border_color": "#ffffff",
+      "border_radius": 0,
+      "padding": 8,
+      "shadow": true
+    },
+    "decorations": {
+      "top_banner": true,
+      "banner_text": "VibePrint",
+      "divider_style": "line",
+      "divider_color": "#ffffff",
+      "date_format": "%Y-%m-%d"
+    },
+    "font": {
+      "family": "default",
+      "color": "#ffffff",
+      "size": 24
+    },
+    "watermark": {
+      "enabled": false,
+      "text": "",
+      "position": "bottom-right",
+      "opacity": 0.3
+    }
+  },
+  "preview_image_url": null,
+  "is_builtin": false,
+  "is_enabled": true,
+  "is_default": true,
+  "sort_order": 0,
+  "created_at": "2025-06-15T10:30:00Z",
+  "updated_at": "2025-06-15T10:30:00Z"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Theme ID |
+| `name` | string | Unique machine-readable identifier (lowercase alphanumeric + underscores) |
+| `display_name` | string | Human-readable theme name |
+| `config` | object | Full theme configuration (background, photo_slot, decorations, font, watermark) |
+| `preview_image_url` | string or null | URL to preview image (currently always null) |
+| `is_builtin` | boolean | Whether the theme is built-in (cannot be deleted) |
+| `is_enabled` | boolean | Whether the theme is visible to the kiosk |
+| `is_default` | boolean | Whether this is the default theme for new sessions |
+| `sort_order` | integer | Display order (lower = higher priority) |
+| `created_at` | string or null | ISO 8601 creation timestamp |
+| `updated_at` | string or null | ISO 8601 last update timestamp |
+
+---
+
+### `GET /api/v1/admin/photobooth/themes`
+
+List all photobooth themes, including disabled ones. Admin-only view for theme management.
+
+**Authentication:** Admin (Bearer token required)
+
+**Query Parameters:** None
+
+**Response (200 OK):**
+
+Returns an array of `ThemeResponse` objects:
+
+```json
+[
+  {
+    "id": 1,
+    "name": "classic_dark",
+    "display_name": "Classic Dark",
+    "config": { "..." : "..." },
+    "preview_image_url": null,
+    "is_builtin": true,
+    "is_enabled": true,
+    "is_default": true,
+    "sort_order": 0,
+    "created_at": "2025-06-15T10:30:00Z",
+    "updated_at": null
+  },
+  {
+    "id": 2,
+    "name": "pastel_heart",
+    "display_name": "Pastel Heart",
+    "config": { "..." : "..." },
+    "preview_image_url": null,
+    "is_builtin": false,
+    "is_enabled": true,
+    "is_default": false,
+    "sort_order": 1,
+    "created_at": "2025-06-16T12:00:00Z",
+    "updated_at": "2025-06-16T14:00:00Z"
+  }
+]
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+
+---
+
+### `POST /api/v1/admin/photobooth/themes`
+
+Create a new custom photobooth theme.
+
+**Authentication:** Admin (Bearer token required)
+
+**Request Body:**
+
+```json
+{
+  "name": "my_custom_theme",
+  "display_name": "My Custom Theme",
+  "config": {
+    "background": {
+      "type": "gradient",
+      "color": "#000000",
+      "gradient_start": "#ff6b6b",
+      "gradient_end": "#feca57"
+    },
+    "photo_slot": {
+      "border_width": 6,
+      "border_color": "#ffffff",
+      "border_radius": 8,
+      "padding": 12,
+      "shadow": true
+    }
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique machine-readable name (lowercase alphanumeric + underscores, max 128 chars) |
+| `display_name` | string | Yes | Human-readable name (max 255 chars) |
+| `config` | object | No | Full theme configuration (defaults to `ThemeConfig` defaults if omitted) |
+
+**Response (201 Created):**
+
+Returns the created `ThemeResponse` object.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 422 | `VALIDATION_ERROR` | Invalid request body (name format, missing required fields) |
+| 409 | `INVALID_STATE` | A theme with this name already exists |
+
+---
+
+### `PUT /api/v1/admin/photobooth/themes/{theme_id}`
+
+Update a photobooth theme. Only provided fields are updated; unspecified fields retain their current values. Built-in themes can be updated.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `theme_id` | integer | Theme ID |
+
+**Request Body:**
+
+```json
+{
+  "display_name": "Updated Theme Name",
+  "config": {
+    "background": {
+      "type": "solid",
+      "color": "#1a1a2e"
+    }
+  },
+  "sort_order": 3
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `display_name` | string | No | New display name |
+| `config` | object | No | New theme configuration (replaces entire config) |
+| `sort_order` | integer | No | New sort order |
+
+**Response (200 OK):**
+
+Returns the updated `ThemeResponse` object.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Theme does not exist |
+
+---
+
+### `PATCH /api/v1/admin/photobooth/themes/{theme_id}/toggle`
+
+Enable or disable a photobooth theme.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `theme_id` | integer | Theme ID |
+
+**Request Body:**
+
+```json
+{
+  "enabled": true
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `enabled` | boolean | No | Whether to enable (`true`) or disable (`false`) the theme. Defaults to `true`. |
+
+**Response (200 OK):**
+
+Returns the updated `ThemeResponse` object.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Theme does not exist |
+| 409 | `INVALID_STATE` | Cannot disable the default theme |
+
+---
+
+### `PATCH /api/v1/admin/photobooth/themes/{theme_id}/default`
+
+Set a theme as the default. The previous default theme is automatically demoted.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `theme_id` | integer | Theme ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+Returns the updated `ThemeResponse` object.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Theme does not exist |
+
+---
+
+### `DELETE /api/v1/admin/photobooth/themes/{theme_id}`
+
+Delete a custom photobooth theme. Built-in themes cannot be deleted.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `theme_id` | integer | Theme ID |
+
+**Request Body:** None
+
+**Response (204 No Content):**
+
+No response body.
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Theme does not exist |
+| 409 | `INVALID_STATE` | Cannot delete a built-in theme |
+
+---
+
+## 12. Gallery Management (Admin)
+
+> Gallery management endpoints allow operators to view, delete, and reprint items from both the photobooth strip gallery and vibe check results gallery.
+
+### `DELETE /api/v1/admin/gallery/{session_id}`
+
+Permanently delete image files and clear database references for a session. Removes both the original image and any cached thumbnails.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Image deleted permanently"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Session does not exist |
+| 400 | `CONFIG_INVALID` | Session has no image data to delete |
+
+---
+
+### `POST /api/v1/admin/gallery/{session_id}/print`
+
+Manually reprint a gallery item. For photobooth sessions, prints the composite strip. For vibe check sessions, prints the AI reading receipt with photo. Uses the current print configuration for footer settings.
+
+**Authentication:** Admin (Bearer token required)
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Print sent"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 401 | `AUTH_TOKEN_INVALID` | Missing or invalid Bearer token |
+| 404 | `NOT_FOUND` | Session does not exist |
+| 400 | `CONFIG_INVALID` | No composite image to print (photobooth) or no AI reading (vibe check) |
+| 502 | `PRINTER_ERROR` | Printer not available or print job failed |
+
+---
+
+## 13. Photobooth Flow (Kiosk)
+
+> Photobooth sessions follow a multi-step flow: snap multiple photos within a time limit, select a frame/theme layout, arrange photos into slots, generate a composite strip image, and optionally print. Each step is a separate API call.
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/snap`
+
+Snap a photo in photobooth mode. The session stays in CAPTURE state so multiple photos can be taken. The capture timer runs from the first snap.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "state": "capture",
+  "photo_url": "/api/v1/kiosk/session/{session_id}/photo/2",
+  "photo_index": 2,
+  "total_photos": 3,
+  "time_remaining_seconds": 18.5
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string (UUID) | Session ID |
+| `state` | string | Current session state (`"capture"`) |
+| `photo_url` | string | URL to the just-snapped photo |
+| `photo_index` | integer | Index of the snapped photo in the session gallery |
+| `total_photos` | integer | Total photos captured so far in this session |
+| `time_remaining_seconds` | float | Seconds remaining in the capture window |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in a capturable state |
+| 503 | `CAMERA_ERROR` | Camera not available or capture failed |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/done`
+
+Finish the capture phase and move to frame selection. The session transitions from CAPTURE to FRAME_SELECT.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+Returns the standard `SessionResponse` (same shape as `GET /api/v1/kiosk/session/{id}`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in CAPTURE state or has too few photos |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/frame`
+
+Select the frame theme and layout. The session transitions from FRAME_SELECT to ARRANGE.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:**
+
+```json
+{
+  "theme_id": 2,
+  "layout_rows": 4
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `theme_id` | integer | Yes | ID of the selected theme |
+| `layout_rows` | integer | Yes | Number of photo rows (1-4) |
+
+**Response (200 OK):**
+
+Returns the standard `SessionResponse` (same shape as `GET /api/v1/kiosk/session/{id}`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or theme does not exist |
+| 409 | `INVALID_STATE` | Session is not in FRAME_SELECT state |
+| 422 | `VALIDATION_ERROR` | Invalid layout_rows value |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/arrange`
+
+Assign photos to frame slots and trigger composite image generation. The session transitions from ARRANGE through COMPOSITING to PHOTOBOOTH_REVEAL.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:**
+
+```json
+{
+  "photo_assignments": {
+    "0": 2,
+    "1": 0,
+    "2": 1,
+    "3": 3
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `photo_assignments` | object | Yes | Map of slot index (0..layout_rows-1) to photo index from the session gallery |
+
+**Response (200 OK):**
+
+Returns the standard `SessionResponse` (same shape as `GET /api/v1/kiosk/session/{id}`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in ARRANGE state |
+| 422 | `VALIDATION_ERROR` | Invalid photo assignments (out of range indices) |
+
+---
+
+### `GET /api/v1/kiosk/session/{session_id}/photobooth/composite`
+
+Serve the generated photobooth composite strip image as a JPEG file.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or composite image not found |
+
+---
+
+### `GET /api/v1/kiosk/session/{session_id}/photobooth/thumbnail`
+
+Serve a thumbnail (300px height) of the photobooth composite. Generated on first request and cached alongside the original composite.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or composite image not found |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/print`
+
+Print the photobooth composite strip on the thermal printer. Uses the current print configuration for footer settings.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "message": "Print sent"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 502 | `PRINTER_ERROR` | Printer not available or print job failed |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/photobooth/retake`
+
+Go back to CAPTURE state from FRAME_SELECT to retake photos. Clears previously captured photos.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+Returns the standard `SessionResponse` (same shape as `GET /api/v1/kiosk/session/{id}`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in FRAME_SELECT state |
+
+---
+
+### `GET /api/v1/kiosk/session/{session_id}/photobooth/share`
+
+Generate a temporary share URL for the composite image. The URL expires based on the `photobooth_share_url_ttl_seconds` configuration.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Query Parameters:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "share_url": "/api/v1/kiosk/share/abc123token",
+  "expires_in": 3600,
+  "qr_data": "/api/v1/kiosk/share/abc123token"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `share_url` | string | Temporary URL for downloading the composite image |
+| `expires_in` | integer | Seconds until the share URL expires |
+| `qr_data` | string | URL string suitable for encoding in a QR code |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist or has no composite image |
+
+---
+
+## 14. Multi-Photo Capture (Kiosk)
+
+> The multi-photo capture flow (`/snap` + `/select`) is the preferred alternative to the legacy single-shot `/capture` endpoint. It allows users to snap multiple photos within a time limit, review them, and select one for AI analysis.
+
+### `POST /api/v1/kiosk/session/{session_id}/snap`
+
+Snap a photo without AI analysis. Saves the photo and appends it to the session gallery. The session transitions to REVIEW state. Can be called repeatedly while the capture timer has not expired.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "state": "review",
+  "photos": [
+    {
+      "photo_url": "/api/v1/kiosk/session/{session_id}/photo/0",
+      "captured_at": "2025-06-15T10:30:05Z"
+    },
+    {
+      "photo_url": "/api/v1/kiosk/session/{session_id}/photo/1",
+      "captured_at": "2025-06-15T10:30:12Z"
+    }
+  ],
+  "photo_url": "/api/v1/kiosk/session/{session_id}/photo/1",
+  "photo_index": 1,
+  "time_remaining_seconds": 18.0
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string (UUID) | Session ID |
+| `state` | string | Current session state (`"review"`) |
+| `photos` | array | All photos taken this session, each with `photo_url` and `captured_at` |
+| `photo_url` | string | URL of the just-snapped photo |
+| `photo_index` | integer | Index of the snapped photo in the photos array |
+| `time_remaining_seconds` | float | Seconds left in the capture window |
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 503 | `CAMERA_ERROR` | Camera not available or capture failed |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/select`
+
+Select a photo from the gallery for AI analysis. Deletes all unselected photos (privacy-first), runs AI analysis, and transitions through PROCESSING to REVEAL.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:**
+
+```json
+{
+  "photo_index": 1
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `photo_index` | integer | Yes | Index of the photo to select (must be >= 0) |
+
+**Response (200 OK):**
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "state": "reveal",
+  "payment_enabled": false,
+  "payment_status": null,
+  "captured_at": "2025-06-15T10:30:15Z",
+  "capture_image_url": "/api/v1/kiosk/session/{session_id}/photo",
+  "analysis_text": "Your energy today radiates confidence and warmth...",
+  "analysis_provider": "openai",
+  "printed_at": null,
+  "created_at": "2025-06-15T10:30:00Z",
+  "updated_at": null,
+  "expires_at": null
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or selected photo does not exist |
+| 409 | `INVALID_STATE` | Session is not in REVIEW state |
+| 422 | `VALIDATION_ERROR` | Invalid photo_index |
+| 502 | `AI_PROVIDER_ERROR` | AI analysis failed |
+
+---
+
+### `POST /api/v1/kiosk/session/{session_id}/retake`
+
+Go back to CAPTURE state to take another photo. Clears the current review.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Request Body:** None
+
+**Response (200 OK):**
+
+Returns the standard `SessionResponse` (same shape as `GET /api/v1/kiosk/session/{id}`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session does not exist |
+| 409 | `INVALID_STATE` | Session is not in REVIEW state |
+
+---
+
+## 15. Photo Serving (Kiosk)
+
+> These endpoints serve captured photos and gallery images as JPEG files. They are used by the kiosk UI and the admin gallery.
+
+### `GET /api/v1/kiosk/session/{session_id}/photo`
+
+Serve the selected/captured photo JPEG for a session. Returns the single primary photo (the one selected via `/select` or captured via `/capture`).
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or photo not found |
+
+---
+
+### `GET /api/v1/kiosk/session/{session_id}/photo/{photo_index}`
+
+Serve a specific photo from the session gallery by index. Used for multi-photo sessions where the gallery contains multiple snapped photos.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `session_id` | string (UUID) | Session ID |
+| `photo_index` | integer | Zero-based photo index in the session gallery |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Session or photo at the given index not found |
+
+---
+
+## 16. Sharing (Kiosk)
+
+> Share endpoints allow kiosk users to generate temporary URLs for downloading their photobooth composite images, suitable for QR code scanning or direct link sharing.
+
+### `GET /api/v1/kiosk/share/{token}`
+
+Serve a composite image via a temporary share token. No authentication required. The token is time-limited and generated by the `/photobooth/share` endpoint.
+
+**Authentication:** None
+
+**Path Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `token` | string | Share token generated by `POST /session/{id}/photobooth/share` |
+
+**Response (200 OK):** JPEG image (`Content-Type: image/jpeg`).
+
+**Error Responses:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 404 | `NOT_FOUND` | Invalid or expired share token, or composite image no longer exists |
+
+---
+
+## 17. Public Photobooth Themes
+
+> Public theme listing for the kiosk UI. Returns only enabled themes, without requiring admin authentication.
+
+### `GET /api/v1/kiosk/photobooth/themes`
+
+List enabled photobooth themes for the kiosk. Only returns themes with `is_enabled = true`. Used by the kiosk UI to present theme choices during the photobooth frame selection step.
+
+**Authentication:** None
+
+**Query Parameters:** None
+
+**Response (200 OK):**
+
+Returns an array of `ThemeResponse` objects (same shape as admin theme listing, but only enabled themes):
+
+```json
+[
+  {
+    "id": 1,
+    "name": "classic_dark",
+    "display_name": "Classic Dark",
+    "config": { "..." : "..." },
+    "preview_image_url": null,
+    "is_builtin": true,
+    "is_enabled": true,
+    "is_default": true,
+    "sort_order": 0,
+    "created_at": "2025-06-15T10:30:00Z",
+    "updated_at": null
+  }
+]
+```

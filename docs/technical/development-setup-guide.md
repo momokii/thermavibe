@@ -128,26 +128,23 @@ Review and edit the `.env` file. The following table describes each variable:
 | Variable | Description | Default (Dev) |
 |----------|-------------|---------------|
 | `APP_ENV` | Environment mode (`development`, `production`) | `development` |
-| `APP_SECRET_KEY` | Secret for JWT tokens and signatures | `dev-secret-key-change-in-production` |
-| `APP_HOST` | Host to bind the backend | `0.0.0.0` |
-| `APP_PORT` | Port to bind the backend | `8000` |
+| `APP_SECRET_KEY` | Secret for JWT tokens and signatures | `change-me-in-production` |
+| `APP_DEBUG` | Enable debug mode | `true` |
+| `APP_PORT` | Port exposed on the host | `8000` |
 | `ADMIN_PIN` | Admin dashboard PIN code | `1234` |
 | `ADMIN_SESSION_TTL_HOURS` | Admin session duration in hours before auto-logout | `24` |
-| `LOG_LEVEL` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `DEBUG` |
 
 #### AI Provider Configuration
 
 | Variable | Description | Default (Dev) |
 |----------|-------------|---------------|
 | `AI_PROVIDER` | Active AI provider (`openai`, `anthropic`, `google`, `ollama`, `mock`) | `mock` |
+| `AI_MODEL` | Model name for the selected provider | `gpt-4o` |
+| `AI_SYSTEM_PROMPT` | System prompt shaping the vibe reading personality | `You are a witty vibe reader.` |
 | `OPENAI_API_KEY` | OpenAI API key | (empty, not needed for mock) |
-| `OPENAI_MODEL` | OpenAI model name | `gpt-4o` |
 | `ANTHROPIC_API_KEY` | Anthropic API key | (empty) |
-| `ANTHROPIC_MODEL` | Anthropic model name | `claude-sonnet-4-20250514` |
 | `GOOGLE_API_KEY` | Google AI API key | (empty) |
-| `GOOGLE_MODEL` | Google model name | `gemini-2.0-flash` |
 | `OLLAMA_BASE_URL` | Ollama server URL | `http://host.docker.internal:11434` |
-| `OLLAMA_MODEL` | Ollama model name | `llava` |
 
 #### Payment Configuration
 
@@ -156,49 +153,56 @@ Review and edit the `.env` file. The following table describes each variable:
 | `PAYMENT_ENABLED` | Enable payment step in kiosk flow | `false` |
 | `PAYMENT_PROVIDER` | Payment gateway (`midtrans`, `xendit`, `mock`) | `mock` |
 | `MIDTRANS_SERVER_KEY` | Midtrans server key | (empty, use sandbox key from Midtrans dashboard) |
-| `MIDTRANS_CLIENT_KEY` | Midtrans client key | (empty) |
 | `MIDTRANS_IS_PRODUCTION` | Use Midtrans production environment | `false` |
-| `XENDIT_SECRET_KEY` | Xendit secret key | (empty) |
-| `XENDIT_IS_PRODUCTION` | Use Xendit production environment | `false` |
+| `XENDIT_API_KEY` | Xendit API key | (empty) |
+| `PAYMENT_AMOUNT` | Payment amount in IDR | `5000` |
+| `PAYMENT_CURRENCY` | Payment currency code | `IDR` |
+| `PAYMENT_TIMEOUT_SECONDS` | Payment session timeout in seconds | `120` |
 
 #### Printer Configuration
 
 | Variable | Description | Default (Dev) |
 |----------|-------------|---------------|
-| `PRINTER_ENABLED` | Enable thermal printer support | `true` |
-| `PRINTER_VENDOR_ID` | USB vendor ID (hex with 0x prefix) -- only needed if auto-detection fails | `0x04b8` |
-| `PRINTER_PRODUCT_ID` | USB product ID (hex with 0x prefix) -- only needed if auto-detection fails | `0x0202` |
-| `PRINTER_INTERFACE` | USB interface number | `0` |
-| `PRINTER_IN_EP` | USB input endpoint | `0x81` |
-| `PRINTER_OUT_EP` | USB output endpoint | `0x03` |
-| `PRINTER_PROFILE` | Printer profile name | `default` |
+| `PRINTER_VENDOR_ID` | USB vendor ID (hex with 0x prefix) -- fallback if auto-detection fails | `0x04b8` |
+| `PRINTER_PRODUCT_ID` | USB product ID (hex with 0x prefix) -- fallback if auto-detection fails | `0x0e15` |
+| `PRINTER_PAPER_WIDTH` | Paper width in dots | `384` |
+| `PRINTER_AUTO_DETECT` | Auto-detect printer via USB enumeration on startup | `true` |
+| `PRINTER_HOTPLUG_INTERVAL_SECONDS` | Interval for background hot-plug scanner (seconds) | `30` |
 
 #### Camera Configuration
 
 | Variable | Description | Default (Dev) |
 |----------|-------------|---------------|
-| `CAMERA_ENABLED` | Enable camera support | `true` |
 | `CAMERA_DEVICE_INDEX` | V4L2 device index (`/dev/videoN`) | `0` |
 | `CAMERA_RESOLUTION_WIDTH` | Capture resolution width | `1280` |
 | `CAMERA_RESOLUTION_HEIGHT` | Capture resolution height | `720` |
-| `CAMERA_MJPEG_QUALITY` | JPEG compression quality (1-100) | `85` |
+
+#### Kiosk Behavior Configuration
+
+| Variable | Description | Default (Dev) |
+|----------|-------------|---------------|
+| `KIOSK_IDLE_TIMEOUT_SECONDS` | Seconds before idle screen resets | `10` |
+| `KIOSK_CAPTURE_COUNTDOWN_SECONDS` | Countdown before photo capture | `3` |
+| `KIOSK_PROCESSING_TIMEOUT_SECONDS` | AI processing timeout | `60` |
+| `KIOSK_REVEAL_DISPLAY_SECONDS` | Seconds to display result before auto-reset | `10` |
 
 #### Photobooth Configuration
 
-Photobooth settings are managed through the **Admin Dashboard** (`/admin`), not through environment variables. They are stored in the PostgreSQL database and take effect immediately.
+Photobooth settings are managed through the **Admin Dashboard** (`/admin`), stored in the PostgreSQL database, and take effect immediately. The `.env` values below are used as seed defaults when the database is first initialized.
 
-| Setting | Description | Default |
+| Setting | Env Variable | Default |
 |---------|-------------|---------|
-| Enable Photobooth | Toggle the photobooth feature on/off | Enabled |
-| Capture Time Limit | Seconds users have to take photos | 30s |
-| Max Photos | Maximum photos per session | 8 |
-| Min Photos | Minimum photos before "Done" button appears | 2 |
-| Default Layout Rows | Default photo slots in strip (1-4) | 4 |
-| Watermark Enabled | Add text watermark to strips | Disabled |
-| Watermark Text | Text shown on watermark | VibePrint OS |
-| Composite Retention | Hours to keep strips for admin viewing | 168h (7 days) |
+| Enable Photobooth | `PHOTOBOOTH_ENABLED` | `true` |
+| Capture Time Limit | `PHOTOBOOTH_CAPTURE_TIME_LIMIT_SECONDS` | `30` |
+| Max Photos | `PHOTOBOOTH_MAX_PHOTOS` | `8` |
+| Min Photos | `PHOTOBOOTH_MIN_PHOTOS` | `2` |
+| Default Layout Rows | `PHOTOBOOTH_DEFAULT_LAYOUT_ROWS` | `4` |
+| Watermark Enabled | `PHOTOBOOTH_WATERMARK_ENABLED` | `false` |
+| Watermark Text | `PHOTOBOOTH_WATERMARK_TEXT` | `VibePrint OS` |
+| Composite Retention | `PHOTOBOOTH_COMPOSITE_RETENTION_HOURS` | `168` |
+| Share URL TTL | `PHOTOBOOTH_SHARE_URL_TTL_SECONDS` | `300` |
 
-The `.env` values are only used as seed defaults when the database is first initialized. After that, all photobooth configuration is read from the database at runtime.
+After initial seeding, all photobooth configuration is read from the database at runtime and can be changed via the admin dashboard.
 
 #### Vibe Check Configuration
 
@@ -215,8 +219,16 @@ The system automatically manages file retention for both features:
 
 - **Retention periods** are configured per-feature in the admin dashboard (in hours). A value of 0 means keep forever.
 - **Background cleanup** starts on app boot and runs periodically, purging expired files.
-- **Cleanup interval** is auto-derived from the shorter of the two retention periods — no separate cleanup schedule to configure.
-- **Photo preservation**: After session completion, result files (vibe check photos and photobooth composites) are moved to a persistent Docker volume (`/tmp/vibeprint/`) so they survive container restarts and are available in the admin gallery.
+- **Cleanup interval** is auto-derived from the shorter of the two retention periods -- no separate cleanup schedule to configure.
+- **Photo preservation**: After session completion, result files (vibe check photos and photobooth composites) are moved to a persistent Docker volume (`app-composites` mounted at `/tmp/vibeprint/`) so they survive container restarts and are available in the admin gallery.
+
+#### CORS and Rate Limiting
+
+| Variable | Description | Default (Dev) |
+|----------|-------------|---------------|
+| `CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed origins | `http://localhost:5173,http://localhost:8000` |
+| `RATE_LIMIT_MAX_REQUESTS` | Maximum requests per window | `60` |
+| `RATE_LIMIT_WINDOW_SECONDS` | Rate limit window in seconds | `60` |
 
 #### Access Code Configuration
 
@@ -240,8 +252,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
 
 This command:
 - Uses the base `docker-compose.yml` for the service definitions
-- Applies `docker-compose.dev.yml` overrides (development environment variables, volume mounts)
+- Applies `docker-compose.dev.yml` overrides (dev container names, volume mounts)
 - Starts only the `postgres` service in detached mode (`-d`)
+
+In dev mode, Postgres is exposed on host port **5433** (to avoid conflicting with any local Postgres on 5432).
 
 Verify the database is running and healthy:
 
@@ -257,18 +271,18 @@ docker compose logs postgres
 
 ## 4. Run Migrations
 
-Once PostgreSQL is healthy, run Alembic migrations to create the database schema:
+In **development mode**, migrations run automatically on startup. The `docker-compose.dev.yml` command is:
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend alembic upgrade head
+```
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-This applies all pending migrations in order. On a fresh database, this creates all tables (sessions, payments, configs, devices).
+So when you run `make dev` (or `./scripts/start-docker.sh dev`), the backend container runs migrations before starting the server. No manual migration step is required in dev mode.
 
-If the backend container is not running yet, start it temporarily:
+For **production mode**, migrations also run automatically on startup via the Dockerfile entrypoint. To run migrations manually (e.g., against a running container):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm backend alembic upgrade head
+make migrate
 ```
 
 Verify the tables were created:
@@ -295,14 +309,21 @@ Review the generated file in `backend/alembic/versions/` before applying it.
 Start the backend application (FastAPI + static frontend files):
 
 ```bash
+make dev
+```
+
+Or manually:
+
+```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
 ```
 
 The backend:
-- Starts on port 8000 inside the container
-- Is accessible at `http://localhost:8000` from the host
-- Mounts the backend source code for hot-reload (development override)
+- Starts on port 8000 inside the container, accessible at `http://localhost:8000` from the host
+- Runs `alembic upgrade head` automatically before starting (dev mode only)
+- Mounts the backend source code (`./backend/app`) for hot-reload (development override)
 - Connects to PostgreSQL via the internal Docker network
+- Auto-detects cameras and passes them to the container via a temporary compose override
 
 Verify the backend is running:
 
@@ -658,9 +679,8 @@ The project `Makefile` provides shortcuts for common operations. All commands ar
 | Command | Description |
 |---------|-------------|
 | `make migrate` | Run pending Alembic migrations (`alembic upgrade head`) |
+| `make migrate-down` | Rollback last migration (`alembic downgrade -1`) |
 | `make migrate-create` | Generate a new migration (`alembic revision --autogenerate -m "message"`) |
-| `make migrate-rollback` | Rollback last migration (`alembic downgrade -1`) |
-| `make db-shell` | Open PostgreSQL shell (`psql`) |
 
 ### Testing
 
@@ -669,18 +689,34 @@ The project `Makefile` provides shortcuts for common operations. All commands ar
 | `make test` | Run all tests (backend + frontend) |
 | `make test-backend` | Run backend tests with verbose output |
 | `make test-frontend` | Run frontend tests |
-| `make test-coverage` | Run backend tests with coverage report |
-| `make test-integration` | Run only integration tests |
 
 ### Code Quality
 
 | Command | Description |
 |---------|-------------|
 | `make lint` | Run all linters (Ruff for Python, ESLint for TypeScript) |
-| `make lint-backend` | Run Ruff linter and formatter check |
+| `make lint-backend` | Run Ruff linter |
 | `make lint-frontend` | Run ESLint on frontend |
-| `make format` | Auto-format code (Ruff format, Prettier) |
-| `make typecheck` | Run TypeScript type checking (`tsc --noEmit`) |
+
+### Local Development (no Docker)
+
+| Command | Description |
+|---------|-------------|
+| `make local-backend` | Run backend with hot-reload locally |
+| `make local-migrate` | Run database migrations locally |
+| `make local-migrate-create msg="desc"` | Create a new migration locally |
+| `make local-test` | Run backend tests locally |
+| `make local-lint` | Lint backend Python code locally |
+
+### Shell and Utilities
+
+| Command | Description |
+|---------|-------------|
+| `make shell-backend` | Open a shell in the backend container |
+| `make shell-db` | Open PostgreSQL shell (`psql`) |
+| `make logs` | Tail all container logs |
+| `make build` | Build production Docker images |
+| `make clean` | Remove all Docker containers, volumes, and built artifacts |
 
 ### Production
 
@@ -712,6 +748,9 @@ dev-logs:
 migrate:
 	docker compose exec app alembic upgrade head
 
+migrate-down:
+	docker compose exec app alembic downgrade -1
+
 # Testing
 test:
 	docker compose exec app python -m pytest tests/ -v
@@ -719,6 +758,6 @@ test:
 
 # Code Quality
 lint:
-	docker compose exec app ruff check backend/app/
-	cd frontend && npx eslint src/
+	docker compose exec app ruff check app/ tests/
+	cd frontend && npm run lint
 ```

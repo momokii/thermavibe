@@ -344,7 +344,7 @@ The `OperatorConfig` entity stores all operator-configurable settings as a key-v
 | `id`          | `SERIAL`           | PRIMARY KEY, AUTO INCREMENT        | Auto-incrementing integer identifier.                                                         |
 | `key`         | `VARCHAR(255)`     | NOT NULL, UNIQUE                   | Configuration key. Unique identifier for this setting. Dot-notation for hierarchy, e.g., `ai.provider`, `printer.paper_width`. |
 | `value`       | `TEXT`             | NOT NULL, DEFAULT `''`             | Configuration value stored as a string. Boolean values stored as `"true"`/`"false"`, integers as their string representation. |
-| `category`    | `VARCHAR(32)`      | NOT NULL, DEFAULT `'general'`      | Configuration category for grouping in the admin dashboard. Values: `hardware`, `ai`, `payment`, `kiosk`, `general`. |
+| `category`    | `VARCHAR(32)`      | NOT NULL, DEFAULT `'general'`      | Configuration category for grouping in the admin dashboard. Values: `hardware`, `ai`, `payment`, `kiosk`, `general`, `photobooth`, `vibe_check`, `access_code`, `print`. |
 | `description` | `TEXT`             | NULL                               | Human-readable description of what this configuration key controls. Displayed as a tooltip or help text in the admin dashboard. |
 | `updated_at`  | `TIMESTAMPTZ`      | NOT NULL, DEFAULT `NOW()`          | Timestamp of the last update to this configuration value.                                     |
 
@@ -359,7 +359,7 @@ CONSTRAINT uq_operator_configs_key UNIQUE (key),
 
 -- Category must be a known value
 CONSTRAINT chk_operator_configs_category CHECK (
-    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general', 'vibe_check', 'photobooth', 'access_code')
+    category IN ('hardware', 'ai', 'payment', 'kiosk', 'general', 'photobooth', 'vibe_check', 'access_code', 'print')
 )
 ```
 
@@ -419,6 +419,11 @@ The following configuration keys are used by the system. These are seeded during
 | `photobooth.photobooth_watermark_text` | `photobooth` | string | `VibePrint OS`             | Text shown on watermark                                                     |
 | `photobooth.composite_retention_hours` | `photobooth` | integer | `168`                  | Hours to retain photobooth composites for admin gallery (0 = forever)      |
 | `access_code.access_code_mode_enabled` | `access_code` | boolean | `false`                | Whether access code entry is required before photo capture. Mutually exclusive with `payment.enabled`. |
+| `print.print_footer_name`              | `print`       | string   | `VibePrint OS`           | Brand name printed on receipt footers (max 24 chars)                                         |
+| `print.print_timezone_offset`          | `print`       | string   | `+7`                     | UTC offset for printed timestamps (e.g. +7 for Jakarta)                                     |
+| `print.print_footer_enabled`           | `print`       | boolean  | `true`                   | Show footer section on printed receipts                                                      |
+| `print.print_footer_name_enabled`      | `print`       | boolean  | `true`                   | Show brand name in footer                                                                    |
+| `print.print_footer_timestamp_enabled` | `print`       | boolean  | `true`                   | Show timestamp in footer                                                                     |
 
 ### 4.6 SQLAlchemy Model (Reference)
 

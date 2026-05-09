@@ -506,6 +506,23 @@ The printer module handles all interaction with the ESC/POS-compatible thermal p
 
 ---
 
+### FR-PRINT-006: Configurable Print Template
+
+**Description:** Operators can configure the receipt footer printed on all thermal print output (Vibe Check and Photobooth). Configuration includes brand name (max 24 chars), timezone offset for timestamps, and per-element toggles (footer on/off, brand name on/off, timestamp on/off). A live preview shows the exact footer output. Configuration is managed via a dedicated Print Template admin page.
+
+**Acceptance Criteria:**
+- Print Template page in admin sidebar under Configuration
+- Footer brand name input with 24-char limit and counter
+- Timezone offset dropdown with common presets + custom input
+- Toggle switches for footer, brand name, and timestamp
+- Live preview shows exact footer output
+- Footer applies consistently to Vibe Check receipts, Photobooth strips, and gallery reprints
+- Default timezone is +7 (Jakarta/WIB)
+
+**Priority:** P2
+
+---
+
 ## Module 6: Payment (FR-PAYMENT)
 
 The payment module handles QRIS payment integration through supported providers (Midtrans and Xendit). It is designed to be toggle-able and includes a mock provider for testing and demonstration purposes.
@@ -719,6 +736,47 @@ The admin gallery allows operators to browse, view, and download session results
 - State distribution includes labels for all states including photobooth-specific ones (Frame Select, Arrange, Compositing, Photobooth Reveal).
 
 **Priority:** P1
+
+---
+
+### FR-ANALYTICS-004: Peak Hours Heatmap
+
+**Description:** Display a heatmap showing session distribution by day-of-week and hour, with toggle between session count and revenue view. Hover shows Vibe Check vs Photobooth breakdown.
+
+**Acceptance Criteria:**
+- Heatmap grid with days (Mon-Sun) x hours (0-23)
+- Toggle between Sessions and Revenue view
+- Hover shows breakdown by feature type (Vibe Check, Photobooth)
+- Respects the selected date range filter
+
+**Priority:** P2
+
+---
+
+### FR-ANALYTICS-005: Drop-off Funnel
+
+**Description:** Show where abandoned sessions (not completed) ended up in the state machine, with feature type filter (All / Vibe Check / Photobooth) and hover explanations for each state.
+
+**Acceptance Criteria:**
+- Horizontal bar chart showing abandoned session count per state
+- Filter by session type (All, Vibe Check, Photobooth)
+- Hover on each state shows explanation of what that state means
+- Respects the selected date range filter
+
+**Priority:** P2
+
+---
+
+### FR-ANALYTICS-006: Print Reliability Stats
+
+**Description:** Display print success/failure statistics from analytics events.
+
+**Acceptance Criteria:**
+- Show total prints, successful, failed counts
+- Show success rate percentage
+- Respects the selected date range filter
+
+**Priority:** P2
 
 ---
 

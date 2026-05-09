@@ -38,9 +38,29 @@ VibePrint OS follows the testing pyramid model, emphasizing a large base of fast
 
 | Layer | Scope | Speed | Count | Isolation | Location |
 |-------|-------|-------|-------|-----------|----------|
-| **Unit** | Individual functions, methods, components | < 1ms per test | High (~70% of tests) | Full mocking | `backend/tests/unit/`, `frontend/src/__tests__/` |
+| **Unit** | Individual functions, methods, components | < 1ms per test | High (~70% of tests) | Full mocking | `backend/tests/unit/`, `frontend/src/__tests__/components/`, `frontend/src/__tests__/hooks/`, `frontend/src/__tests__/stores/` |
 | **Integration** | API endpoints, component integration | 10-100ms per test | Medium (~25% of tests) | Real DB, mocked external services | `backend/tests/integration/` |
 | **E2E** | Full kiosk flow, hardware interaction | 1-10s per test | Low (~5% of tests) | Real services or manual | `tests/e2e/`, manual |
+
+### Current Test Inventory
+
+**Backend** (`backend/tests/`):
+
+| Category | Files |
+|----------|-------|
+| Shared fixtures | `conftest.py` |
+| Unit tests (12 files) | `test_access_code_service.py`, `test_ai_service.py`, `test_analytics_service.py`, `test_camera_service.py`, `test_config_service.py`, `test_exceptions.py`, `test_hardware_service.py`, `test_payment_service.py`, `test_printer_service.py`, `test_retention_service.py`, `test_security.py`, `test_session_service.py` |
+| Integration tests (4 files) | `test_admin_flow.py`, `test_ai_flow.py`, `test_kiosk_flow.py`, `test_payment_flow.py` |
+
+**Frontend** (`frontend/src/__tests__/`):
+
+| Category | Files |
+|----------|-------|
+| Setup | `setup.ts` |
+| MSW mocks | `mocks/handlers.ts`, `mocks/server.ts` |
+| Components (4 files) | `components/AdminLoginPage.test.tsx`, `components/CaptureScreen.test.tsx`, `components/IdleScreen.test.tsx`, `components/RevealScreen.test.tsx` |
+| Hooks (1 file) | `hooks/useCountdown.test.ts` |
+| Stores (2 files) | `stores/adminStore.test.ts`, `stores/kioskStore.test.ts` |
 
 ### What Gets Tested at Each Layer
 
@@ -89,14 +109,19 @@ Two approaches are supported:
 
 ```python
 # backend/tests/conftest.py
-import pytest_asyncio
+import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.app.core.database import Base
 
-TEST_DATABASE_URL = "sqlite+aiosqlite://"
+from app.core.database import Base
+from app.models.analytics import AnalyticsEvent, PrintJob  # noqa: F401
+from app.models.configuration import OperatorConfig  # noqa: F401
+from app.models.device import Device  # noqa: F401
+from app.models.session import KioskSession  # noqa: F401
 
-@pytest_asyncio.fixture(scope="session")
-def test_engine():
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+@pytest.fixture
+async def db_engine():
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -105,9 +130,9 @@ def test_engine():
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
-@pytest_asyncio.fixture
-async def db_session(test_engine):
-    session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
+@pytest.fixture
+async def db_session(db_engine):
+    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session
         await session.rollback()
@@ -139,18 +164,27 @@ The test client wraps FastAPI's ASGI app in an httpx AsyncClient, providing the 
 
 ```python
 # backend/tests/conftest.py
-import pytest_asyncio
+import pytest
+from collections.abc import AsyncGenerator
 from httpx import AsyncClient, ASGITransport
-from backend.app.main import app
-from backend.app.core.database import get_db
-from backend.app.api.deps import get_db as override_get_db
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-@pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db_session():
-        yield db_session
+from app.api.deps import get_db_session
+from app.main import app
 
-    app.dependency_overrides[get_db] = override_get_db_session
+@pytest.fixture
+async def client(db_engine) -> AsyncGenerator[AsyncClient, None]:
+    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+        async with session_factory() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db_session] = override_get_db_session
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
@@ -166,8 +200,8 @@ AI providers are mocked to return deterministic responses, enabling reliable ass
 ```python
 # backend/tests/conftest.py
 from unittest.mock import AsyncMock
-from backend.app.ai.base import AIProvider
-from backend.app.ai.mock_provider import MockAIProvider
+from app.ai.base import AIProvider
+from app.ai.mock_provider import MockAIProvider
 
 @pytest.fixture
 def mock_ai_provider() -> MockAIProvider:
@@ -179,10 +213,10 @@ def mock_ai_provider() -> MockAIProvider:
 
 
 # Override AI provider in tests
-@pytest_asyncio.fixture
+@pytest.fixture
 async def client_with_mock_ai(client: AsyncClient, mock_ai_provider: AIProvider):
-    from backend.app.api.deps import get_ai_service
-    from backend.app.services.ai_service import AIService
+    from app.api.deps import get_ai_service
+    from app.services.ai_service import AIService
 
     async def override_ai_service():
         service = AIService()
@@ -198,7 +232,7 @@ async def client_with_mock_ai(client: AsyncClient, mock_ai_provider: AIProvider)
 
 ```python
 # backend/app/ai/mock_provider.py
-from backend.app.ai.base import AIProvider
+from app.ai.base import AIProvider
 
 
 class MockAIProvider(AIProvider):
@@ -252,7 +286,7 @@ def mock_payment_provider():
     return provider
 
 
-# backend/app/payment/mock_provider.py
+# backend/app/payment/mock_provider.py (simplified example)
 class MockPaymentProvider:
     """Mock payment provider for testing. Simulates QRIS payment flow."""
 
@@ -304,7 +338,7 @@ def mock_printer():
     return printer
 
 
-# backend/tests/utils/test_print_mock.py
+# backend/tests/utils/mock_printer.py (test utility)
 class MockPrinter:
     """Mock thermal printer that captures ESC/POS bytes instead of printing."""
 
@@ -350,8 +384,8 @@ class MockPrinter:
 **Example test using mock printer:**
 
 ```python
-from backend.tests.utils.test_print_mock import MockPrinter
-from backend.app.services.print_service import PrintService
+from backend.tests.utils.mock_printer import MockPrinter
+from app.services.print_service import PrintService
 
 
 class TestPrintService:
@@ -387,15 +421,15 @@ class TestPrintService:
 ### 2.7 Example Unit Test: Kiosk Service
 
 ```python
-# backend/tests/unit/test_kiosk_service.py
+# backend/tests/unit/test_session_service.py
 import pytest
-from backend.app.services.kiosk_service import KioskService, VALID_TRANSITIONS
-from backend.app.core.exceptions import InvalidStateTransition, SessionNotFoundError
+from app.services.session_service import SessionService, VALID_TRANSITIONS
+from app.core.exceptions import InvalidStateTransition, SessionNotFoundError
 
 
 class TestKioskServiceCreate:
     async def test_create_session_returns_idle_state(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
         session = await service.create_session(payment_enabled=False)
 
         assert session.id is not None
@@ -403,7 +437,7 @@ class TestKioskServiceCreate:
         assert session.payment_enabled is False
 
     async def test_create_session_with_payment_enabled(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
         session = await service.create_session(payment_enabled=True)
 
         assert session.payment_enabled is True
@@ -412,21 +446,21 @@ class TestKioskServiceCreate:
 
 class TestKioskServiceTransition:
     async def test_valid_transition_succeeds(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
         session = await service.create_session()
 
         updated = await service.transition(session.id, "CAPTURE")
         assert updated.state == "CAPTURE"
 
     async def test_invalid_transition_raises_error(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
         session = await service.create_session()
 
         with pytest.raises(InvalidStateTransition, match="Cannot transition from IDLE to REVEAL"):
             await service.transition(session.id, "REVEAL")
 
     async def test_transition_nonexistent_session_raises_error(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
 
         with pytest.raises(SessionNotFoundError):
             await service.transition("nonexistent-id", "CAPTURE")
@@ -434,7 +468,7 @@ class TestKioskServiceTransition:
 
 class TestKioskServiceReset:
     async def test_reset_clears_session_data(self, db_session):
-        service = KioskService(db=db_session)
+        service = SessionService(db=db_session)
         session = await service.create_session()
         await service.transition(session.id, "CAPTURE")
 
@@ -448,7 +482,7 @@ class TestKioskServiceReset:
 ### 2.8 Example Integration Test: API Endpoints
 
 ```python
-# backend/tests/integration/test_kiosk_endpoints.py
+# backend/tests/integration/test_kiosk_flow.py
 import pytest
 
 
@@ -682,7 +716,7 @@ export const handlers = [
 Components are tested using React Testing Library, which emphasizes testing user behavior over implementation details:
 
 ```tsx
-// frontend/src/__tests__/components/kiosk/IdleScreen.test.tsx
+// frontend/src/__tests__/components/IdleScreen.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -732,7 +766,7 @@ describe('IdleScreen', () => {
 ```
 
 ```tsx
-// frontend/src/__tests__/components/kiosk/RevealScreen.test.tsx
+// frontend/src/__tests__/components/RevealScreen.test.tsx
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -977,9 +1011,9 @@ Use factory functions to generate test data with sensible defaults and easy cust
 # backend/tests/factories.py
 import uuid
 from datetime import datetime, timezone, timedelta
-from backend.app.models.session import Session
-from backend.app.models.payment import Payment
-from backend.app.models.config import Config
+from app.models.session import KioskSession
+from app.models.payment import Payment
+from app.models.configuration import OperatorConfig
 
 
 def create_test_session(
@@ -988,8 +1022,8 @@ def create_test_session(
     payment_enabled: bool = False,
     created_at: datetime | None = None,
     **overrides,
-) -> Session:
-    """Create a Session instance for testing without persisting to the database."""
+) -> KioskSession:
+    """Create a KioskSession instance for testing without persisting to the database."""
     now = created_at or datetime.now(timezone.utc)
     defaults = {
         "id": session_id or str(uuid.uuid4()),
@@ -1083,7 +1117,7 @@ For integration tests that require pre-populated data (e.g., analytics queries, 
 
 ```python
 # backend/tests/seed.py
-from backend.tests.factories import create_test_session, create_test_payment
+from backend.tests.factories import create_test_session, create_test_payment  # noqa: I001
 
 
 def seed_sessions(db, count: int = 10, state: str = "REVEAL"):
@@ -1118,12 +1152,12 @@ def seed_payments(db, session_count: int = 10, paid_ratio: float = 0.9):
 
 | Area | Target | Rationale |
 |------|--------|-----------|
-| Backend services (`backend/app/services/`) | 80% | Core business logic: state machine, payment verification, AI orchestration |
-| Backend utilities (`backend/app/utils/`) | 90% | Pure functions (dithering, ESC/POS, image processing) are easy to test comprehensively |
-| Backend API endpoints (`backend/app/api/`) | 70% | Integration tests covering request validation, response format, error handling |
-| Backend AI providers (`backend/app/ai/`) | 80% | Provider implementations must handle various response formats and errors |
-| Backend payment providers (`backend/app/payment/`) | 80% | Payment logic must be reliable: signature verification, status mapping, error handling |
-| Backend models and schemas (`backend/app/models/`, `backend/app/schemas/`) | 60% | Mostly declarative; validated indirectly through service and endpoint tests |
+| Backend services (`app/services/`) | 80% | Core business logic: state machine, payment verification, AI orchestration |
+| Backend utilities (`app/utils/`) | 90% | Pure functions (dithering, ESC/POS, image processing) are easy to test comprehensively |
+| Backend API endpoints (`app/api/`) | 70% | Integration tests covering request validation, response format, error handling |
+| Backend AI providers (`app/ai/`) | 80% | Provider implementations must handle various response formats and errors |
+| Backend payment providers (`app/payment/`) | 80% | Payment logic must be reliable: signature verification, status mapping, error handling |
+| Backend models and schemas (`app/models/`, `app/schemas/`) | 60% | Mostly declarative; validated indirectly through service and endpoint tests |
 | Frontend kiosk components (`components/kiosk/`) | 70% | State transitions, user interactions, conditional rendering |
 | Frontend admin components (`components/admin/`) | 60% | CRUD operations, form validation |
 | Frontend hooks (`hooks/`) | 80% | Custom hooks encapsulate reusable logic and must handle edge cases |
@@ -1135,8 +1169,8 @@ def seed_payments(db, session_count: int = 10, paid_ratio: float = 0.9):
 **Backend:**
 ```bash
 # Terminal report
-docker compose exec backend python -m pytest tests/ \
-    --cov=backend/app \
+docker compose exec app python -m pytest tests/ \
+    --cov=app \
     --cov-report=term-missing \
     --cov-report=html
 
@@ -1154,10 +1188,10 @@ npx vitest run --coverage
 
 The following files are excluded from coverage tracking because they contain configuration, initialization code, or generated code:
 
-- `backend/app/main.py` (application factory, side effects)
-- `backend/app/core/database.py` (engine setup)
-- `backend/app/core/config.py` (settings class, read from env)
-- `backend/alembic/` (generated migration files)
+- `app/main.py` (application factory, side effects)
+- `app/core/database.py` (engine setup)
+- `app/core/config.py` (settings class, read from env)
+- `alembic/` (generated migration files)
 - `frontend/src/main.tsx` (entry point, side effects)
 - `frontend/src/vite-env.d.ts` (type declarations)
 - `frontend/src/components/ui/` (third-party shadcn/ui components)
@@ -1253,7 +1287,7 @@ jobs:
         run: |
           cd backend
           python -m pytest tests/ -v \
-            --cov=backend/app \
+            --cov=app \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml
       - name: Upload coverage

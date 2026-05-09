@@ -1,7 +1,7 @@
 # VibePrint OS -- Executive Summary
 
-**Document Version:** 1.0
-**Last Updated:** April 2026
+**Document Version:** 1.1
+**Last Updated:** May 2026
 **Status:** Active
 
 ---
@@ -22,13 +22,21 @@ The photobooth industry remains fragmented between expensive proprietary hardwar
 
 VibePrint OS solves these problems through a modular, containerized software stack that decouples the photobooth experience from any single hardware vendor or AI provider:
 
+- **Dual Feature Set**: The platform offers two distinct user experiences: **Vibe Check** (single photo capture with a witty AI-generated personality reading) and **Photobooth** (multi-photo strips with configurable layouts, themes, and optional watermarks). Operators choose which feature to enable, or run both simultaneously.
+
 - **Hardware-Agnostic Architecture**: The system works with any UVC-compliant USB webcam and any ESC/POS-compatible thermal printer (58mm or 80mm), allowing operators to source hardware locally at market prices rather than importing expensive proprietary equipment. Camera detection and printer discovery happen automatically on startup.
 
 - **Provider-Agnostic AI Integration**: The AI "vibe reading" engine supports OpenAI, Anthropic, Google, and local Ollama models interchangeably. Operators can select the provider that fits their budget and latency requirements, and they retain full control over the system prompt that shapes each user's personality analysis. This means the product's personality can be customized per venue -- a cafe might use a coffee-themed prompt while a music festival uses an energetic, music-forward tone.
 
 - **Integrated QRIS Payment Flow**: Payment is mediated through Indonesian-standard QRIS QR codes via Midtrans or Xendit, with the entire flow toggle-able. Operators in paid venues can charge per session, while operators at events or promotional activations can disable payment entirely. The payment module includes timeout handling, webhook confirmation, and a mock provider for testing and demonstration.
 
-- **Tangible, Shareable Output**: The final deliverable is a thermal receipt containing a dithered halftone rendering of the user's photo alongside the AI-generated vibe reading text. This physical artifact drives organic word-of-mouth marketing -- users photograph their receipts and share them on Instagram and TikTok, creating a self-sustaining customer acquisition loop for operators.
+- **Access Code System**: For event-hosted kiosks, a built-in access code system replaces payment with code-based entry. Operators generate batches of codes (with optional pricing tiers and QR codes for scanning), assign them to specific features or make them universal, and revoke them as needed. This enables prepaid event models without requiring payment gateway integration.
+
+- **Configurable Print Template**: The receipt output is fully customizable. Operators configure the footer through the admin dashboard -- brand name, timezone, and per-element toggles -- giving each installation a branded look while maintaining consistent layout across all print types.
+
+- **Comprehensive Analytics**: The admin dashboard provides real-time operational intelligence including session counts, revenue tracking, feature usage breakdown, peak-hours heatmaps, drop-off funnels for identifying UX friction points, and print reliability metrics. These analytics help operators optimize pricing, placement, and maintenance schedules.
+
+- **Tangible, Shareable Output**: The final deliverable is a thermal receipt containing a dithered halftone rendering of the user's photo alongside the AI-generated vibe reading text (Vibe Check) or a multi-photo strip with themed layout (Photobooth). This physical artifact drives organic word-of-mouth marketing -- users photograph their receipts and share them on Instagram and TikTok, creating a self-sustaining customer acquisition loop for operators.
 
 ---
 
@@ -67,6 +75,8 @@ The QRIS payment standard is expanding across Southeast Asia through the ASEAN Q
 | **Operator Satisfaction** | 4.0/5.0 or higher on quarterly operator survey | In-app survey or email-based Net Promoter Score collection |
 | **Revenue Per Kiosk** | Operators report positive ROI within 60 days of deployment | Self-reported operator metrics via admin dashboard |
 | **Social Sharing Rate** | 20% or more of receipts are photographed and shared on social media | Estimated through branded hashtag tracking and optional QR code on receipts |
+| **Feature Adoption** | 30% of operators enable Photobooth mode within 60 days | Admin dashboard analytics: feature usage breakdown |
+| **Analytics Utilization** | 60% of operators check the admin dashboard at least weekly | Admin dashboard login telemetry (opt-in) |
 
 ---
 
@@ -96,6 +106,14 @@ A complete VibePrint OS kiosk can be assembled for under IDR 2,000,000 (approxim
 
 VibePrint OS does not force operators into a single AI provider or payment gateway. The multi-provider AI dispatch system allows operators to choose based on cost, speed, or language support. The toggle-able payment system means the same software can serve free promotional activations and paid commercial deployments without code changes.
 
+### 7. Dual Experience Modes
+
+The platform serves two distinct markets with a single deployment: the quick "Vibe Check" mode for high-throughput venues (cafes, retail) where speed matters, and the multi-photo "Photobooth" mode for events and activations where the experience is the product. Operators configure which mode to present, or offer both as user-selected options.
+
+### 8. Built-In Analytics and Access Control
+
+Unlike competing solutions that require third-party analytics or separate event management tools, VibePrint OS includes a comprehensive admin dashboard with real-time heatmaps, funnel analysis, and print reliability tracking. The integrated access code system eliminates the need for external ticketing platforms at events, allowing operators to generate, distribute, and revoke session codes entirely within the platform.
+
 ---
 
 ## Strategic Risks and Mitigations
@@ -105,11 +123,12 @@ VibePrint OS does not force operators into a single AI provider or payment gatew
 | AI provider cost increases raise per-session costs | Medium | Medium | Support for local Ollama models eliminates API costs entirely; operators can switch providers with a single configuration change |
 | Thermal printer quality varies across manufacturers | Medium | Low | Automated print calibration and test print functionality; documented compatibility list of verified printers |
 | QRIS payment gateway policy changes | Low | High | Payment module is abstracted behind an interface; switching between Midtrans and Xendit requires configuration only, not code changes |
-| User photo privacy concerns | Medium | Medium | Photos are processed in-memory and never persisted to disk; session data is wiped after receipt printing; privacy-first architecture by design |
+| User photo privacy concerns | Medium | Medium | Photos are retained only for the configurable retention period, then automatically purged; privacy-first architecture by design |
 | Hardware supply chain disruptions in Indonesia | Low | Medium | Hardware-agnostic design means alternative components can be substituted without software modifications |
+| Access code fraud or sharing | Medium | Low | Codes can be revoked instantly via admin dashboard; one-time-use enforcement; batch-level revocation for compromised code sets |
 
 ---
 
 ## Conclusion
 
-VibePrint OS occupies a unique position at the intersection of open-source software, experiential retail, and AI-powered personalization. By eliminating software licensing costs, decoupling from proprietary hardware, and enabling full customization of the user experience, it empowers a new category of micro-entrepreneurs to participate in the experience economy. The product's architecture is designed for reliability in unattended public environments, its business model aligns operator incentives with product quality, and its thermal receipt output creates organic, self-propagating marketing. VibePrint OS is not merely photobooth software -- it is a platform for deploying AI-powered experiential interactions anywhere in the physical world.
+VibePrint OS occupies a unique position at the intersection of open-source software, experiential retail, and AI-powered personalization. By eliminating software licensing costs, decoupling from proprietary hardware, and enabling full customization of the user experience -- from AI prompts and print templates to photobooth themes and access code batches -- it empowers a new category of micro-entrepreneurs to participate in the experience economy. The product's architecture is designed for reliability in unattended public environments, its built-in analytics give operators actionable insight into kiosk performance, and its thermal receipt output creates organic, self-propagating marketing. VibePrint OS is not merely photobooth software -- it is a platform for deploying AI-powered experiential interactions anywhere in the physical world.

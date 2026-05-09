@@ -98,6 +98,15 @@ The following diagram shows all major components of VibePrint OS and their conne
 |  +-------------------+          |  /admin route                 |  |
 |                                 |  - Config management          |  |
 |                                 |  - Analytics dashboard        |  |
+|                                 |    (peak hours heatmap,       |  |
+|                                 |     drop-off funnel,          |  |
+|                                 |     print reliability stats,  |  |
+|                                 |     feature breakdown)        |  |
+|                                 |  - Access code management     |  |
+|                                 |    (summary stats)            |  |
+|                                 |  - Print template config      |  |
+|                                 |  - Theme editor               |  |
+|                                 |  - Gallery (delete, reprint)  |  |
 |                                 |  - Hardware testing           |  |
 |                                 +-------------------------------+  |
 +-------------------------------------------------------------------+
@@ -114,7 +123,7 @@ The following diagram shows all major components of VibePrint OS and their conne
 | **Payment Gateway** | Midtrans / Xendit | Processes QRIS payments via QR code generation and webhook callbacks |
 | **Thermal Printer** | USB / ESC/POS | Prints receipts with AI results and optional photo thumbnail |
 | **USB Camera** | V4L2 / OpenCV | Captures photos and provides live MJPEG preview stream |
-| **Admin Dashboard** | React 19 (same app, /admin route) | Operator interface for configuration, monitoring, analytics, gallery, and hardware testing |
+| **Admin Dashboard** | React 19 (same app, /admin route) | Operator interface for configuration, monitoring, analytics dashboard (peak hours heatmap, drop-off funnel, print reliability stats, feature breakdown), access code management with summary stats, print template configuration, theme editor, gallery with delete and manual reprint, and hardware testing |
 
 ### Communication Protocols
 
@@ -448,6 +457,7 @@ The backend follows a strict layered architecture to separate concerns and maint
 |  - retention_service.py (automated cleanup of expired files and sessions) |
 |  - theme_service.py     (photobooth theme CRUD, enable/disable)  |
 |  - access_code_service.py (access code generation, validation, redemption, CRUD) |
+|  - share_service.py     (time-limited share URLs for composites) |
 +--------------------------------+---------------------------------+
                                  |
                                  | Direct instantiation / DI
@@ -485,10 +495,12 @@ The backend follows a strict layered architecture to separate concerns and maint
 | `AIService` | Accept image bytes, select active provider, send to AI API, parse response, handle retries and fallbacks. | AI providers (OpenAI, Anthropic, Google, Ollama) |
 | `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
 | `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. On startup, auto-detects thermal printers via pyusb enumeration using a three-tier strategy: (1) USB printer class matching, (2) known ESC/POS vendor IDs, (3) keyword matching on device descriptions. Runs a background hot-plug scanner at 30-second intervals to detect newly connected printers and auto-reconnects after printer disconnect. | python-escpos, pyusb, USB device |
-| `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
+| `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code, print), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
 | `AnalyticsService` | Aggregate session data, calculate revenue totals across all entry methods (confirmed payments AND access-code redemptions with price), generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment, AccessCode models) |
-| `AccessCodeService` | Generate, validate, redeem, and manage access codes. Codes grant feature access (vibe_check, photobooth, or universal) as an alternative to payment. Supports batch generation, expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (AccessCode model) |
-| `RetentionService` | Purge expired session files and data based on configurable retention periods. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
+| `AccessCodeService` | Access code lifecycle: generate, batch generate, validate, redeem, revoke, delete, list, and summary stats. Codes are typed (vibe_check, photobooth, universal) and track usage. Supports expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (AccessCode model) |
+| `RetentionService` | Automated cleanup of expired photos and composite images based on per-feature retention periods configured in operator settings. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
+| `ThemeService` | Photobooth theme CRUD: list, create, update, toggle enabled/disabled, set default theme, delete. Built-in themes cannot be deleted. | PostgreSQL (Theme model) |
+| `ShareService` | Generates time-limited share URLs for photobooth composite images. | PostgreSQL (Session model), filesystem |
 
 ### Orchestration Flow: Complete Kiosk Session
 
