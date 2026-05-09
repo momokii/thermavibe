@@ -590,7 +590,14 @@ async def photobooth_arrange(
     settings: Settings = Depends(get_settings),
 ) -> SessionResponse:
     """Assign photos to slots and trigger composite generation."""
+    from app.models.session import KioskState
     from app.services import photobooth_service
+
+    session = await session_service.get_session(db, session_id)
+
+    # Idempotent: if composite already generated, return current state
+    if session.state in (KioskState.PHOTOBOOTH_REVEAL, KioskState.RESET) and session.composite_image_path:
+        return _session_to_response(session, settings)
 
     # Assign photos
     session = await photobooth_service.arrange_photos(

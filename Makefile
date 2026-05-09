@@ -33,6 +33,10 @@ deploy: ## Validate env, build, start production, and verify health
 dev-down: ## Stop all containers
 	./scripts/start-docker.sh down
 
+.PHONY: prod-down
+prod-down: ## Stop production containers
+	./scripts/start-docker.sh down
+
 .PHONY: dev-logs
 dev-logs: ## Tail development environment logs
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
