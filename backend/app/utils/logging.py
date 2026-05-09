@@ -58,6 +58,10 @@ def setup_logging(log_level: str = 'INFO') -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.getLevelName(log_level))
 
+    # Silence noisy third-party loggers — they log every SQL query at INFO
+    for noisy in ('sqlalchemy.engine.Engine', 'uvicorn.access'):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a structlog logger instance.

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_secret_key: str = "change-me-in-production"
     app_debug: bool = True
+    log_level: str = "INFO"
 
     # Database
     database_url: str = "postgresql+asyncpg://thermavibe:thermavibe@localhost:5432/thermavibe"

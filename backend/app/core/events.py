@@ -21,6 +21,13 @@ from app.utils.logging import setup_logging
 logger = structlog.get_logger(__name__)
 
 
+def _get_log_level() -> str:
+    """Get log level from environment, falling back to INFO."""
+    import os
+
+    return os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+
 @dataclass
 class AppState:
     """Shared application state available during the lifespan.
@@ -48,7 +55,7 @@ async def lifespan(app: FastAPI):
         app: The FastAPI application instance.
     """
     # --- Startup ---
-    setup_logging()
+    setup_logging(log_level=_get_log_level())
     state = AppState()
     app.state.app_state = state
 
