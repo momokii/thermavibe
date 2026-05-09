@@ -58,9 +58,11 @@ def setup_logging(log_level: str = 'INFO') -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.getLevelName(log_level))
 
-    # Silence noisy third-party loggers — they log every SQL query at INFO
+    # Silence noisy third-party loggers.
+    # SQLAlchemy logs every SQL query at INFO — only show when app is in DEBUG.
+    sa_level = logging.DEBUG if log_level == 'DEBUG' else logging.WARNING
     for noisy in ('sqlalchemy.engine.Engine', 'uvicorn.access'):
-        logging.getLogger(noisy).setLevel(logging.WARNING)
+        logging.getLogger(noisy).setLevel(sa_level)
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:

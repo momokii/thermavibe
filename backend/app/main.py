@@ -22,6 +22,7 @@ app = FastAPI(
     description='Open-source AI-powered photobooth kiosk software',
     version='0.1.0',
     lifespan=lifespan,
+    debug=settings.app_debug,
 )
 
 # Middleware (order matters — outermost added first runs first)

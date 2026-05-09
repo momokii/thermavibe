@@ -331,18 +331,18 @@ cp .env.production .env
 
 ### Environment variables (deployment-time)
 
+Only these need to be set in `.env`. All other settings have sensible defaults and are managed via the admin panel after first run.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `development` | `development` or `production` |
 | `APP_SECRET_KEY` | (change me) | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `APP_DEBUG` | `true` | Debug mode (always `false` in production) |
-| `LOG_LEVEL` | `INFO` / `WARNING` | Application log level (see below) |
+| `APP_DEBUG` | `true` | Enables detailed error traces. Always `false` in production. |
+| `LOG_LEVEL` | `INFO` | Application log level — see **Log Levels** below. |
 | `DATABASE_URL` | (auto) | PostgreSQL connection string |
 | `ADMIN_PIN` | `1234` | PIN for admin dashboard access |
-| `ADMIN_SESSION_TTL_HOURS` | `24` | Admin session duration before auto-logout |
-| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0, auto-detected at startup) |
-| `PRINTER_AUTO_DETECT` | `true` | Auto-detect USB thermal printer |
-| `PRINTER_HOTPLUG_INTERVAL_SECONDS` | `30` | How often to scan for newly plugged-in printers |
+| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0) |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,...` | Comma-separated allowed origins (dev only) |
 
 ### Log Levels
 
@@ -350,13 +350,13 @@ Control verbosity with the `LOG_LEVEL` environment variable:
 
 | Level | Dev Default | Prod Default | Use When |
 |-------|-------------|--------------|----------|
-| `DEBUG` | | | Troubleshooting specific issues |
-| `INFO` | default | | Normal development — shows app events |
+| `DEBUG` | | | Troubleshooting — shows all SQL queries and internal details |
+| `INFO` | default | | Normal development — shows app events, no SQL noise |
 | `WARNING` | | default | Production — only warnings and errors |
 | `ERROR` | | | Minimal output — only failures |
 | `CRITICAL` | | | Silent except catastrophic failures |
 
-Noisy third-party loggers (SQLAlchemy queries, uvicorn access logs) are always silenced to `WARNING+`.
+SQLAlchemy query logging and uvicorn access logs are silenced unless `LOG_LEVEL=DEBUG`.
 
 ### Admin panel settings (runtime, stored in database)
 
@@ -480,6 +480,24 @@ Full documentation is in the [`docs/`](docs/) directory:
 - [Docker Deployment Guide](docs/technical/docker-deployment-guide.md)
 - [Coding Standards](docs/technical/coding-standards.md)
 - [Testing Strategy](docs/technical/testing-strategy.md)
+
+---
+
+## Project Website
+
+A marketing/documentation website built with Astro + Tailwind CSS. Serves as the public-facing landing page for the project.
+
+```bash
+# Local development
+make website-dev
+
+# Docker deployment
+make website-build
+make website-up      # http://localhost:3000
+make website-down
+```
+
+Gallery demo images (GIFs, screenshots) go in `website/public/images/gallery/`. See that folder's README for details.
 
 ---
 
