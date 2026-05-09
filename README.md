@@ -99,68 +99,139 @@ make dev-down
 
 ---
 
-## Production Mode
+## Production Deployment
 
-Production mode builds the frontend into static assets and serves everything from a single Docker container.
+Production mode builds the frontend into static assets and serves everything from a single Docker container. FastAPI serves both the API (`/api/v1/*`) and the frontend SPA.
 
-### 1. Clone and configure
+### Quick deploy (recommended)
+
+```bash
+cp .env.production .env        # Copy production template
+nano .env                       # Edit secrets (marked with [CHANGE ME])
+make deploy                     # Build, start, and verify health
+```
+
+`make deploy` validates your `.env`, builds Docker images, starts containers, auto-detects connected cameras/printers, and waits for the health check to pass.
+
+### Step-by-step deploy
+
+#### 1. Clone and configure
 
 ```bash
 git clone https://github.com/your-org/thermavibe.git
 cd thermavibe
 
-cp .env.example .env
-# Edit .env with your production values:
-#   - Set APP_ENV=production
-#   - Set APP_SECRET_KEY to a strong random string
-#   - Set ADMIN_PIN to a secure PIN
-#   - Configure AI_PROVIDER and API keys
-#   - Configure PAYMENT_ENABLED and payment provider keys
-#   - Set printer USB VID/PID
+cp .env.production .env
 ```
 
-### 2. Build and start
+Edit `.env` — values marked `[CHANGE ME]` must be set:
+
+| Variable | How to generate |
+|----------|----------------|
+| `APP_SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `ADMIN_PIN` | Choose a secure PIN |
+| `POSTGRES_PASSWORD` | Choose a secure database password |
+
+Also configure your AI provider and hardware settings.
+
+#### 2. Build and start
 
 ```bash
 make prod
 ```
 
-This uses `scripts/start-docker.sh` which auto-detects connected cameras and passes them to the container. The Dockerfile runs a multi-stage build:
-1. **Stage 1**: Builds frontend static assets with Node 20
-2. **Stage 2**: Copies built assets into Python 3.12 runtime
+This uses `scripts/start-docker.sh` which:
+- Auto-detects connected cameras (`/dev/video*`) and USB printers
+- Sets up USB permissions (udev rules)
+- Builds a multi-stage Docker image (Node 20 frontend build + Python 3.12 runtime)
+- Runs database migrations on startup (`alembic upgrade head`)
 
-On startup, the container automatically runs `alembic upgrade head` to apply migrations, then starts uvicorn.
-
-### 3. Run migrations manually (if needed)
+#### 3. Verify it's running
 
 ```bash
-make migrate
+curl http://localhost:8000/health
+# Expected: {"status":"ok","version":"0.1.0",...}
 ```
 
-### 4. Launch kiosk mode (on the kiosk machine)
+#### 4. Launch kiosk mode
 
 ```bash
 bash scripts/start-kiosk.sh
 ```
 
-This launches Chromium in fullscreen kiosk mode pointing at `http://localhost:8000`. You can override the URL:
+Launches Chromium in fullscreen kiosk mode pointing at `http://localhost:8000`. Override the URL:
 
 ```bash
 KIOSK_URL=http://192.168.1.100:8000 bash scripts/start-kiosk.sh
 ```
 
-### 5. Access the application
+#### 5. Access the application
 
 | URL | Description |
 |-----|-------------|
-| `http://localhost:8000` | Kiosk UI (production build) |
+| `http://localhost:8000` | Kiosk UI (production SPA) |
 | `http://localhost:8000/admin` | Admin dashboard |
 | `http://localhost:8000/docs` | API documentation |
+| `http://localhost:8000/health` | Health check |
 
-### 6. Stop production
+### Auto-start on boot (systemd)
+
+Install the systemd service so VibePrint OS starts automatically when the kiosk machine boots:
+
+```bash
+# Adjust WorkingDirectory in the service file if needed
+sudo cp deploy/thermavibe.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable thermavibe    # Start on boot
+sudo systemctl start thermavibe     # Start now
+```
+
+Check status:
+
+```bash
+sudo systemctl status thermavibe
+```
+
+### Stop production
 
 ```bash
 make dev-down
+```
+
+### Update to a new version
+
+```bash
+git pull
+make prod
+```
+
+---
+
+## Local Development (no Docker)
+
+For backend development without Docker. Requires PostgreSQL running locally.
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# Run migrations
+alembic upgrade head
+
+# Start backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Or use Makefile shortcuts:
+
+```bash
+make local-backend           # Run backend with hot-reload
+make local-migrate           # Run migrations
+make local-migrate-create msg="description"  # Create migration
+make local-test              # Run tests
+make local-lint              # Lint code
 ```
 
 ---
@@ -200,23 +271,15 @@ npm test
 
 All commands are run from the repository root. Run `make help` for the full list.
 
-### Development
+### Deployment
 
 | Command | Description |
 |---------|-------------|
+| `make deploy` | Validate env, build, start production, verify health |
+| `make prod` | Start production mode (auto-detects hardware) |
 | `make dev` | Start dev environment (Docker + hot-reload) |
-| `make dev-down` | Stop dev environment |
+| `make dev-down` | Stop all containers |
 | `make dev-logs` | Tail dev environment logs |
-
-### Local Development (no Docker)
-
-| Command | Description |
-|---------|-------------|
-| `make local-backend` | Run backend with hot-reload locally |
-| `make local-migrate` | Run database migrations locally |
-| `make local-migrate-create msg="desc"` | Create a new migration locally |
-| `make local-test` | Run backend tests locally |
-| `make local-lint` | Lint backend Python code locally |
 
 ### Testing & Quality
 
@@ -251,10 +314,19 @@ All commands are run from the repository root. Run `make help` for the full list
 
 ## Environment Variables
 
-All configuration is done via environment variables. Copy `.env.example` and edit:
+All configuration is done via environment variables.
+
+| Template | Purpose |
+|----------|---------|
+| `.env.example` | Development defaults (AI provider, camera, printer, etc.) |
+| `.env.production` | Production template with security markers |
 
 ```bash
+# For development
 cp .env.example .env
+
+# For production
+cp .env.production .env
 ```
 
 ### Key variables
@@ -344,11 +416,13 @@ thermavibe/
 │   └── technical/           # Technical specs (9 documents)
 ├── scripts/                  # Operational scripts
 ├── config/                   # Static configuration and fallback templates
+├── deploy/                   # Production deployment (systemd service)
 ├── docker-compose.yml        # Production Docker Compose
 ├── docker-compose.dev.yml    # Development overrides
 ├── Dockerfile                # Multi-stage build (Node → Python)
-├── Makefile                  # Development commands
-└── .env.example              # Environment variable template
+├── Makefile                  # All commands (dev, prod, deploy, test, lint)
+├── .env.example              # Development environment template
+└── .env.production           # Production environment template
 ```
 
 ---
