@@ -50,85 +50,20 @@ class _SafeUsbPrinter:
 
     This subclass overrides ``_configure_usb()`` to skip the reset,
     keeping the handle valid while preserving all other python-escpos
-    functionality.  It also detaches kernel drivers that may block
-    ``set_configuration()`` after a device power cycle.
+    functionality.
     """
 
     def __new__(cls, vendor_id: int, product_id: int):
         from escpos.printer import Usb as EscposUsb
 
-        # Create a dynamic subclass that overrides open() to always do fresh device lookup
+        # Create a dynamic subclass that only overrides _configure_usb
         class _NoResetUsb(EscposUsb):
-            def open(self, timeout=0) -> None:
-                """Open the printer by doing a fresh USB device lookup.
-
-                This ensures that after a reset/power cycle, we find the device
-                at its NEW bus/address, not the cached old one.
-                """
-                import usb.core
-                import usb.util
-
-                # Clear the cached device from __init__ — it's stale after power cycle
-                if hasattr(self, 'device') and self.device is not None:
-                    usb.util.dispose_resources(self.device)
-                    self.device = None
-
-                # Fresh device lookup every time — finds current bus/address
-                dev = usb.core.find(idVendor=self.usb_args['idVendor'], idProduct=self.usb_args['idProduct'])
-                if dev is None:
-                    raise PrinterOfflineError('Printer device not found')
-
-                # Detach kernel driver if claimed
-                try:
-                    if dev.is_kernel_driver_active(0):
-                        dev.detach_kernel_driver(0)
-                except (usb.core.USBError, NotImplementedError):
-                    pass
-
-                # Set configuration
-                try:
-                    dev.set_configuration()
-                except usb.core.USBError:
-                    pass  # Already configured
-
-                # Get configuration and extract endpoints properly
-                cfg = dev.get_active_configuration()
-                intf = cfg[(0, 0)]
-
-                # Find the correct endpoints by checking their direction
-                self.in_ep = None
-                self.out_ep = None
-                for ep in intf:
-                    # Check endpoint direction: bit 7 set = IN (device to host)
-                    if usb.util.endpoint_direction(ep.bEndpointAddress) == usb.util.ENDPOINT_IN:
-                        self.in_ep = ep.bEndpointAddress
-                    else:
-                        self.out_ep = ep.bEndpointAddress
-
-                if self.out_ep is None:
-                    raise PrinterError('Could not find output endpoint')
-
-                # Claim interface using usb.util
-                try:
-                    usb.util.claim_interface(dev, 0)
-                except usb.core.USBError:
-                    # Interface already claimed - try to detach kernel driver
-                    try:
-                        if dev.is_kernel_driver_active(0):
-                            dev.detach_kernel_driver(0)
-                            usb.util.claim_interface(dev, 0)
-                    except (usb.core.USBError, NotImplementedError):
-                        pass
-
-                self.device = dev
-                self._usb_device = dev  # Store for python-escpos internals
-
             def _configure_usb(self) -> None:
                 """Override to skip the destructive dev.reset()."""
                 # Skip reset — breaks bridge chips
                 pass
 
-        # Create instance normally (it will cache device in __init__)
+        # Create instance with fresh device lookup
         return _NoResetUsb(vendor_id, product_id)
 
 
@@ -424,58 +359,24 @@ def _dispose_all_for(vendor_id: int, product_id: int) -> None:
 
 
 def _connect_usb_printer_inner(vendor_id: int, product_id: int):
-    """Inner connection logic — called by _connect_usb_printer with guard.
-
-    After power cycle, the USB device needs time to stabilize. The key is
-    to wait longer between retries and avoid aggressive USB operations that
-    can put the device in a worse state.
-    """
+    """Inner connection logic — called by _connect_usb_printer with guard."""
     import time
 
     import usb.core
     import usb.util
 
-    # Step 0: Dispose ALL stale pyusb resources for this VID:PID.
-    # After power cycle, pyusb caches device objects that point to
-    # gone /dev/bus/usb paths. Clearing them forces a fresh enumerate.
+    # Clear any stale pyusb resources
     _dispose_all_for(vendor_id, product_id)
 
-    # After power cycle, the device needs significant time to re-enumerate and stabilize.
-    # The USB-to-parallel bridge chip (0fe6:811e) is especially slow to recover.
-    wait_times = [0, 3, 5, 8]  # Progressive wait times (0 for immediate first attempt)
-
-    for attempt, wait_time in enumerate(wait_times, 1):
-        # Wait before attempting connection (except first attempt)
-        if attempt > 1:
-            logger.info(f'connect_attempt_{attempt}_waiting', wait_seconds=wait_time)
-            time.sleep(wait_time)
-
-        # Dispose stale resources before each attempt
-        _dispose_all_for(vendor_id, product_id)
-
-        # Check if device is physically present via sysfs first
-        if not _is_device_present():
-            logger.info(f'connect_attempt_{attempt}_device_not_physically_present')
-            continue
-
-        # Try to create printer and open it - the open() method handles fresh device lookup
-        try:
-            printer = _SafeUsbPrinter(vendor_id, product_id)
-            printer.open()
-
-            # Verify the connection is actually usable
-            if _is_printer_usable(printer):
-                logger.info(f'connect_attempt_{attempt}_success')
-                return printer
-            else:
-                logger.warning(f'connect_attempt_{attempt}_not_usable')
-                _close_printer(printer)
-        except Exception as exc:
-            logger.warning(f'connect_attempt_{attempt}_failed', error=str(exc), error_type=type(exc).__name__)
-
-    # All attempts failed
-    logger.info('connect_all_attempts_failed')
-    raise PrinterOfflineError()
+    # Simple connection attempt - let python-escpos handle the USB setup
+    try:
+        printer = _SafeUsbPrinter(vendor_id, product_id)
+        printer.open()
+        logger.info('printer_connected_successfully')
+        return printer
+    except Exception as exc:
+        logger.warning('printer_connect_failed', error=str(exc), error_type=type(exc).__name__)
+        raise PrinterOfflineError() from exc
 
 
 def _reset_usb_port_sysfs(vid_hex: str, pid_hex: str) -> bool:
@@ -528,31 +429,29 @@ def _get_printer():
         logger.info('get_printer_cached_check', present=present, usable=usable)
         if present and usable:
             return _printer
-        # Device physically gone or handle stale — close and reconnect
-        logger.info('printer_connection_lost_reconnecting', present=present, usable=usable)
+
+        # Device not usable - close old connection
+        logger.info('printer_connection_lost_closing_old')
         _close_printer(_printer)
         _printer = None
-        # Dispose stale pyusb resources for a clean reconnect
-        if _active_vendor_id and _active_product_id:
-            with contextlib.suppress(Exception):
-                _dispose_all_for(int(_active_vendor_id, 16), int(_active_product_id, 16))
 
-        # Power cycle detected: device present but handle not usable.
-        # The USB-to-parallel bridge needs time to stabilize after power cycle.
+        # Power cycle detected: device physically present but old handle not usable
+        # Wait for device to stabilize before reconnecting
         if present and not usable:
-            logger.info('power_cycle_detected_waiting', wait_seconds=3)
-            time.sleep(3)
+            logger.info('power_cycle_detected_waiting_for_stabilization')
+            time.sleep(5)
 
-    # Try to reconnect with current IDs
+    # Try to connect with current IDs
     if _active_vendor_id and _active_product_id:
         try:
             vendor_id = int(_active_vendor_id, 16)
             product_id = int(_active_product_id, 16)
             _printer = _connect_usb_printer(vendor_id, product_id)
-            logger.info('printer_reconnected', vid=_active_vendor_id, pid=_active_product_id)
+            logger.info('printer_connected_successfully')
             return _printer
         except Exception:
-            logger.info('printer_reconnect_failed', vid=_active_vendor_id, pid=_active_product_id)
+            logger.info('printer_connect_failed')
+            raise
 
     raise PrinterOfflineError()
 
