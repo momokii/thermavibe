@@ -248,10 +248,10 @@ class TestDefaultConfigs:
     """Verify DEFAULT_CONFIGS structure."""
 
     def test_has_eight_categories(self):
-        """DEFAULT_CONFIGS should have exactly 8 categories."""
+        """DEFAULT_CONFIGS should have exactly 9 categories."""
         from app.services.config_service import DEFAULT_CONFIGS
 
-        assert len(DEFAULT_CONFIGS) == 8
+        assert len(DEFAULT_CONFIGS) == 9
 
     def test_has_all_expected_categories(self):
         """DEFAULT_CONFIGS should contain all expected categories."""
@@ -266,6 +266,7 @@ class TestDefaultConfigs:
             ConfigCategory.PHOTOBOOTH,
             ConfigCategory.VIBE_CHECK,
             ConfigCategory.ACCESS_CODE,
+            ConfigCategory.PRINT,
         }
         assert set(DEFAULT_CONFIGS.keys()) == expected
 

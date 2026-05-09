@@ -129,6 +129,28 @@ async def update_config(
                 detail='AI timeout must be between 1 and 30 minutes.',
             )
 
+    # Guard: print config validation
+    if category == 'print':
+        import re
+
+        if 'print_footer_name' in values and len(values['print_footer_name']) > 24:
+            raise HTTPException(
+                status_code=422,
+                detail='Footer name must be 24 characters or fewer.',
+            )
+        if 'print_timezone_offset' in values:
+            if not re.match(r'^[+-]?\d{1,2}$', values['print_timezone_offset']):
+                raise HTTPException(
+                    status_code=422,
+                    detail='Timezone offset must be a number like +7, -5, or +0.',
+                )
+            offset_val = int(values['print_timezone_offset'])
+            if offset_val < -14 or offset_val > 14:
+                raise HTTPException(
+                    status_code=422,
+                    detail='Timezone offset must be between -14 and +14.',
+                )
+
     updated = await config_service.update_config(db, category, values)
     all_values = await config_service.get_configs_by_category(db, category)
 
@@ -630,13 +652,32 @@ async def print_gallery_item(
     if session is None:
         raise HTTPException(status_code=404, detail='Session not found')
 
+    # Read print config for consistent footers
+    print_cfg = await config_service.get_configs_by_category(db, 'print')
+
+    footer_name = print_cfg.get('print_footer_name', 'VibePrint OS')
+    try:
+        tz_offset = int(print_cfg.get('print_timezone_offset', '+7'))
+    except (ValueError, TypeError):
+        tz_offset = 7
+    footer_enabled = print_cfg.get('print_footer_enabled', 'true').lower() == 'true'
+    name_enabled = print_cfg.get('print_footer_name_enabled', 'true').lower() == 'true'
+    timestamp_enabled = print_cfg.get('print_footer_timestamp_enabled', 'true').lower() == 'true'
+    footer_kwargs = {
+        'footer_name': footer_name,
+        'timezone_offset': tz_offset,
+        'footer_enabled': footer_enabled,
+        'name_enabled': name_enabled,
+        'timestamp_enabled': timestamp_enabled,
+    }
+
     if session.session_type == SessionType.PHOTOBOOTH:
         if not session.composite_image_path or not os.path.exists(session.composite_image_path):
             raise HTTPException(status_code=400, detail='No composite image to print')
         try:
             from app.services.printer_service import print_photobooth_strip
 
-            res = print_photobooth_strip(session.composite_image_path)
+            res = print_photobooth_strip(session.composite_image_path, **footer_kwargs)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
     elif session.session_type == SessionType.VIBE_CHECK:
@@ -654,6 +695,7 @@ async def print_gallery_item(
                 ai_text=session.ai_response_text,
                 photo_bytes=photo_bytes,
                 include_photo=True,
+                **footer_kwargs,
             )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
@@ -796,3 +838,56 @@ async def get_access_code_qr(
     buf.seek(0)
 
     return StreamingResponse(buf, media_type='image/png')
+
+
+@router.post('/access-codes/{code_id}/print', response_model=SuccessMessage)
+async def print_access_code(
+    code_id: int,
+    _admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> SuccessMessage:
+    """Print an access code receipt to the thermal printer."""
+    from sqlalchemy import select
+
+    from app.models.access_code import AccessCode, AccessCodeStatus
+    from app.services.printer_service import print_access_code as do_print
+
+    stmt = select(AccessCode).where(AccessCode.id == code_id)
+    result = await db.execute(stmt)
+    code = result.scalar_one_or_none()
+
+    if code is None:
+        raise HTTPException(status_code=404, detail=f'Access code {code_id} not found')
+
+    if code.status != AccessCodeStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail='Only active codes can be printed')
+
+    # Read print config for consistent footers
+    print_cfg = await config_service.get_configs_by_category(db, 'print')
+    footer_name = print_cfg.get('print_footer_name', 'VibePrint OS')
+    try:
+        tz_offset = int(print_cfg.get('print_timezone_offset', '+7'))
+    except (ValueError, TypeError):
+        tz_offset = 7
+    footer_enabled = print_cfg.get('print_footer_enabled', 'true').lower() == 'true'
+    name_enabled = print_cfg.get('print_footer_name_enabled', 'true').lower() == 'true'
+    timestamp_enabled = print_cfg.get('print_footer_timestamp_enabled', 'true').lower() == 'true'
+
+    try:
+        res = do_print(
+            code=code.code,
+            code_type=code.code_type,
+            max_uses=code.max_uses,
+            price=code.price,
+            expires_at=code.expires_at,
+            notes=code.notes,
+            footer_name=footer_name,
+            timezone_offset=tz_offset,
+            footer_enabled=footer_enabled,
+            name_enabled=name_enabled,
+            timestamp_enabled=timestamp_enabled,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc
+
+    return SuccessMessage(message=res.get('message', 'Print sent'))

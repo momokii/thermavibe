@@ -12,6 +12,7 @@ import AdminAnalyticsPage from '@/pages/AdminAnalyticsPage';
 import AdminPhotoboothPage from '@/pages/AdminPhotoboothPage';
 import AdminVibeCheckPage from '@/pages/AdminVibeCheckPage';
 import AdminStripsGalleryPage from '@/pages/AdminStripsGalleryPage';
+import AdminPrintTemplatePage from '@/pages/AdminPrintTemplatePage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ function App() {
             <Route path="ai-provider" element={<AdminAiProviderPage />} />
             <Route path="payment-access" element={<AdminPaymentAccessPage />} />
             <Route path="hardware" element={<AdminHardwarePage />} />
+            <Route path="print-template" element={<AdminPrintTemplatePage />} />
             <Route path="vibe-check" element={<AdminVibeCheckPage />} />
             <Route path="photobooth" element={<AdminPhotoboothPage />} />
             <Route path="strips" element={<AdminStripsGalleryPage />} />

@@ -74,6 +74,13 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
     ConfigCategory.ACCESS_CODE: {
         'access_code_mode_enabled': {'value': 'false', 'description': 'Enable access code mode (disables payment when ON)'},
     },
+    ConfigCategory.PRINT: {
+        'print_footer_name': {'value': 'VibePrint OS', 'description': 'Brand name printed on receipt footers (max 24 chars)'},
+        'print_timezone_offset': {'value': '+7', 'description': 'UTC offset for printed timestamps (e.g. +7 for Jakarta, +0 for UTC)'},
+        'print_footer_enabled': {'value': 'true', 'description': 'Show footer on printed receipts'},
+        'print_footer_name_enabled': {'value': 'true', 'description': 'Show brand name in footer'},
+        'print_footer_timestamp_enabled': {'value': 'true', 'description': 'Show timestamp in footer'},
+    },
 }
 
 

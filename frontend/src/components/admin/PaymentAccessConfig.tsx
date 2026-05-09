@@ -19,6 +19,7 @@ import {
   Copy,
   Plus,
   RefreshCw,
+  Printer,
   Search,
   X,
   ChevronLeft,
@@ -279,17 +280,31 @@ export default function PaymentAccessConfig() {
     },
   });
 
+  const printCodeMutation = useMutation({
+    mutationFn: (codeId: number) => adminApi.printAccessCode(codeId),
+    onSuccess: () => {
+      toast.success('Code sent to printer');
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail ?? 'Print failed — is the printer connected?');
+    },
+  });
+
   // ── Confirmation modal ────────────────────────────────────────
   const [confirmAction, setConfirmAction] = useState<{
-    type: 'revoke' | 'delete';
+    type: 'revoke' | 'delete' | 'print';
     codeId: number;
     codeStr: string;
+    codeDetails?: AccessCodeResponse;
   } | null>(null);
 
   const handleConfirm = () => {
     if (!confirmAction) return;
     if (confirmAction.type === 'revoke') {
       revokeMutation.mutate(confirmAction.codeId);
+    } else if (confirmAction.type === 'print') {
+      printCodeMutation.mutate(confirmAction.codeId);
     } else {
       deleteMutation.mutate(confirmAction.codeId);
     }
@@ -841,19 +856,35 @@ export default function PaymentAccessConfig() {
                       <td style={{ padding: '0.75rem 1rem' }}>
                         <div className="flex items-center gap-1">
                           {code.status === 'active' && (
-                            <button
-                              onClick={() =>
-                                setConfirmAction({
-                                  type: 'revoke',
-                                  codeId: code.id,
-                                  codeStr: code.code,
-                                })
-                              }
-                              className="p-1.5 rounded-lg text-white/30 hover:text-yellow-400 hover:bg-yellow-500/10"
-                              title="Revoke — disable this code so it can't be used again (record kept)"
-                            >
-                              <Ban className="h-3.5 w-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    type: 'print',
+                                    codeId: code.id,
+                                    codeStr: code.code,
+                                    codeDetails: code,
+                                  })
+                                }
+                                className="p-1.5 rounded-lg text-white/30 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                title="Print code receipt"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    type: 'revoke',
+                                    codeId: code.id,
+                                    codeStr: code.code,
+                                  })
+                                }
+                                className="p-1.5 rounded-lg text-white/30 hover:text-yellow-400 hover:bg-yellow-500/10"
+                                title="Revoke — disable this code so it can't be used again (record kept)"
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => handleViewQr(code.id)}
@@ -1061,19 +1092,63 @@ export default function PaymentAccessConfig() {
           >
             <div
               className="bg-surface-1 rounded-2xl border border-white/[0.06]"
-              style={{ padding: '2rem', maxWidth: '28rem', width: '100%' }}
+              style={{ padding: '2rem', maxWidth: '32rem', width: '100%' }}
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-lg font-display font-bold text-white mb-2">
-                {confirmAction.type === 'revoke' ? 'Revoke Access Code' : 'Delete Access Code'}
+                {confirmAction.type === 'print'
+                  ? 'Print Access Code'
+                  : confirmAction.type === 'revoke'
+                    ? 'Revoke Access Code'
+                    : 'Delete Access Code'}
               </h3>
               <p className="text-sm text-white/50 mb-1">
                 <span className="font-mono text-white/70">{confirmAction.codeStr}</span>
               </p>
+
+              {/* Print preview details */}
+              {confirmAction.type === 'print' && confirmAction.codeDetails && (
+                <div
+                  className="rounded-lg border border-white/[0.06] bg-white/[0.02] mt-3 mb-4"
+                  style={{ padding: '0.75rem 1rem' }}
+                >
+                  <p className="text-[11px] text-white/25 uppercase tracking-wider mb-2">Receipt Preview</p>
+                  <div className="grid grid-cols-2 gap-y-1.5 text-sm">
+                    <span className="text-white/30">Type</span>
+                    <span className="text-white/60">
+                      {({ vibe_check: 'Vibe Check', photobooth: 'Photobooth' } as Record<string, string>)[confirmAction.codeDetails.code_type] ?? 'Universal'}
+                    </span>
+                    <span className="text-white/30">Price</span>
+                    <span className="text-white/60">
+                      {confirmAction.codeDetails.price != null
+                        ? `Rp ${confirmAction.codeDetails.price.toLocaleString('id-ID')}`
+                        : 'Free'}
+                    </span>
+                    <span className="text-white/30">Uses</span>
+                    <span className="text-white/60">
+                      {confirmAction.codeDetails.use_count} / {confirmAction.codeDetails.max_uses}
+                    </span>
+                    <span className="text-white/30">Expires</span>
+                    <span className="text-white/60">
+                      {confirmAction.codeDetails.expires_at
+                        ? <>
+                            {formatExpiryDate(confirmAction.codeDetails.expires_at)}
+                            <span className={`ml-1.5 text-[11px] ${isExpired(confirmAction.codeDetails.expires_at) ? 'text-red-400/70' : 'text-emerald-400/60'}`}>
+                              ({formatRelativeTime(confirmAction.codeDetails.expires_at)})
+                            </span>
+                          </>
+                        : 'Never'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <p className="text-sm text-white/40 mb-6">
-                {confirmAction.type === 'revoke'
-                  ? 'This code will no longer be accepted at the kiosk. The record stays in the list with "revoked" status for audit.'
-                  : 'This will permanently remove the code from the database. This cannot be undone.'}
+                {confirmAction.type === 'print'
+                  ? 'Send this access code to the thermal printer? The receipt will include the code, type, price, and expiry information shown above.'
+                  : confirmAction.type === 'revoke'
+                    ? 'This code will no longer be accepted at the kiosk. The record stays in the list with "revoked" status for audit.'
+                    : 'This will permanently remove the code from the database. This cannot be undone.'}
               </p>
               <div className="flex items-center gap-3 justify-end">
                 <Button
@@ -1086,14 +1161,23 @@ export default function PaymentAccessConfig() {
                 </Button>
                 <Button
                   onClick={handleConfirm}
+                  disabled={confirmAction.type === 'print' && printCodeMutation.isPending}
                   className={`border-0 ${
-                    confirmAction.type === 'revoke'
-                      ? 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30'
-                      : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                    confirmAction.type === 'print'
+                      ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                      : confirmAction.type === 'revoke'
+                        ? 'bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30'
+                        : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
                   }`}
                   style={{ padding: '0.625rem 1.5rem' }}
                 >
-                  {confirmAction.type === 'revoke' ? 'Yes, Revoke' : 'Yes, Delete'}
+                  {confirmAction.type === 'print' && printCodeMutation.isPending
+                    ? 'Printing...'
+                    : confirmAction.type === 'print'
+                      ? 'Print Now'
+                      : confirmAction.type === 'revoke'
+                        ? 'Yes, Revoke'
+                        : 'Yes, Delete'}
                 </Button>
               </div>
             </div>

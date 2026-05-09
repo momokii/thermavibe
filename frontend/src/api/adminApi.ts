@@ -102,6 +102,9 @@ export const adminApi = {
   getAccessCodeQr: (codeId: number) =>
     apiClient.get(`/admin/access-codes/${codeId}/qr`, { responseType: 'blob' }),
 
+  printAccessCode: (codeId: number) =>
+    apiClient.post<{ message: string }>(`/admin/access-codes/${codeId}/print`),
+
   // --- Gallery actions ---
 
   deleteGalleryItem: (sessionId: string) =>

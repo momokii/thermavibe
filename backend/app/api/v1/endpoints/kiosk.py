@@ -44,6 +44,25 @@ router = APIRouter()
 log = structlog.get_logger(__name__)
 
 
+def _parse_print_footer_config(print_cfg: dict) -> dict:
+    """Extract print footer params from a config dict for printer service functions."""
+    footer_name = print_cfg.get('print_footer_name', 'VibePrint OS')
+    try:
+        tz_offset = int(print_cfg.get('print_timezone_offset', '+7'))
+    except (ValueError, TypeError):
+        tz_offset = 7
+    footer_enabled = print_cfg.get('print_footer_enabled', 'true').lower() == 'true'
+    name_enabled = print_cfg.get('print_footer_name_enabled', 'true').lower() == 'true'
+    timestamp_enabled = print_cfg.get('print_footer_timestamp_enabled', 'true').lower() == 'true'
+    return {
+        'footer_name': footer_name,
+        'timezone_offset': tz_offset,
+        'footer_enabled': footer_enabled,
+        'name_enabled': name_enabled,
+        'timestamp_enabled': timestamp_enabled,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Session CRUD
 # ---------------------------------------------------------------------------
@@ -435,6 +454,7 @@ async def print_receipt(
     try:
         import os
 
+        from app.services import config_service
         from app.services.printer_service import print_receipt as do_print
 
         photo_bytes = None
@@ -442,10 +462,13 @@ async def print_receipt(
             with open(session.photo_path, 'rb') as f:
                 photo_bytes = f.read()
 
+        print_cfg = await config_service.get_configs_by_category(db, 'print')
+
         result = do_print(
             ai_text=session.ai_response_text,
             photo_bytes=photo_bytes,
             include_photo=body.include_photo,
+            **_parse_print_footer_config(print_cfg),
         )
         return SuccessMessage(message=result.get('message', 'Print sent'))
     except Exception as exc:
@@ -659,8 +682,15 @@ async def photobooth_print(
         return SuccessMessage(message='No composite image to print')
 
     try:
+        from app.services import config_service
         from app.services.printer_service import print_photobooth_strip
-        result = print_photobooth_strip(session.composite_image_path)
+
+        print_cfg = await config_service.get_configs_by_category(db, 'print')
+
+        result = print_photobooth_strip(
+            session.composite_image_path,
+            **_parse_print_footer_config(print_cfg),
+        )
         return SuccessMessage(message=result.get('message', 'Print sent'))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f'Print failed: {exc}') from exc

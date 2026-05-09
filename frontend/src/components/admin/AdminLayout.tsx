@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAdminStore } from '@/stores/adminStore';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { LayoutDashboard, HardDrive, BarChart3, Camera, ImageIcon, Sparkles, LogOut, Bot, CreditCard } from 'lucide-react';
+import { LayoutDashboard, HardDrive, BarChart3, Camera, ImageIcon, Sparkles, LogOut, Bot, CreditCard, Printer } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 type NavItem = { label: string; path: string; icon: React.ComponentType<{ className?: string }> };
@@ -21,6 +21,7 @@ const navSections: NavSection[] = [
       { label: 'AI Provider', path: '/admin/ai-provider', icon: Bot },
       { label: 'Payment & Access', path: '/admin/payment-access', icon: CreditCard },
       { label: 'Hardware', path: '/admin/hardware', icon: HardDrive },
+      { label: 'Print Template', path: '/admin/print-template', icon: Printer },
     ],
   },
   {
