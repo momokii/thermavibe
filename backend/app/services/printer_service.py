@@ -467,6 +467,9 @@ def _get_printer():
 
     global _printer
 
+    # Track if this is a power cycle scenario (device present but old handle not usable)
+    is_power_cycle_scenario = False
+
     if _printer is not None:
         present = _is_device_present()
         usable = _is_printer_usable(_printer)
@@ -479,10 +482,11 @@ def _get_printer():
         _close_printer(_printer)
         _printer = None
 
-    # Try to connect with current IDs
-    # Only retry with progressive waits if this is a power cycle (device was present before)
-    is_power_cycle_scenario = present if _printer is None else (present and not usable)
+        # Power cycle detected: device physically present but old handle not usable
+        if present and not usable:
+            is_power_cycle_scenario = True
 
+    # Try to connect with current IDs
     if _active_vendor_id and _active_product_id:
         try:
             vendor_id = int(_active_vendor_id, 16)
