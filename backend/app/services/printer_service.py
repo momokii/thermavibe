@@ -423,23 +423,6 @@ def _dispose_all_for(vendor_id: int, product_id: int) -> None:
     gc.collect()
 
 
-def _test_device_communication(dev) -> bool:
-    """Test if a USB device can actually communicate.
-
-    Does a simple control transfer to verify the device is responsive.
-    Returns True if device responds, False otherwise.
-    """
-    import usb.core
-
-    try:
-        # Try to read the device configuration - this is a simple control transfer
-        # that should work if the device is responsive
-        cfg = dev.get_active_configuration()
-        return cfg is not None
-    except (usb.core.USBError, Exception):
-        return False
-
-
 def _connect_usb_printer_inner(vendor_id: int, product_id: int):
     """Inner connection logic — called by _connect_usb_printer with guard.
 
@@ -459,7 +442,7 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int):
 
     # After power cycle, the device needs significant time to re-enumerate and stabilize.
     # The USB-to-parallel bridge chip (0fe6:811e) is especially slow to recover.
-    wait_times = [2, 3, 5, 8]  # Progressive wait times
+    wait_times = [0, 3, 5, 8]  # Progressive wait times (0 for immediate first attempt)
 
     for attempt, wait_time in enumerate(wait_times, 1):
         # Wait before attempting connection (except first attempt)
@@ -470,27 +453,19 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int):
         # Dispose stale resources before each attempt
         _dispose_all_for(vendor_id, product_id)
 
-        # Find the device
-        dev = usb.core.find(idVendor=vendor_id, idProduct=product_id)
-        if dev is None:
-            logger.info(f'connect_attempt_{attempt}_device_not_found')
+        # Check if device is physically present via sysfs first
+        if not _is_device_present():
+            logger.info(f'connect_attempt_{attempt}_device_not_physically_present')
             continue
 
-        logger.info(f'connect_attempt_{attempt}_device_found', bus=dev.bus, address=dev.address)
-
-        # Test if device can actually communicate
-        if not _test_device_communication(dev):
-            logger.warning(f'connect_attempt_{attempt}_device_not_responsive')
-            continue
-
-        # Device is responsive, try to create printer and open it
+        # Try to create printer and open it - the open() method handles fresh device lookup
         try:
             printer = _SafeUsbPrinter(vendor_id, product_id)
             printer.open()
 
             # Verify the connection is actually usable
             if _is_printer_usable(printer):
-                logger.info(f'connect_attempt_{attempt}_success', bus=dev.bus, address=dev.address)
+                logger.info(f'connect_attempt_{attempt}_success')
                 return printer
             else:
                 logger.warning(f'connect_attempt_{attempt}_not_usable')
