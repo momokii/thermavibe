@@ -368,7 +368,7 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int, retry_for_power_
     Args:
         vendor_id: USB vendor ID
         product_id: USB product ID
-        retry_for_power_cycle: If True, retry with progressive waits for power cycle recovery.
+        retry_for_power_cycle: If True, wait 15s then retry with progressive waits for power cycle recovery.
                               If False, fail immediately on first error.
 
     The USB-to-parallel bridge chip (0fe6:811e) needs significant time to
@@ -387,8 +387,14 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int, retry_for_power_
         logger.info('printer_not_physically_present')
         raise PrinterOfflineError()
 
-    # Progressive retry only for power cycle recovery (device present but not responsive)
-    wait_times = [0] if not retry_for_power_cycle else [0, 5, 10, 15]
+    # For power cycle, wait 15 seconds FIRST to let bridge chip stabilize
+    # Then retry with progressive waits
+    if retry_for_power_cycle:
+        logger.info('power_cycle_recovery_waiting_for_chip_stabilization', wait_seconds=15)
+        time.sleep(15)
+
+    # Progressive retry only for power cycle recovery
+    wait_times = [0] if not retry_for_power_cycle else [0, 5, 10]
 
     for attempt, wait_sec in enumerate(wait_times, 1):
         if attempt > 1:
