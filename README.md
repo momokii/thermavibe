@@ -312,14 +312,14 @@ All commands are run from the repository root. Run `make help` for the full list
 
 ---
 
-## Environment Variables
+## Configuration
 
-All configuration is done via environment variables.
+VibePrint OS uses a **two-tier configuration system**:
 
-| Template | Purpose |
-|----------|---------|
-| `.env.example` | Development defaults (AI provider, camera, printer, etc.) |
-| `.env.production` | Production template with security markers |
+1. **Environment variables** (`.env`) — deployment-time settings like secrets, database, hardware detection
+2. **Database configs** (admin panel) — runtime settings like AI provider, payment, photobooth, printer hardware, kiosk timings
+
+On first startup, runtime settings are **seeded** from env var defaults into the database. After that, operators change them via the admin panel — no redeployment needed.
 
 ```bash
 # For development
@@ -329,22 +329,52 @@ cp .env.example .env
 cp .env.production .env
 ```
 
-### Key variables
+### Environment variables (deployment-time)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `development` | `development` or `production` |
-| `AI_PROVIDER` | `openai` | AI provider: `openai`, `anthropic`, `google`, `ollama`, or `mock` |
-| `PAYMENT_ENABLED` | `false` | Enable/disable payment flow |
-| `PAYMENT_PROVIDER` | `mock` | Payment provider: `mock`, `midtrans`, or `xendit` |
-| `PAYMENT_AMOUNT` | `5000` | Payment amount in IDR |
+| `APP_SECRET_KEY` | (change me) | JWT signing key — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `APP_DEBUG` | `true` | Debug mode (always `false` in production) |
+| `LOG_LEVEL` | `INFO` / `WARNING` | Application log level (see below) |
+| `DATABASE_URL` | (auto) | PostgreSQL connection string |
 | `ADMIN_PIN` | `1234` | PIN for admin dashboard access |
-| `ADMIN_SESSION_TTL_HOURS` | `24` | Admin session duration in hours before auto-logout |
-| `PRINTER_VENDOR_ID` | `0x04b8` | USB vendor ID of thermal printer |
-| `PRINTER_PRODUCT_ID` | `0x0e15` | USB product ID of thermal printer |
-| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (auto-detected at startup, `/dev/video0` = 0) |
+| `ADMIN_SESSION_TTL_HOURS` | `24` | Admin session duration before auto-logout |
+| `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0, auto-detected at startup) |
+| `PRINTER_AUTO_DETECT` | `true` | Auto-detect USB thermal printer |
+| `PRINTER_HOTPLUG_INTERVAL_SECONDS` | `30` | How often to scan for newly plugged-in printers |
 
-See `.env.example` for the complete list with descriptions.
+### Log Levels
+
+Control verbosity with the `LOG_LEVEL` environment variable:
+
+| Level | Dev Default | Prod Default | Use When |
+|-------|-------------|--------------|----------|
+| `DEBUG` | | | Troubleshooting specific issues |
+| `INFO` | default | | Normal development — shows app events |
+| `WARNING` | | default | Production — only warnings and errors |
+| `ERROR` | | | Minimal output — only failures |
+| `CRITICAL` | | | Silent except catastrophic failures |
+
+Noisy third-party loggers (SQLAlchemy queries, uvicorn access logs) are always silenced to `WARNING+`.
+
+### Admin panel settings (runtime, stored in database)
+
+These are configured via the admin dashboard after deployment — no `.env` edits needed:
+
+| Category | Settings |
+|----------|----------|
+| **AI** | Provider, API keys, model, system prompt, timeout |
+| **Payment** | Enable/disable, provider (Midtrans/Xendit/Mock), amount, currency, timeout |
+| **Printer Hardware** | USB vendor/product ID, paper width |
+| **Camera** | Resolution |
+| **Photobooth** | Enable, capture time, min/max photos, layout, watermark, retention |
+| **Vibe Check** | Enable, system prompt, retention |
+| **Kiosk UX** | Idle timeout, countdown, processing timeout, reveal duration |
+| **Print Template** | Footer brand name, timezone, per-element toggles |
+| **Access Codes** | Enable/disable access code mode |
+
+See `.env.example` or `.env.production` for initial seed values.
 
 ---
 
