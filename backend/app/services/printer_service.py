@@ -320,12 +320,16 @@ def _is_printer_usable(printer) -> bool:
         return False
 
 
-def _connect_usb_printer(vendor_id: int, product_id: int):
+def _connect_usb_printer(vendor_id: int, product_id: int, retry_for_power_cycle: bool = False):
     """Create a USB printer connection with retry.
 
     Uses _SafeUsbPrinter which skips the destructive dev.reset() that
-    python-escpos's Usb class performs.  Multiple attempts with
-    progressively stronger USB cleanup between each try.
+    python-escpos's Usb class performs.
+
+    Args:
+        vendor_id: USB vendor ID
+        product_id: USB product ID
+        retry_for_power_cycle: If True, retry with progressive waits for power cycle recovery
     """
     global _connecting
 
@@ -334,7 +338,7 @@ def _connect_usb_printer(vendor_id: int, product_id: int):
     _connecting = True
 
     try:
-        return _connect_usb_printer_inner(vendor_id, product_id)
+        return _connect_usb_printer_inner(vendor_id, product_id, retry_for_power_cycle)
     finally:
         _connecting = False
 
@@ -358,11 +362,17 @@ def _dispose_all_for(vendor_id: int, product_id: int) -> None:
     gc.collect()
 
 
-def _connect_usb_printer_inner(vendor_id: int, product_id: int):
+def _connect_usb_printer_inner(vendor_id: int, product_id: int, retry_for_power_cycle: bool = False):
     """Inner connection logic — called by _connect_usb_printer with guard.
 
+    Args:
+        vendor_id: USB vendor ID
+        product_id: USB product ID
+        retry_for_power_cycle: If True, retry with progressive waits for power cycle recovery.
+                              If False, fail immediately on first error.
+
     The USB-to-parallel bridge chip (0fe6:811e) needs significant time to
-    stabilize after power cycle. Retry with progressive waits up to 20 seconds.
+    stabilize after power cycle. Only retry when device is physically present.
     """
     import time
 
@@ -372,14 +382,22 @@ def _connect_usb_printer_inner(vendor_id: int, product_id: int):
     # Clear any stale pyusb resources
     _dispose_all_for(vendor_id, product_id)
 
-    # Progressive retry with increasing waits for power cycle recovery
-    # The bridge chip can take 10-20 seconds to become responsive
-    wait_times = [0, 5, 10, 15]  # Wait times before each attempt
+    # Check if device is physically present before attempting connection
+    if not _is_device_present():
+        logger.info('printer_not_physically_present')
+        raise PrinterOfflineError()
+
+    # Progressive retry only for power cycle recovery (device present but not responsive)
+    wait_times = [0] if not retry_for_power_cycle else [0, 5, 10, 15]
 
     for attempt, wait_sec in enumerate(wait_times, 1):
         if attempt > 1:
             logger.info('printer_retry_waiting', attempt=attempt, wait_seconds=wait_sec)
             time.sleep(wait_sec)
+            # Check if device still present before retry
+            if not _is_device_present():
+                logger.info('printer_no_longer_present_during_retry')
+                raise PrinterOfflineError()
 
         # Clear stale resources before each attempt
         _dispose_all_for(vendor_id, product_id)
@@ -461,18 +479,15 @@ def _get_printer():
         _close_printer(_printer)
         _printer = None
 
-        # Power cycle detected: device physically present but old handle not usable
-        # The USB-to-parallel bridge chip needs 10-20 seconds to stabilize
-        if present and not usable:
-            logger.info('power_cycle_detected_waiting_for_stabilization', wait_seconds=15)
-            time.sleep(15)
-
     # Try to connect with current IDs
+    # Only retry with progressive waits if this is a power cycle (device was present before)
+    is_power_cycle_scenario = present if _printer is None else (present and not usable)
+
     if _active_vendor_id and _active_product_id:
         try:
             vendor_id = int(_active_vendor_id, 16)
             product_id = int(_active_product_id, 16)
-            _printer = _connect_usb_printer(vendor_id, product_id)
+            _printer = _connect_usb_printer(vendor_id, product_id, retry_for_power_cycle=is_power_cycle_scenario)
             logger.info('printer_connected_successfully')
             return _printer
         except Exception:
