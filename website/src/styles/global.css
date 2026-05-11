@@ -50,6 +50,7 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   font-size: 0.9375rem;
   padding: 0;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 200ms ease, text-decoration-color 200ms ease;
   text-decoration: underline;
