@@ -2,32 +2,45 @@
 
 Static marketing site built with Astro + React + Tailwind CSS.
 
-## Quick Start
+## Development
 
 ```bash
 npm install
 npm run dev        # http://localhost:4321
 ```
 
-## Build
+The Astro dev toolbar appears at the bottom during development. It does not appear in production builds.
+
+## Production
+
+### Docker Compose (recommended)
+
+```bash
+docker compose up -d --build
+```
+
+The site is served by nginx on **port 3000** with gzip compression and security headers.
+
+```bash
+docker compose down        # Stop
+docker compose up -d --build  # Rebuild and restart
+```
+
+### Docker (manual)
+
+```bash
+docker build -t vibeprint-website .
+docker run -d -p 3000:80 --name vibeprint-website vibeprint-website
+```
+
+### Static build (for Vercel, Netlify, etc.)
 
 ```bash
 npm run build      # outputs to dist/
-npm run preview    # preview the built site
+npm run preview    # preview locally
 ```
 
-## Docker
-
-```bash
-# Build and run
-docker build -t vibeprint-website .
-docker run -p 3000:80 vibeprint-website
-
-# Or with docker compose (from this directory)
-docker compose up --build
-```
-
-The site runs on **port 3000** by default.
+Serve `dist/` with any static file server.
 
 ## Pages
 
