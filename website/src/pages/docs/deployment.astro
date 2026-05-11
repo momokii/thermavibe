@@ -14,64 +14,50 @@ const content = `
 <pre><code>git clone https://github.com/momokii/thermavibe.git
 cd thermavibe
 cp .env.production .env</code></pre>
-<p>Edit <code>.env</code> and fill in your production values:</p>
+<p>Edit <code>.env</code> and fill in your production values. Values marked <code>[CHANGE ME]</code> must be set:</p>
 <ul>
-  <li>Set a strong <code>DATABASE_URL</code> with a secure password</li>
-  <li>Set <code>AI_PROVIDER</code> to your chosen provider and add the corresponding API key</li>
-  <li>Set <code>PAYMENT_PROVIDER</code> to <code>midtrans</code> or <code>xendit</code> and add production keys</li>
-  <li>Set <code>PAYMENT_ENABLED=true</code> if you want to charge per session</li>
+  <li><code>APP_SECRET_KEY</code> — generate with <code>python -c "import secrets; print(secrets.token_hex(32))"</code></li>
+  <li><code>ADMIN_PIN</code> — choose a secure PIN for admin dashboard access</li>
+  <li><code>POSTGRES_PASSWORD</code> — choose a secure database password</li>
 </ul>
+<p>AI provider, payment, and hardware settings are configured via the admin panel after deployment.</p>
 
 <h3>2. Deploy the stack</h3>
-<pre><code>make deploy</code></pre>
-<p>This runs Docker Compose in production mode with optimized builds, health checks, and automatic restart policies.</p>
+<pre><code>make prod</code></pre>
+<p>This auto-detects connected cameras and printers, builds Docker images, runs database migrations, and starts all services.</p>
 
-<h3>3. Run database migrations</h3>
-<pre><code>docker compose exec backend alembic upgrade head</code></pre>
-<p>This runs any pending database migrations. Run this after every update.</p>
-
-<h3>4. Verify the deployment</h3>
+<h3>3. Verify the deployment</h3>
 <pre><code># Check that all containers are running
 docker compose ps
 
 # Test the health endpoint
-curl http://localhost:8000/health
+curl http://localhost:8000/health</code></pre>
 
-# Check the API docs are accessible
-curl -s http://localhost:8000/docs | head -20</code></pre>
+<h3>4. Launch kiosk mode</h3>
+<pre><code>bash scripts/start-kiosk.sh</code></pre>
+<p>Opens Chromium in fullscreen kiosk mode pointing at the application. Override the URL:</p>
+<pre><code>KIOSK_URL=http://192.168.1.100:8000 bash scripts/start-kiosk.sh</code></pre>
 
 <h2>Systemd Auto-Start</h2>
-<p>To ensure the kiosk starts automatically on boot, create a systemd service:</p>
-<pre><code>[Unit]
-Description=VibePrint OS Kiosk
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/opt/thermavibe
-ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.yml down
-
-[Install]
-WantedBy=multi-user.target</code></pre>
-<p>Save this as <code>/etc/systemd/system/vibeprint.service</code>, then enable it:</p>
-<pre><code>sudo systemctl enable vibeprint
-sudo systemctl start vibeprint</code></pre>
+<p>Install the included systemd service so VibePrint OS starts automatically on boot:</p>
+<pre><code>sudo cp deploy/thermavibe.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable thermavibe
+sudo systemctl start thermavibe</code></pre>
+<p>Check status:</p>
+<pre><code>sudo systemctl status thermavibe</code></pre>
 
 <h2>Updates</h2>
 <p>To update to the latest version:</p>
-<pre><code>git pull origin main
-make deploy
-docker compose exec backend alembic upgrade head</code></pre>
+<pre><code>git pull
+make prod</code></pre>
 
 <h2>Backup</h2>
 <p>The database stores all session data, analytics, and configuration. Back it up regularly:</p>
 <pre><code>docker compose exec db pg_dump -U vibeprint vibeprint > backup.sql</code></pre>
 
 <h2>Reverse Proxy (Optional)</h2>
-<p>If you need HTTPS or want to serve on a custom domain, place a reverse proxy (nginx or Caddy) in front of the containers. The backend listens on port 8000 and the frontend on port 5173 by default.</p>
+<p>If you need HTTPS or want to serve on a custom domain, place a reverse proxy (nginx or Caddy) in front of the containers. In production mode, the backend serves both the API and the frontend SPA on port 8000.</p>
 `;
 ---
 

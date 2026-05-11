@@ -10,57 +10,55 @@ const content = `
 <h2>Two-Tier Configuration</h2>
 <p>VibePrint OS uses a two-tier configuration system:</p>
 <ol>
-  <li><strong>Environment variables</strong> (<code>.env</code> file) — Infrastructure settings like database URLs, API keys, and hardware paths. These require a restart to apply.</li>
-  <li><strong>Admin panel</strong> (<code>/admin</code> in the UI) — Runtime settings like pricing, templates, AI prompts, and access codes. Changes take effect immediately without restart.</li>
+  <li><strong>Environment variables</strong> (<code>.env</code> file) — Infrastructure settings like secrets, database URLs, and hardware detection. Set before deployment, require restart to apply.</li>
+  <li><strong>Admin panel</strong> (<code>/admin</code> in the UI) — Runtime settings like AI provider, pricing, templates, and access codes. Changes take effect immediately without restart.</li>
 </ol>
+<p>On first startup, runtime settings are seeded from env var defaults into the database. After that, operators change them via the admin panel — no redeployment needed.</p>
 
 <h2>Environment Variables</h2>
-<p>Copy <code>.env.example</code> to <code>.env</code> and fill in the values. All settings use Pydantic BaseSettings with type validation.</p>
+<p>Copy <code>.env.example</code> (development) or <code>.env.production</code> (production) to <code>.env</code> and fill in the values.</p>
 
 <table>
   <thead>
     <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
   </thead>
   <tbody>
+    <tr><td><code>APP_ENV</code></td><td><code>development</code></td><td><code>development</code> or <code>production</code></td></tr>
+    <tr><td><code>APP_SECRET_KEY</code></td><td><code>change-me-in-production</code></td><td>JWT signing key — generate with <code>python -c "import secrets; print(secrets.token_hex(32))"</code></td></tr>
+    <tr><td><code>APP_DEBUG</code></td><td><code>true</code></td><td>Enables detailed error traces. Always <code>false</code> in production.</td></tr>
+    <tr><td><code>LOG_LEVEL</code></td><td><code>INFO</code></td><td>Application log level: <code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code></td></tr>
     <tr><td><code>DATABASE_URL</code></td><td><code>postgresql+asyncpg://...</code></td><td>PostgreSQL connection string (async driver required)</td></tr>
-    <tr><td><code>AI_PROVIDER</code></td><td><code>mock</code></td><td>AI provider: <code>openai</code>, <code>anthropic</code>, <code>google</code>, <code>ollama</code>, or <code>mock</code></td></tr>
-    <tr><td><code>OPENAI_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=openai</code></td></tr>
-    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=anthropic</code></td></tr>
-    <tr><td><code>GOOGLE_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=google</code></td></tr>
-    <tr><td><code>OLLAMA_BASE_URL</code></td><td><code>http://localhost:11434</code></td><td>Ollama server URL (for local AI)</td></tr>
-    <tr><td><code>PAYMENT_PROVIDER</code></td><td><code>mock</code></td><td>Payment provider: <code>midtrans</code>, <code>xendit</code>, or <code>mock</code></td></tr>
-    <tr><td><code>PAYMENT_ENABLED</code></td><td><code>false</code></td><td>Toggle payment requirement for sessions</td></tr>
-    <tr><td><code>MIDTRANS_SERVER_KEY</code></td><td>—</td><td>Midtrans server key (when using Midtrans)</td></tr>
-    <tr><td><code>XENDIT_SECRET_KEY</code></td><td>—</td><td>Xendit secret key (when using Xendit)</td></tr>
-    <tr><td><code>PRINTER_USB_VENDOR</code></td><td>auto-detect</td><td>USB vendor ID for the thermal printer</td></tr>
-    <tr><td><code>PRINTER_USB_PRODUCT</code></td><td>auto-detect</td><td>USB product ID for the thermal printer</td></tr>
-    <tr><td><code>CAMERA_DEVICE_INDEX</code></td><td><code>0</code></td><td>Camera device index for OpenCV capture</td></tr>
-    <tr><td><code>SESSION_TIMEOUT_SECONDS</code></td><td><code>300</code></td><td>Seconds before an inactive session expires</td></tr>
+    <tr><td><code>ADMIN_PIN</code></td><td><code>1234</code></td><td>PIN for admin dashboard access</td></tr>
+    <tr><td><code>CAMERA_DEVICE_INDEX</code></td><td><code>0</code></td><td>Camera device index (<code>/dev/video0</code> = 0)</td></tr>
+    <tr><td><code>CORS_ALLOWED_ORIGINS</code></td><td><code>http://localhost:5173,...</code></td><td>Comma-separated allowed origins (dev only)</td></tr>
   </tbody>
 </table>
 
-<h2>Admin Panel Categories</h2>
-<p>The admin dashboard at <code>/admin</code> provides runtime configuration for:</p>
+<h2>Admin Panel Settings (Runtime)</h2>
+<p>These are configured via the admin dashboard at <code>/admin</code> after deployment — no <code>.env</code> edits needed:</p>
 
 <table>
   <thead>
     <tr><th>Category</th><th>Settings</th></tr>
   </thead>
   <tbody>
-    <tr><td>Kiosk Settings</td><td>Session timeout, idle screen content, default language, touch sounds</td></tr>
-    <tr><td>AI Configuration</td><td>Model selection, system prompt, temperature, max tokens</td></tr>
-    <tr><td>Print Templates</td><td>Receipt layout, photo strip dimensions, logo upload, footer text</td></tr>
-    <tr><td>Pricing</td><td>Price per session, currency, discounts, free mode toggle</td></tr>
-    <tr><td>Access Codes</td><td>Batch generation, expiry settings, QR code format, redemption limits</td></tr>
-    <tr><td>Hardware</td><td>Camera resolution, printer paper width, test print button</td></tr>
+    <tr><td>AI</td><td>Provider (OpenAI, Anthropic, Google, Ollama, Mock), API keys, model, system prompt, timeout</td></tr>
+    <tr><td>Payment</td><td>Enable/disable, provider (Midtrans/Xendit/Mock), amount, currency, timeout</td></tr>
+    <tr><td>Printer Hardware</td><td>USB vendor/product ID, paper width</td></tr>
+    <tr><td>Camera</td><td>Resolution</td></tr>
+    <tr><td>Photobooth</td><td>Enable, capture time, min/max photos, layout, watermark, retention</td></tr>
+    <tr><td>Vibe Check</td><td>Enable, system prompt, retention</td></tr>
+    <tr><td>Kiosk UX</td><td>Idle timeout, countdown, processing timeout, reveal duration</td></tr>
+    <tr><td>Print Template</td><td>Footer brand name, timezone, per-element toggles</td></tr>
+    <tr><td>Access Codes</td><td>Enable/disable access code mode, batch generation, expiry, QR codes, revocation</td></tr>
   </tbody>
 </table>
 
 <h2>AI Provider Fallback</h2>
-<p>When the primary AI provider fails (rate limit, network error, invalid key), VibePrint OS automatically falls back to the mock provider so the kiosk keeps running. Guests will receive a generated personality reading instead of an AI-analyzed one. Check the admin dashboard logs to see fallback events.</p>
+<p>When the primary AI provider fails (rate limit, network error, invalid key), VibePrint OS automatically falls back through the provider chain so the kiosk keeps running. Check the admin dashboard logs to see fallback events.</p>
 
 <h2>Payment Toggle</h2>
-<p>Set <code>PAYMENT_ENABLED=false</code> in <code>.env</code> to run the kiosk in free mode. This is useful for events where access is controlled by codes instead of per-session payments. The mock provider simulates successful payments for development and testing.</p>
+<p>Payment is disabled by default. Enable it via the admin panel and configure your provider (Midtrans or Xendit) with production keys. The mock provider simulates successful payments for development and testing.</p>
 `;
 ---
 

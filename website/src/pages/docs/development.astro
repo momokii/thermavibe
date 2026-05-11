@@ -31,7 +31,7 @@ cp .env.example .env</code></pre>
 <pre><code>cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e .
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000</code></pre>
 
@@ -78,8 +78,9 @@ cd frontend && npx tsc --noEmit</code></pre>
 │   │   ├── core/
 │   │   │   └── config.py    # Pydantic BaseSettings
 │   │   ├── models/          # SQLAlchemy models
-│   │   ├── routes/          # API route handlers
+│   │   ├── api/v1/endpoints/ # API route handlers
 │   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── utils/           # Utilities (dithering, ESC/POS, image processing)
 │   │   └── services/        # Business logic
 │   ├── tests/               # Backend tests
 │   └── alembic/             # Database migrations
@@ -88,8 +89,9 @@ cd frontend && npx tsc --noEmit</code></pre>
 │   │   ├── components/      # React components
 │   │   ├── stores/          # Zustand stores
 │   │   ├── pages/           # Page components
-│   │   └── lib/             # Utility functions
-│   └── tests/               # Frontend tests
+│   │   ├── hooks/           # Custom React hooks
+│   │   └── api/             # API client + typed endpoint functions
+│   └── __tests__/           # Frontend tests
 ├── docs/                    # Project documentation
 ├── scripts/                 # Operational scripts
 └── config/                  # Static configuration files</code></pre>
