@@ -16,7 +16,7 @@ const content = `
   <li>Verify the printer is connected and powered on: <code>lsusb</code> should list the device</li>
   <li>Check that the user running Docker has USB access: <code>ls -la /dev/bus/usb/*/*</code></li>
   <li>If using a USB-to-parallel bridge chip (vendor ID <code>0fe6</code>), note that <code>is_online()</code> status checks do not work with bridge chips. VibePrint OS uses sysfs checks instead.</li>
-  <li>Try setting <code>PRINTER_USB_VENDOR</code> and <code>PRINTER_USB_PRODUCT</code> explicitly in <code>.env</code></li>
+  <li>Try setting <code>PRINTER_VENDOR_ID</code> and <code>PRINTER_PRODUCT_ID</code> explicitly in <code>.env</code></li>
   <li>On some systems, you need udev rules to allow non-root access to USB devices</li>
 </ul>
 
@@ -32,7 +32,7 @@ const content = `
 
 <h3>Printer disconnects after power cycle</h3>
 <p><strong>Symptom:</strong> After turning the printer off and on, printing stops working.</p>
-<p><strong>Solution:</strong> VibePrint OS implements a 3-attempt USB reconnection strategy for known bridge chips. If the issue persists, restart the backend container: <code>docker compose restart backend</code></p>
+<p><strong>Solution:</strong> VibePrint OS implements a 3-attempt USB reconnection strategy for known bridge chips. If the issue persists, restart the backend container: <code>docker compose restart app</code></p>
 
 <h2>Camera Issues</h2>
 
@@ -62,9 +62,9 @@ const content = `
 <p><strong>Symptom:</strong> The payment screen shows an error instead of a QR code.</p>
 <p><strong>Solutions:</strong></p>
 <ul>
-  <li>Verify your payment provider API keys are correct in <code>.env</code></li>
-  <li>Check that <code>PAYMENT_ENABLED=true</code> is set</li>
-  <li>For development, use <code>PAYMENT_PROVIDER=mock</code> to bypass real payment gateways</li>
+  <li>Verify your payment provider API keys are set in the admin panel</li>
+  <li>Check that payment is enabled via the admin panel</li>
+  <li>For development, use the mock provider to bypass real payment gateways</li>
   <li>Check backend logs for payment provider error responses</li>
 </ul>
 
@@ -73,7 +73,7 @@ const content = `
 <p><strong>Solutions:</strong></p>
 <ul>
   <li>Ensure the webhook URL in your payment provider dashboard points to your server's public URL</li>
-  <li>The webhook endpoint is <code>POST /api/payment/webhook</code></li>
+  <li>The webhook endpoint is <code>POST /api/v1/payment/webhook/{provider}</code></li>
   <li>If behind a reverse proxy, verify the proxy forwards the request body and headers correctly</li>
 </ul>
 
@@ -83,21 +83,21 @@ const content = `
 <p><strong>Symptom:</strong> <code>docker compose ps</code> shows containers in a restart loop.</p>
 <p><strong>Solutions:</strong></p>
 <ul>
-  <li>Check logs: <code>docker compose logs backend</code> or <code>docker compose logs frontend</code></li>
+  <li>Check logs: <code>docker compose logs app</code></li>
   <li>The most common cause is a missing or invalid <code>.env</code> file</li>
-  <li>Database connection failures: ensure the <code>db</code> container is healthy before the backend starts</li>
+  <li>Database connection failures: ensure the <code>postgres</code> container is healthy before the app starts</li>
 </ul>
 
 <h3>Port already in use</h3>
-<p><strong>Symptom:</strong> Docker reports "port 8000 already allocated" or "port 5173 already allocated".</p>
-<p><strong>Solution:</strong> Stop the conflicting service or change the ports in <code>docker-compose.yml</code>.</p>
+<p><strong>Symptom:</strong> Docker reports "port 8000 already allocated".</p>
+<p><strong>Solution:</strong> Stop the conflicting service or change the port in <code>docker-compose.yml</code>.</p>
 
 <h3>Database migration errors</h3>
 <p><strong>Symptom:</strong> <code>alembic upgrade head</code> fails with relation errors.</p>
 <p><strong>Solutions:</strong>
 <ul>
-  <li>Check the current migration version: <code>docker compose exec backend alembic current</code></li>
-  <li>For a fresh start: <code>docker compose down -v</code> (warning: deletes all data) then <code>docker compose up -d</code></li>
+  <li>Check the current migration version: <code>docker compose exec app alembic current</code></li>
+  <li>For a fresh start: <code>make clean</code> (warning: deletes all data) then <code>make prod</code></li>
   <li>Never change database column types without creating a new Alembic migration</li>
 </ul>
 `;

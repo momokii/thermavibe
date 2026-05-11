@@ -8,77 +8,117 @@ const currentPage = '/docs/api-reference';
 
 const content = `
 <h2>Overview</h2>
-<p>VibePrint OS exposes a RESTful API built with FastAPI. All endpoints return JSON. The full interactive documentation is available at <code>/docs</code> (Swagger UI) or <code>/redoc</code> (ReDoc) on your running backend instance.</p>
+<p>VibePrint OS exposes a RESTful API built with FastAPI. All endpoints are under the <code>/api/v1</code> prefix and return JSON. The full interactive documentation is available at <code>/docs</code> (Swagger UI) or <code>/redoc</code> (ReDoc) on your running backend instance.</p>
 
-<h2>Endpoint Groups</h2>
-
-<h3>Kiosk Session Endpoints</h3>
-<p>These endpoints manage the guest-facing kiosk flow — creating sessions, capturing photos, triggering AI analysis, and printing.</p>
+<h2>Kiosk Session Endpoints</h2>
+<p>Manage the guest-facing kiosk flow — creating sessions, capturing photos, and printing.</p>
 <table>
   <thead>
     <tr><th>Method</th><th>Path</th><th>Description</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions</code></td><td>Create a new kiosk session</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/kiosk/sessions/{id}</code></td><td>Get session status and state</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/capture</code></td><td>Trigger photo capture</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/analyze</code></td><td>Run AI analysis on captured photo</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/print</code></td><td>Send print job to thermal printer</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/cancel</code></td><td>Cancel an active session</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session</code></td><td>Create a new kiosk session</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/kiosk/session/{id}</code></td><td>Get session status and state</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/snap</code></td><td>Trigger photo snap (vibe check)</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/select</code></td><td>Select photo option (multi-photo)</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/retake</code></td><td>Retake last photo</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/capture</code></td><td>Full capture + AI analysis</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/print</code></td><td>Send print job to thermal printer</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/finish</code></td><td>End and complete a session</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/kiosk/session/{id}/photo</code></td><td>Get captured photo</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/kiosk/features</code></td><td>Get available features (vibe check, photobooth)</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/validate-access-code</code></td><td>Validate an access code</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/redeem-code</code></td><td>Redeem an access code for a session</td></tr>
   </tbody>
 </table>
 
-<h3>Admin Endpoints</h3>
+<h3>Photobooth Endpoints</h3>
+<p>Multi-photo strip specific endpoints within a session:</p>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/photobooth/snap</code></td><td>Snap a single photo in multi-photo mode</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/photobooth/done</code></td><td>Finish capturing photos</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/kiosk/session/{id}/photobooth/composite</code></td><td>Get the assembled photo strip</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/kiosk/session/{id}/photobooth/print</code></td><td>Print the photo strip</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/kiosk/photobooth/themes</code></td><td>List available photobooth themes</td></tr>
+  </tbody>
+</table>
+
+<h2>Admin Endpoints</h2>
 <p>Operator-facing endpoints for dashboard analytics, configuration, and management.</p>
 <table>
   <thead>
     <tr><th>Method</th><th>Path</th><th>Description</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>GET</code></td><td><code>/api/admin/stats/summary</code></td><td>Dashboard summary statistics</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/admin/stats/revenue</code></td><td>Revenue data with time range</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/admin/stats/sessions</code></td><td>Session history and counts</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/admin/stats/heatmap</code></td><td>Revenue heatmap data</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/admin/stats/funnel</code></td><td>Drop-off funnel analytics</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/admin/config</code></td><td>Get current runtime configuration</td></tr>
-    <tr><td><code>PATCH</code></td><td><code>/api/admin/config</code></td><td>Update runtime configuration</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/admin/login</code></td><td>Authenticate with admin PIN</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/config</code></td><td>Get current runtime configuration</td></tr>
+    <tr><td><code>PUT</code></td><td><code>/api/v1/admin/config/{category}</code></td><td>Update configuration for a specific category</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/sessions</code></td><td>Session history and counts</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/revenue</code></td><td>Revenue data with time range</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/features</code></td><td>Feature breakdown statistics</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/peak-hours</code></td><td>Peak hours heatmap data</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/dropoff</code></td><td>Drop-off funnel analytics</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/analytics/print-stats</code></td><td>Print reliability statistics</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/hardware/status</code></td><td>Camera and printer connection status</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/admin/hardware/camera/test</code></td><td>Test camera capture</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/admin/hardware/printer/test</code></td><td>Send test print</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/access-codes</code></td><td>List access codes with filters</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/admin/access-codes</code></td><td>Generate a batch of access codes</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/v1/admin/access-codes/{id}</code></td><td>Revoke an access code</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/vibe-check/results</code></td><td>Browse vibe check gallery</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/admin/photobooth/strips</code></td><td>Browse photobooth strip gallery</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/admin/gallery/{id}/print</code></td><td>Manually reprint from gallery</td></tr>
   </tbody>
 </table>
 
-<h3>Camera Endpoints</h3>
+<h2>Camera Endpoints</h2>
 <table>
   <thead>
     <tr><th>Method</th><th>Path</th><th>Description</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>GET</code></td><td><code>/api/camera/preview</code></td><td>MJPEG live preview stream</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/camera/capture</code></td><td>Capture a single frame</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/camera/status</code></td><td>Camera connection status</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/camera/stream</code></td><td>MJPEG live preview stream</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/camera/devices</code></td><td>List available camera devices</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/camera/select</code></td><td>Select active camera device</td></tr>
   </tbody>
 </table>
 
-<h3>Payment Endpoints</h3>
+<h2>Payment Endpoints</h2>
 <table>
   <thead>
     <tr><th>Method</th><th>Path</th><th>Description</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>POST</code></td><td><code>/api/payment/create</code></td><td>Create a new QRIS payment</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/payment/{id}/status</code></td><td>Check payment status</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/payment/webhook</code></td><td>Webhook receiver for payment gateway callbacks</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/payment/create-qr</code></td><td>Create a new QRIS payment</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/payment/status/{session_id}</code></td><td>Check payment status</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/payment/webhook/{provider}</code></td><td>Webhook receiver for payment gateway callbacks</td></tr>
   </tbody>
 </table>
 
-<h3>Access Code Endpoints</h3>
+<h2>AI Endpoint</h2>
 <table>
   <thead>
     <tr><th>Method</th><th>Path</th><th>Description</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>POST</code></td><td><code>/api/codes/generate</code></td><td>Generate a batch of access codes</td></tr>
-    <tr><td><code>GET</code></td><td><code>/api/codes</code></td><td>List all access codes with filters</td></tr>
-    <tr><td><code>POST</code></td><td><code>/api/codes/{code}/redeem</code></td><td>Redeem an access code</td></tr>
-    <tr><td><code>DELETE</code></td><td><code>/api/codes/{code}</code></td><td>Revoke an access code</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/ai/analyze</code></td><td>Run AI analysis on an image (standalone)</td></tr>
+  </tbody>
+</table>
+
+<h2>Printer Endpoints</h2>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET</code></td><td><code>/api/v1/printer/devices</code></td><td>List detected printers</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/printer/select</code></td><td>Select active printer</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/v1/printer/status</code></td><td>Get printer connection status</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/v1/printer/test</code></td><td>Send test print</td></tr>
   </tbody>
 </table>
 

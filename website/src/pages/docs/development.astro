@@ -80,6 +80,8 @@ cd frontend && npx tsc --noEmit</code></pre>
 │   │   ├── models/          # SQLAlchemy models
 │   │   ├── api/v1/endpoints/ # API route handlers
 │   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── ai/              # AI provider adapters (OpenAI, Anthropic, Google, Ollama, Mock)
+│   │   ├── payment/         # Payment provider adapters (Midtrans, Xendit, Mock)
 │   │   ├── utils/           # Utilities (dithering, ESC/POS, image processing)
 │   │   └── services/        # Business logic
 │   ├── tests/               # Backend tests
@@ -90,8 +92,8 @@ cd frontend && npx tsc --noEmit</code></pre>
 │   │   ├── stores/          # Zustand stores
 │   │   ├── pages/           # Page components
 │   │   ├── hooks/           # Custom React hooks
-│   │   └── api/             # API client + typed endpoint functions
-│   └── __tests__/           # Frontend tests
+│   │   ├── api/             # API client + typed endpoint functions
+│   │   └── __tests__/       # Frontend tests
 ├── docs/                    # Project documentation
 ├── scripts/                 # Operational scripts
 └── config/                  # Static configuration files</code></pre>

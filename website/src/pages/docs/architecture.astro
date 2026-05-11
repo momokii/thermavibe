@@ -50,7 +50,7 @@ const content = `
 <p>The backend follows a strict three-layer architecture. No layer may be skipped:</p>
 
 <h3>Routes (API Layer)</h3>
-<p>FastAPI route handlers in <code>app/routes/</code> handle HTTP request parsing, response formatting, and input validation via Pydantic schemas. Routes never contain business logic.</p>
+<p>FastAPI route handlers in <code>app/api/v1/endpoints/</code> handle HTTP request parsing, response formatting, and input validation via Pydantic schemas. Routes never contain business logic.</p>
 
 <h3>Services (Business Logic Layer)</h3>
 <p>Service classes in <code>app/services/</code> contain all business logic. The most important service is <code>session_service.py</code>, which implements the kiosk state machine.</p>

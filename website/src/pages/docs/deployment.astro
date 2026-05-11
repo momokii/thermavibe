@@ -54,7 +54,7 @@ make prod</code></pre>
 
 <h2>Backup</h2>
 <p>The database stores all session data, analytics, and configuration. Back it up regularly:</p>
-<pre><code>docker compose exec db pg_dump -U vibeprint vibeprint > backup.sql</code></pre>
+<pre><code>docker compose exec postgres pg_dump -U thermavibe thermavibe > backup.sql</code></pre>
 
 <h2>Reverse Proxy (Optional)</h2>
 <p>If you need HTTPS or want to serve on a custom domain, place a reverse proxy (nginx or Caddy) in front of the containers. In production mode, the backend serves both the API and the frontend SPA on port 8000.</p>

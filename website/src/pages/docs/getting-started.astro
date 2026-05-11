@@ -30,9 +30,17 @@ cd thermavibe</code></pre>
 
 <h3>3. Start the stack</h3>
 <pre><code>make dev</code></pre>
-<p>This runs <code>docker compose up</code> with the development overlay, starting the backend API, frontend UI, and PostgreSQL database.</p>
+<p>This runs <code>docker compose up</code> with the development overlay, starting the backend API and PostgreSQL database.</p>
 
-<h3>4. Access the application</h3>
+	<h3>4. Start the frontend dev server</h3>
+	<pre><code>cd frontend
+	npm install
+	npm run dev</code></pre>
+	<p>The frontend dev server runs at <code>http://localhost:5173</code> with HMR and auto-proxies API requests to the backend.</p>
+
+	<h3>5. Access the application</h3>
+
+<h3>6. Access the application</h3>
 <table>
   <thead>
     <tr><th>Service</th><th>URL</th></tr>
@@ -42,6 +50,7 @@ cd thermavibe</code></pre>
     <tr><td>Admin Dashboard</td><td><a href="http://localhost:5173/admin">http://localhost:5173/admin</a></td></tr>
     <tr><td>Backend API</td><td><a href="http://localhost:8000">http://localhost:8000</a></td></tr>
     <tr><td>API Docs (Swagger)</td><td><a href="http://localhost:8000/docs">http://localhost:8000/docs</a></td></tr>
+    <tr><td>Health Check</td><td><a href="http://localhost:8000/health">http://localhost:8000/health</a></td></tr>
   </tbody>
 </table>
 
