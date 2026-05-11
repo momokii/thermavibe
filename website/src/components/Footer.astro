@@ -3,46 +3,46 @@ const currentYear = new Date().getFullYear();
 ---
 
 <footer style="border-top: 1px solid var(--border);">
-  <div style="max-width: 72rem; margin: 0 auto; padding: 5rem 1.5rem 3rem;">
-    <div style="display: grid; grid-template-columns: repeat(1, 1fr); gap: 3rem;">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 2.5rem 1.5rem 2rem;">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 3rem;">
       <!-- Brand -->
-      <div>
+      <div style="flex: 1 1 14rem;">
         <a href="/" style="font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 700; text-decoration: none;">
           <span class="text-gradient-vibe">VibePrint OS</span>
         </a>
-        <p style="margin-top: 1rem; font-size: 0.9375rem; line-height: 1.65; color: var(--text-3); max-width: 20rem;">
+        <p style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.6; color: var(--text-3); max-width: 16rem;">
           Open-source kiosk software for AI-powered photobooths.
         </p>
       </div>
 
       <!-- Docs -->
       <div>
-        <p style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 1rem;">
+        <p style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 0.625rem;">
           Docs
         </p>
-        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;">
-          <li><a href="/docs/getting-started" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Getting Started</a></li>
-          <li><a href="/docs/architecture" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Architecture</a></li>
-          <li><a href="/docs/configuration" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Configuration</a></li>
-          <li><a href="/docs/deployment" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Deployment</a></li>
-          <li><a href="/docs/api-reference" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">API Reference</a></li>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+          <li><a href="/docs/getting-started" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Getting Started</a></li>
+          <li><a href="/docs/architecture" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Architecture</a></li>
+          <li><a href="/docs/configuration" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Configuration</a></li>
+          <li><a href="/docs/deployment" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">Deployment</a></li>
+          <li><a href="/docs/api-reference" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">API Reference</a></li>
         </ul>
       </div>
 
       <!-- Community -->
       <div>
-        <p style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 1rem;">
+        <p style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 0.625rem;">
           Community
         </p>
-        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;">
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
           <li>
-            <a href="https://github.com/momokii/thermavibe" target="_blank" rel="noopener noreferrer" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); display: inline-flex; align-items: center; gap: 0.375rem; transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">
+            <a href="https://github.com/momokii/thermavibe" target="_blank" rel="noopener noreferrer" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); display: inline-flex; align-items: center; gap: 0.375rem; transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">
               GitHub
               <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" /></svg>
             </a>
           </li>
           <li>
-            <a href="https://github.com/momokii/thermavibe/issues" target="_blank" rel="noopener noreferrer" style="font-size: 0.9375rem; text-decoration: none; color: var(--text-2); display: inline-flex; align-items: center; gap: 0.375rem; transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">
+            <a href="https://github.com/momokii/thermavibe/issues" target="_blank" rel="noopener noreferrer" style="font-size: 0.875rem; text-decoration: none; color: var(--text-2); display: inline-flex; align-items: center; gap: 0.375rem; transition: color 200ms;" onMouseEnter="this.style.color='var(--text)'" onMouseLeave="this.style.color='var(--text-2)'">
               Report Issue
               <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" /></svg>
             </a>
@@ -51,16 +51,8 @@ const currentYear = new Date().getFullYear();
       </div>
     </div>
 
-    <style>
-      @media (min-width: 768px) {
-        footer > div > div:first-child { grid-column: span 1; }
-        footer > div > div { }
-        footer > div { grid-template-columns: 2fr 1fr 1fr; }
-      }
-    </style>
-
     <!-- Bottom -->
-    <div style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); text-align: center;">
+    <div style="margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
       <p style="font-size: 0.8125rem; color: var(--text-3);">
         &copy; {currentYear} VibePrint OS contributors. MIT License.
       </p>

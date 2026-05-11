@@ -15,15 +15,13 @@ import FeatureCard from './FeatureCard.astro';
     </div>
 
     <!-- Grid -->
-    <div style="display: grid; grid-template-columns: repeat(1, 1fr); gap: 1px; background: var(--border); border-radius: 1rem; overflow: hidden;">
+    <div style="display: grid; grid-template-columns: repeat(1, 1fr); gap: 1.25rem;">
       {features.map((feature, i) => (
-        <div style="background: var(--bg);">
-          <FeatureCard
-            title={feature.title}
-            description={feature.description}
-            icon={feature.icon}
-          />
-        </div>
+        <FeatureCard
+          title={feature.title}
+          description={feature.description}
+          icon={feature.icon}
+        />
       ))}
     </div>
 
