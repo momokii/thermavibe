@@ -68,7 +68,8 @@ const content = `
     <tr><td><code>POST</code></td><td><code>/api/v1/admin/hardware/printer/test</code></td><td>Send test print</td></tr>
     <tr><td><code>GET</code></td><td><code>/api/v1/admin/access-codes</code></td><td>List access codes with filters</td></tr>
     <tr><td><code>POST</code></td><td><code>/api/v1/admin/access-codes</code></td><td>Generate a batch of access codes</td></tr>
-    <tr><td><code>DELETE</code></td><td><code>/api/v1/admin/access-codes/{id}</code></td><td>Revoke an access code</td></tr>
+    <tr><td><code>PATCH</code></td><td><code>/api/v1/admin/access-codes/{id}/revoke</code></td><td>Revoke an access code</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/v1/admin/access-codes/{id}</code></td><td>Hard-delete an access code</td></tr>
     <tr><td><code>GET</code></td><td><code>/api/v1/admin/vibe-check/results</code></td><td>Browse vibe check gallery</td></tr>
     <tr><td><code>GET</code></td><td><code>/api/v1/admin/photobooth/strips</code></td><td>Browse photobooth strip gallery</td></tr>
     <tr><td><code>POST</code></td><td><code>/api/v1/admin/gallery/{id}/print</code></td><td>Manually reprint from gallery</td></tr>
