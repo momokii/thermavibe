@@ -94,7 +94,7 @@ const content = `
 
 <h3>Database migration errors</h3>
 <p><strong>Symptom:</strong> <code>alembic upgrade head</code> fails with relation errors.</p>
-<p><strong>Solutions:</strong>
+<p><strong>Solutions:</strong></p>
 <ul>
   <li>Check the current migration version: <code>docker compose exec app alembic current</code></li>
   <li>For a fresh start: <code>make clean</code> (warning: deletes all data) then <code>make prod</code></li>
