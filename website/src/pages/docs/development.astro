@@ -1,0 +1,128 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'Development';
+const currentPage = '/docs/development';
+
+const content = `
+<h2>Local Development Setup</h2>
+<p>Set up your local environment for contributing to VibePrint OS.</p>
+
+<h3>Prerequisites</h3>
+<ul>
+  <li>Python 3.12+</li>
+  <li>Node.js 20+</li>
+  <li>Docker and Docker Compose</li>
+  <li>Git</li>
+</ul>
+
+<h3>1. Clone and configure</h3>
+<pre><code>git clone https://github.com/momokii/thermavibe.git
+cd thermavibe
+cp .env.example .env</code></pre>
+
+<h3>2. Start the database</h3>
+<pre><code>docker compose up db -d</code></pre>
+<p>Only the database runs in Docker during development. The backend and frontend run natively for faster hot-reload.</p>
+
+<h3>3. Run the backend</h3>
+<pre><code>cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000</code></pre>
+
+<h3>4. Run the frontend</h3>
+<pre><code>cd frontend
+npm install
+npm run dev</code></pre>
+<p>The frontend dev server starts on port 5173 and proxies API calls to the backend on port 8000.</p>
+
+<h2>Test Commands</h2>
+
+<h3>Backend</h3>
+<pre><code># Run all tests
+cd backend && python -m pytest tests/ -v
+
+# Run a specific test file
+python -m pytest tests/test_session_service.py -v
+
+# Run with coverage
+python -m pytest tests/ -v --cov=app</code></pre>
+
+<h3>Frontend</h3>
+<pre><code># Run all tests
+cd frontend && npm test
+
+# Run tests in watch mode
+npm run test:watch</code></pre>
+
+<h2>Lint Commands</h2>
+<pre><code># Lint backend (Ruff)
+cd backend && ruff check app/ tests/
+
+# Lint frontend (ESLint)
+cd frontend && npm run lint
+
+# Type check frontend
+cd frontend && npx tsc --noEmit</code></pre>
+
+<h2>Project Structure</h2>
+<pre><code>thermavibe/
+├── backend/
+│   ├── app/
+│   │   ├── main.py          # FastAPI app factory
+│   │   ├── core/
+│   │   │   └── config.py    # Pydantic BaseSettings
+│   │   ├── models/          # SQLAlchemy models
+│   │   ├── routes/          # API route handlers
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   └── services/        # Business logic
+│   ├── tests/               # Backend tests
+│   └── alembic/             # Database migrations
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── stores/          # Zustand stores
+│   │   ├── pages/           # Page components
+│   │   └── lib/             # Utility functions
+│   └── tests/               # Frontend tests
+├── docs/                    # Project documentation
+├── scripts/                 # Operational scripts
+└── config/                  # Static configuration files</code></pre>
+
+<h2>Coding Standards</h2>
+<ul>
+  <li><strong>Python:</strong> PEP 8, enforced by Ruff. Max line length 120. All public functions must have docstrings. Full type hints required.</li>
+  <li><strong>TypeScript:</strong> Strict mode. Prettier + ESLint. 2-space indent. Single quotes. All public functions must have JSDoc.</li>
+  <li><strong>Commits:</strong> Conventional Commits format (<code>feat:</code>, <code>fix:</code>, <code>docs:</code>, <code>chore:</code>).</li>
+  <li><strong>Tests:</strong> Every service must have unit tests. Every API endpoint must have integration tests. Never break existing tests.</li>
+</ul>
+
+<h2>Making Changes</h2>
+<ol>
+  <li>Create a feature branch: <code>git checkout -b feat/your-feature</code></li>
+  <li>Make your changes following the layer contract (Routes → Services → Models)</li>
+  <li>Write tests for your changes</li>
+  <li>Run the full test suite and lint checks</li>
+  <li>Open a pull request against <code>main</code></li>
+</ol>
+`;
+---
+
+<BaseLayout title="Development — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>

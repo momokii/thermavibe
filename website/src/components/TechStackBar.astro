@@ -1,0 +1,19 @@
+---
+const techs = ['Python', 'FastAPI', 'React', 'TypeScript', 'Tailwind CSS', 'Docker', 'PostgreSQL', 'OpenAI'];
+---
+
+<section class="section" style="border-top: 1px solid var(--border);">
+  <div class="section-inner" style="text-align: center;">
+    <p class="section-label" style="text-align: center;">Stack</p>
+    <h2 class="section-title" style="text-align: center;">Built with tools you already know</h2>
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.625rem; margin-top: 2.5rem;">
+      {techs.map((tech) => (
+        <span
+          style="padding: 0.5rem 1.25rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; color: var(--text-2); background: var(--bg-card); border: 1px solid var(--border);"
+        >
+          {tech}
+        </span>
+      ))}
+    </div>
+  </div>
+</section>

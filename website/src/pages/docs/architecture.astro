@@ -1,0 +1,97 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'Architecture';
+const currentPage = '/docs/architecture';
+
+const content = `
+<h2>System Overview</h2>
+<p>VibePrint OS is a three-tier system: a Python/FastAPI backend, a React/TypeScript frontend, and a PostgreSQL database. Everything runs in Docker containers orchestrated by Docker Compose.</p>
+
+<pre><code>┌─────────────────────────────────────────────────┐
+│                   Frontend (React)                │
+│  ┌──────────┐  ┌──────────────┐  ┌───────────┐  │
+│  │ Kiosk UI │  │ Admin Panel  │  │  Gallery  │  │
+│  └────┬─────┘  └──────┬───────┘  └───────────┘  │
+│       │               │                          │
+│       └───────┬───────┘                          │
+│               │ REST API                         │
+└───────────────┼──────────────────────────────────┘
+                │
+┌───────────────┼──────────────────────────────────┐
+│               ▼   Backend (FastAPI)               │
+│  ┌──────────┐  ┌───────────┐  ┌──────────────┐  │
+│  │  Routes   │→ │ Services  │→ │   Models     │  │
+│  └──────────┘  └─────┬─────┘  └──────────────┘  │
+│                      │                            │
+│       ┌──────────────┼──────────────┐            │
+│       ▼              ▼              ▼            │
+│  ┌─────────┐  ┌───────────┐  ┌──────────┐      │
+│  │  Camera  │  │  Printer  │  │   AI     │      │
+│  │ (OpenCV) │  │ (ESC/POS) │  │Providers │      │
+│  └─────────┘  └───────────┘  └──────────┘      │
+│                      │                            │
+│       ┌──────────────┼──────────────┐            │
+│       ▼              ▼              ▼            │
+│  ┌─────────┐  ┌───────────┐  ┌──────────┐      │
+│  │ Payment  │  │  Access   │  │  Session │      │
+│  │ (QRIS)   │  │  Codes    │  │ Manager  │      │
+│  └─────────┘  └───────────┘  └──────────┘      │
+└──────────────────────────────────────────────────┘
+                │
+                ▼
+         ┌─────────────┐
+         │ PostgreSQL   │
+         └─────────────┘</code></pre>
+
+<h2>Layer Contract</h2>
+<p>The backend follows a strict three-layer architecture. No layer may be skipped:</p>
+
+<h3>Routes (API Layer)</h3>
+<p>FastAPI route handlers in <code>app/routes/</code> handle HTTP request parsing, response formatting, and input validation via Pydantic schemas. Routes never contain business logic.</p>
+
+<h3>Services (Business Logic Layer)</h3>
+<p>Service classes in <code>app/services/</code> contain all business logic. The most important service is <code>session_service.py</code>, which implements the kiosk state machine.</p>
+
+<h3>Models (Data Layer)</h3>
+<p>SQLAlchemy 2.0 async models in <code>app/models/</code> define the database schema. All database operations use async sessions and are accessed exclusively through services.</p>
+
+<h2>Kiosk State Machine</h2>
+<p>The core of VibePrint OS is the session state machine. Each guest interaction follows this flow:</p>
+<pre><code>IDLE → ACTIVE → CAPTURE → PROCESSING → PRINTING → COMPLETE
+         │
+         └→ EXPIRED (timeout)</code></pre>
+<ul>
+  <li><strong>IDLE</strong> — Waiting for a guest to start (tap screen or scan access code)</li>
+  <li><strong>ACTIVE</strong> — Guest is in the session, selecting options</li>
+  <li><strong>CAPTURE</strong> — Camera is taking photos</li>
+  <li><strong>PROCESSING</strong> — AI is generating the vibe reading or applying filters</li>
+  <li><strong>PRINTING</strong> — Thermal printer is outputting the receipt or photo strip</li>
+  <li><strong>COMPLETE</strong> — Session finished, data saved, back to IDLE</li>
+  <li><strong>EXPIRED</strong> — Session timed out (configurable duration)</li>
+</ul>
+
+<h2>Frontend Architecture</h2>
+<p>The frontend is a React 19 single-page application using Zustand for state management. It communicates with the backend exclusively via REST API. The frontend never talks directly to hardware — the only exception is the MJPEG camera preview stream, which is served from the backend.</p>
+<p>There are two distinct UIs: the <strong>Kiosk UI</strong> (public-facing, touch-optimized) and the <strong>Admin Dashboard</strong> (operator-facing, analytics and configuration).</p>
+
+<h2>Payment Flow</h2>
+<p>When payments are enabled, the flow is: Guest initiates session → Backend creates QRIS payment via provider (Midtrans/Xendit) → Frontend displays QR code → Frontend polls backend for payment status → On success, session continues. Payment webhooks from the gateway are received by the backend directly.</p>
+`;
+---
+
+<BaseLayout title="Architecture — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>

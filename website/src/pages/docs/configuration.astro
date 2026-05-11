@@ -1,0 +1,79 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'Configuration';
+const currentPage = '/docs/configuration';
+
+const content = `
+<h2>Two-Tier Configuration</h2>
+<p>VibePrint OS uses a two-tier configuration system:</p>
+<ol>
+  <li><strong>Environment variables</strong> (<code>.env</code> file) — Infrastructure settings like database URLs, API keys, and hardware paths. These require a restart to apply.</li>
+  <li><strong>Admin panel</strong> (<code>/admin</code> in the UI) — Runtime settings like pricing, templates, AI prompts, and access codes. Changes take effect immediately without restart.</li>
+</ol>
+
+<h2>Environment Variables</h2>
+<p>Copy <code>.env.example</code> to <code>.env</code> and fill in the values. All settings use Pydantic BaseSettings with type validation.</p>
+
+<table>
+  <thead>
+    <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>DATABASE_URL</code></td><td><code>postgresql+asyncpg://...</code></td><td>PostgreSQL connection string (async driver required)</td></tr>
+    <tr><td><code>AI_PROVIDER</code></td><td><code>mock</code></td><td>AI provider: <code>openai</code>, <code>anthropic</code>, <code>google</code>, <code>ollama</code>, or <code>mock</code></td></tr>
+    <tr><td><code>OPENAI_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=openai</code></td></tr>
+    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=anthropic</code></td></tr>
+    <tr><td><code>GOOGLE_API_KEY</code></td><td>—</td><td>Required when <code>AI_PROVIDER=google</code></td></tr>
+    <tr><td><code>OLLAMA_BASE_URL</code></td><td><code>http://localhost:11434</code></td><td>Ollama server URL (for local AI)</td></tr>
+    <tr><td><code>PAYMENT_PROVIDER</code></td><td><code>mock</code></td><td>Payment provider: <code>midtrans</code>, <code>xendit</code>, or <code>mock</code></td></tr>
+    <tr><td><code>PAYMENT_ENABLED</code></td><td><code>false</code></td><td>Toggle payment requirement for sessions</td></tr>
+    <tr><td><code>MIDTRANS_SERVER_KEY</code></td><td>—</td><td>Midtrans server key (when using Midtrans)</td></tr>
+    <tr><td><code>XENDIT_SECRET_KEY</code></td><td>—</td><td>Xendit secret key (when using Xendit)</td></tr>
+    <tr><td><code>PRINTER_USB_VENDOR</code></td><td>auto-detect</td><td>USB vendor ID for the thermal printer</td></tr>
+    <tr><td><code>PRINTER_USB_PRODUCT</code></td><td>auto-detect</td><td>USB product ID for the thermal printer</td></tr>
+    <tr><td><code>CAMERA_DEVICE_INDEX</code></td><td><code>0</code></td><td>Camera device index for OpenCV capture</td></tr>
+    <tr><td><code>SESSION_TIMEOUT_SECONDS</code></td><td><code>300</code></td><td>Seconds before an inactive session expires</td></tr>
+  </tbody>
+</table>
+
+<h2>Admin Panel Categories</h2>
+<p>The admin dashboard at <code>/admin</code> provides runtime configuration for:</p>
+
+<table>
+  <thead>
+    <tr><th>Category</th><th>Settings</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Kiosk Settings</td><td>Session timeout, idle screen content, default language, touch sounds</td></tr>
+    <tr><td>AI Configuration</td><td>Model selection, system prompt, temperature, max tokens</td></tr>
+    <tr><td>Print Templates</td><td>Receipt layout, photo strip dimensions, logo upload, footer text</td></tr>
+    <tr><td>Pricing</td><td>Price per session, currency, discounts, free mode toggle</td></tr>
+    <tr><td>Access Codes</td><td>Batch generation, expiry settings, QR code format, redemption limits</td></tr>
+    <tr><td>Hardware</td><td>Camera resolution, printer paper width, test print button</td></tr>
+  </tbody>
+</table>
+
+<h2>AI Provider Fallback</h2>
+<p>When the primary AI provider fails (rate limit, network error, invalid key), VibePrint OS automatically falls back to the mock provider so the kiosk keeps running. Guests will receive a generated personality reading instead of an AI-analyzed one. Check the admin dashboard logs to see fallback events.</p>
+
+<h2>Payment Toggle</h2>
+<p>Set <code>PAYMENT_ENABLED=false</code> in <code>.env</code> to run the kiosk in free mode. This is useful for events where access is controlled by codes instead of per-session payments. The mock provider simulates successful payments for development and testing.</p>
+`;
+---
+
+<BaseLayout title="Configuration — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>

@@ -1,0 +1,12 @@
+---
+interface Props {
+  tag?: string;
+}
+
+const { tag = 'span' } = Astro.props;
+const Tag = tag as any;
+---
+
+<Tag class="text-gradient-vibe">
+  <slot />
+</Tag>

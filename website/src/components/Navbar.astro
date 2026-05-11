@@ -1,0 +1,88 @@
+---
+import { mainNav } from '../data/nav';
+---
+
+<header
+  style="position: sticky; top: 0; z-index: 50; background: rgba(9, 9, 11, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);"
+>
+  <nav style="max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; height: 4rem; display: flex; align-items: center; justify-content: space-between;">
+    <!-- Logo -->
+    <a href="/" style="font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 700; text-decoration: none; color: var(--text);">
+      <span class="text-gradient-vibe">VibePrint OS</span>
+    </a>
+
+    <!-- Desktop nav -->
+    <div style="display: none; align-items: center; gap: 0.25rem;" class="md-flex">
+      {mainNav.map((item) => (
+        <a
+          href={item.href}
+          style="padding: 0.5rem 0.875rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; color: var(--text-3); transition: color 200ms;"
+          onMouseEnter="this.style.color='var(--text)'"
+          onMouseLeave="this.style.color='var(--text-3)'"
+          target={item.external ? '_blank' : undefined}
+          rel={item.external ? 'noopener noreferrer' : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+      <a href="/docs/getting-started" class="btn-primary" style="margin-left: 0.5rem; padding: 0.5rem 1.25rem; font-size: 0.8125rem;">
+        Get Started
+      </a>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button
+      id="mobile-menu-toggle"
+      style="padding: 0.5rem; color: var(--text-3); background: none; border: none; cursor: pointer;"
+      aria-label="Open menu"
+    >
+      <svg style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </nav>
+  <style>
+    @media (min-width: 768px) {
+      .md-flex { display: flex !important; }
+      #mobile-menu-toggle { display: none; }
+    }
+  </style>
+</header>
+
+<div id="mobile-menu-root"></div>
+
+<script>
+  const toggle = document.getElementById('mobile-menu-toggle');
+  const root = document.getElementById('mobile-menu-root');
+  let menuOpen = false;
+
+  if (toggle && root) {
+    toggle.addEventListener('click', async () => {
+      menuOpen = !menuOpen;
+      if (menuOpen) {
+        const { createRoot } = await import('react-dom/client');
+        const React = await import('react');
+        const { default: MobileMenu } = await import('./MobileMenu.tsx');
+
+        const wrapper = document.createElement('div');
+        while (root.firstChild) {
+          root.removeChild(root.firstChild);
+        }
+        root.appendChild(wrapper);
+
+        const rootEl = createRoot(wrapper);
+        rootEl.render(
+          React.createElement(MobileMenu, {
+            onClose: () => {
+              menuOpen = false;
+              rootEl.unmount();
+              while (root.firstChild) {
+                root.removeChild(root.firstChild);
+              }
+            },
+          })
+        );
+      }
+    });
+  }
+</script>

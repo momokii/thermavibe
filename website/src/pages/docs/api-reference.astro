@@ -1,0 +1,105 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'API Reference';
+const currentPage = '/docs/api-reference';
+
+const content = `
+<h2>Overview</h2>
+<p>VibePrint OS exposes a RESTful API built with FastAPI. All endpoints return JSON. The full interactive documentation is available at <code>/docs</code> (Swagger UI) or <code>/redoc</code> (ReDoc) on your running backend instance.</p>
+
+<h2>Endpoint Groups</h2>
+
+<h3>Kiosk Session Endpoints</h3>
+<p>These endpoints manage the guest-facing kiosk flow — creating sessions, capturing photos, triggering AI analysis, and printing.</p>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions</code></td><td>Create a new kiosk session</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/kiosk/sessions/{id}</code></td><td>Get session status and state</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/capture</code></td><td>Trigger photo capture</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/analyze</code></td><td>Run AI analysis on captured photo</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/print</code></td><td>Send print job to thermal printer</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/kiosk/sessions/{id}/cancel</code></td><td>Cancel an active session</td></tr>
+  </tbody>
+</table>
+
+<h3>Admin Endpoints</h3>
+<p>Operator-facing endpoints for dashboard analytics, configuration, and management.</p>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET</code></td><td><code>/api/admin/stats/summary</code></td><td>Dashboard summary statistics</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/admin/stats/revenue</code></td><td>Revenue data with time range</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/admin/stats/sessions</code></td><td>Session history and counts</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/admin/stats/heatmap</code></td><td>Revenue heatmap data</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/admin/stats/funnel</code></td><td>Drop-off funnel analytics</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/admin/config</code></td><td>Get current runtime configuration</td></tr>
+    <tr><td><code>PATCH</code></td><td><code>/api/admin/config</code></td><td>Update runtime configuration</td></tr>
+  </tbody>
+</table>
+
+<h3>Camera Endpoints</h3>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET</code></td><td><code>/api/camera/preview</code></td><td>MJPEG live preview stream</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/camera/capture</code></td><td>Capture a single frame</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/camera/status</code></td><td>Camera connection status</td></tr>
+  </tbody>
+</table>
+
+<h3>Payment Endpoints</h3>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST</code></td><td><code>/api/payment/create</code></td><td>Create a new QRIS payment</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/payment/{id}/status</code></td><td>Check payment status</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/payment/webhook</code></td><td>Webhook receiver for payment gateway callbacks</td></tr>
+  </tbody>
+</table>
+
+<h3>Access Code Endpoints</h3>
+<table>
+  <thead>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST</code></td><td><code>/api/codes/generate</code></td><td>Generate a batch of access codes</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/codes</code></td><td>List all access codes with filters</td></tr>
+    <tr><td><code>POST</code></td><td><code>/api/codes/{code}/redeem</code></td><td>Redeem an access code</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/codes/{code}</code></td><td>Revoke an access code</td></tr>
+  </tbody>
+</table>
+
+<h2>Authentication</h2>
+<p>The current version runs on a trusted network (kiosk LAN). Admin endpoints are protected by a simple API key passed via the <code>X-Admin-Key</code> header. Set the key in <code>.env</code> as <code>ADMIN_API_KEY</code>.</p>
+
+<h2>Interactive Docs</h2>
+<p>For full request/response schemas, try-it-out functionality, and model definitions, visit the Swagger UI at <code>http://your-kiosk:8000/docs</code>.</p>
+`;
+---
+
+<BaseLayout title="API Reference — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>

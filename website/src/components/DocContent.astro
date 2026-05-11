@@ -1,0 +1,37 @@
+---
+interface Props {
+  title: string;
+  content: string;
+  currentPage: string;
+}
+
+const { title, content, currentPage } = Astro.props;
+
+const parts = currentPage.replace('/docs/', '').split('/');
+const breadcrumbLabel = parts[parts.length - 1]
+  .replace(/-/g, ' ')
+  .replace(/\b\w/g, (c) => c.toUpperCase());
+---
+
+<div style="flex: 1; min-width: 0; padding: 2.5rem 1.5rem;">
+  <!-- Breadcrumb -->
+  <nav style="font-size: 0.8125rem; margin-bottom: 2.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-3);">
+    <a href="/" style="text-decoration: none; color: var(--text-3);">Home</a>
+    <span>/</span>
+    <a href="/docs" style="text-decoration: none; color: var(--text-3);">Docs</a>
+    {breadcrumbLabel !== 'Docs' && (
+      <>
+        <span>/</span>
+        <span style="color: var(--text);">{breadcrumbLabel}</span>
+      </>
+    )}
+  </nav>
+
+  <!-- Title -->
+  <h1 style="font-family: 'Outfit', sans-serif; font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 700; margin-bottom: 2.5rem; color: var(--text);">
+    {title}
+  </h1>
+
+  <!-- Content -->
+  <div class="prose-docs" set:html={content} />
+</div>

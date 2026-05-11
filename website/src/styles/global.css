@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #09090b;
+  --bg-card: #111113;
+  --bg-card-hover: #18181b;
+  --bg-elevated: #1a1a1e;
+  --accent: #a78bfa;
+  --accent-dim: rgba(167, 139, 250, 0.12);
+  --accent-border: rgba(167, 139, 250, 0.2);
+  --pink: #f472b6;
+  --text: #fafafa;
+  --text-2: #a1a1aa;
+  --text-3: #71717a;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  line-height: 1.15;
+}
+
+/* ── Gradient text ── */
+.text-gradient-vibe {
+  background: linear-gradient(135deg, #a78bfa 0%, #f472b6 50%, #fb923c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: 0.625rem;
+  padding: 0.75rem 1.75rem;
+  cursor: pointer;
+  transition: all 200ms ease;
+  text-decoration: none;
+  border: none;
+  line-height: 1.4;
+}
+.btn-primary {
+  composes: btn;
+  background: #fafafa;
+  color: #09090b;
+}
+.btn-primary:hover {
+  background: #e4e4e7;
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  composes: btn;
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: rgba(255,255,255,0.03);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.75rem;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.card:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+/* ── Section spacing ── */
+.section {
+  padding: 7rem 1.5rem;
+}
+@media (min-width: 768px) {
+  .section { padding: 8rem 2rem; }
+}
+
+.section-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+/* ── Section heading ── */
+.section-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.section-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.section-desc {
+  font-size: 1.125rem;
+  color: var(--text-2);
+  line-height: 1.7;
+  max-width: 36rem;
+}
+
+/* ── Prose (docs) ── */
+.prose-docs {
+  max-width: 48rem;
+  line-height: 1.8;
+  color: var(--text-2);
+}
+.prose-docs h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text); }
+.prose-docs h2 { font-size: 1.5rem; font-weight: 600; margin-top: 3rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); color: var(--text); }
+.prose-docs h3 { font-size: 1.25rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--text); }
+.prose-docs p { margin-bottom: 1.25rem; font-size: 1rem; }
+.prose-docs a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-docs a:hover { color: #c4b5fd; }
+.prose-docs ul, .prose-docs ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
+.prose-docs li { margin-bottom: 0.5rem; }
+.prose-docs code { background: var(--bg-elevated); padding: 2px 8px; border-radius: 6px; font-size: 0.875em; color: var(--accent); }
+.prose-docs pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; overflow-x: auto; margin-bottom: 1.5rem; }
+.prose-docs pre code { background: none; padding: 0; border-radius: 0; color: var(--text-2); }
+.prose-docs table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+.prose-docs th { text-align: left; padding: 0.75rem 1rem; background: var(--bg-card); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); }
+.prose-docs td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.prose-docs blockquote { border-left: 3px solid var(--accent); padding-left: 1.25rem; margin-bottom: 1.25rem; color: var(--text-3); font-style: italic; }

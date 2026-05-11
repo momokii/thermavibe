@@ -1,0 +1,118 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'Troubleshooting';
+const currentPage = '/docs/troubleshooting';
+
+const content = `
+<h2>Printer Issues</h2>
+
+<h3>Printer not found</h3>
+<p><strong>Symptom:</strong> The backend logs show "No USB printer detected" or the print endpoint returns an error.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Verify the printer is connected and powered on: <code>lsusb</code> should list the device</li>
+  <li>Check that the user running Docker has USB access: <code>ls -la /dev/bus/usb/*/*</code></li>
+  <li>If using a USB-to-parallel bridge chip (vendor ID <code>0fe6</code>), note that <code>is_online()</code> status checks do not work with bridge chips. VibePrint OS uses sysfs checks instead.</li>
+  <li>Try setting <code>PRINTER_USB_VENDOR</code> and <code>PRINTER_USB_PRODUCT</code> explicitly in <code>.env</code></li>
+  <li>On some systems, you need udev rules to allow non-root access to USB devices</li>
+</ul>
+
+<h3>Printed output is garbled</h3>
+<p><strong>Symptom:</strong> The thermal printer outputs random characters or blank paper.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Verify the paper width matches your config (58mm vs 80mm)</li>
+  <li>Check that the printer supports ESC/POS commands (most thermal receipt printers do)</li>
+  <li>Some USB-to-parallel adapters have known issues. Try a direct USB connection if possible</li>
+  <li>Test with a raw ESC/POS test print: use the "Test Print" button in the admin panel hardware settings</li>
+</ul>
+
+<h3>Printer disconnects after power cycle</h3>
+<p><strong>Symptom:</strong> After turning the printer off and on, printing stops working.</p>
+<p><strong>Solution:</strong> VibePrint OS implements a 3-attempt USB reconnection strategy for known bridge chips. If the issue persists, restart the backend container: <code>docker compose restart backend</code></p>
+
+<h2>Camera Issues</h2>
+
+<h3>Camera not found</h3>
+<p><strong>Symptom:</strong> The backend logs show "Camera device not available" or the preview stream is black.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>List available video devices: <code>ls /dev/video*</code></li>
+  <li>Try a different device index in <code>.env</code>: <code>CAMERA_DEVICE_INDEX=1</code> or <code>CAMERA_DEVICE_INDEX=2</code></li>
+  <li>Ensure no other application is using the camera (close Cheese, OBS, etc.)</li>
+  <li>For Docker, the camera device must be passed through: check <code>docker-compose.yml</code> for device mappings</li>
+  <li>Test manually: <code>ffplay /dev/video0</code> or <code>v4l2-ctl --list-devices</code></li>
+</ul>
+
+<h3>Preview stream is laggy</h3>
+<p><strong>Symptom:</strong> The MJPEG preview on the kiosk UI has high latency.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Lower the camera resolution in admin panel hardware settings</li>
+  <li>Reduce MJPEG quality in the configuration</li>
+  <li>Ensure USB 2.0+ connection for the camera (USB 1.1 is too slow for video)</li>
+</ul>
+
+<h2>Payment Issues</h2>
+
+<h3>QR code not generating</h3>
+<p><strong>Symptom:</strong> The payment screen shows an error instead of a QR code.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Verify your payment provider API keys are correct in <code>.env</code></li>
+  <li>Check that <code>PAYMENT_ENABLED=true</code> is set</li>
+  <li>For development, use <code>PAYMENT_PROVIDER=mock</code> to bypass real payment gateways</li>
+  <li>Check backend logs for payment provider error responses</li>
+</ul>
+
+<h3>Webhook not received</h3>
+<p><strong>Symptom:</strong> Payments complete in Midtrans/Xendit dashboard but sessions stay in "waiting for payment" state.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Ensure the webhook URL in your payment provider dashboard points to your server's public URL</li>
+  <li>The webhook endpoint is <code>POST /api/payment/webhook</code></li>
+  <li>If behind a reverse proxy, verify the proxy forwards the request body and headers correctly</li>
+</ul>
+
+<h2>Docker Issues</h2>
+
+<h3>Containers keep restarting</h3>
+<p><strong>Symptom:</strong> <code>docker compose ps</code> shows containers in a restart loop.</p>
+<p><strong>Solutions:</strong></p>
+<ul>
+  <li>Check logs: <code>docker compose logs backend</code> or <code>docker compose logs frontend</code></li>
+  <li>The most common cause is a missing or invalid <code>.env</code> file</li>
+  <li>Database connection failures: ensure the <code>db</code> container is healthy before the backend starts</li>
+</ul>
+
+<h3>Port already in use</h3>
+<p><strong>Symptom:</strong> Docker reports "port 8000 already allocated" or "port 5173 already allocated".</p>
+<p><strong>Solution:</strong> Stop the conflicting service or change the ports in <code>docker-compose.yml</code>.</p>
+
+<h3>Database migration errors</h3>
+<p><strong>Symptom:</strong> <code>alembic upgrade head</code> fails with relation errors.</p>
+<p><strong>Solutions:</strong>
+<ul>
+  <li>Check the current migration version: <code>docker compose exec backend alembic current</code></li>
+  <li>For a fresh start: <code>docker compose down -v</code> (warning: deletes all data) then <code>docker compose up -d</code></li>
+  <li>Never change database column types without creating a new Alembic migration</li>
+</ul>
+`;
+---
+
+<BaseLayout title="Troubleshooting — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>

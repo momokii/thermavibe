@@ -483,24 +483,6 @@ Full documentation is in the [`docs/`](docs/) directory:
 
 ---
 
-## Project Website
-
-A marketing/documentation website built with Astro + Tailwind CSS. Serves as the public-facing landing page for the project.
-
-```bash
-# Local development
-make website-dev
-
-# Docker deployment
-make website-build
-make website-up      # http://localhost:3000
-make website-down
-```
-
-Gallery demo images (GIFs, screenshots) go in `website/public/images/gallery/`. See that folder's README for details.
-
----
-
 ## Known Limitations
 
 - **No CI/CD pipeline**: No automated build/test/deploy pipeline yet.

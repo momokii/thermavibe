@@ -49,6 +49,9 @@ docker-data/
 Thumbs.db
 *.log
 
+# Astro (website)
+website/.astro/
+
 # Alembic (keep versions/ tracked)
 alembic/versions/*.pyc
 .docker-compose.devices.yml

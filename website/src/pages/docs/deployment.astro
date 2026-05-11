@@ -1,0 +1,90 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocSidebar from '../../components/DocSidebar.astro';
+import DocContent from '../../components/DocContent.astro';
+
+const title = 'Deployment';
+const currentPage = '/docs/deployment';
+
+const content = `
+<h2>Production Deployment</h2>
+<p>Follow these steps to deploy VibePrint OS to a production kiosk machine.</p>
+
+<h3>1. Prepare the environment</h3>
+<pre><code>git clone https://github.com/momokii/thermavibe.git
+cd thermavibe
+cp .env.production .env</code></pre>
+<p>Edit <code>.env</code> and fill in your production values:</p>
+<ul>
+  <li>Set a strong <code>DATABASE_URL</code> with a secure password</li>
+  <li>Set <code>AI_PROVIDER</code> to your chosen provider and add the corresponding API key</li>
+  <li>Set <code>PAYMENT_PROVIDER</code> to <code>midtrans</code> or <code>xendit</code> and add production keys</li>
+  <li>Set <code>PAYMENT_ENABLED=true</code> if you want to charge per session</li>
+</ul>
+
+<h3>2. Deploy the stack</h3>
+<pre><code>make deploy</code></pre>
+<p>This runs Docker Compose in production mode with optimized builds, health checks, and automatic restart policies.</p>
+
+<h3>3. Run database migrations</h3>
+<pre><code>docker compose exec backend alembic upgrade head</code></pre>
+<p>This runs any pending database migrations. Run this after every update.</p>
+
+<h3>4. Verify the deployment</h3>
+<pre><code># Check that all containers are running
+docker compose ps
+
+# Test the health endpoint
+curl http://localhost:8000/health
+
+# Check the API docs are accessible
+curl -s http://localhost:8000/docs | head -20</code></pre>
+
+<h2>Systemd Auto-Start</h2>
+<p>To ensure the kiosk starts automatically on boot, create a systemd service:</p>
+<pre><code>[Unit]
+Description=VibePrint OS Kiosk
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/thermavibe
+ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.yml down
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+<p>Save this as <code>/etc/systemd/system/vibeprint.service</code>, then enable it:</p>
+<pre><code>sudo systemctl enable vibeprint
+sudo systemctl start vibeprint</code></pre>
+
+<h2>Updates</h2>
+<p>To update to the latest version:</p>
+<pre><code>git pull origin main
+make deploy
+docker compose exec backend alembic upgrade head</code></pre>
+
+<h2>Backup</h2>
+<p>The database stores all session data, analytics, and configuration. Back it up regularly:</p>
+<pre><code>docker compose exec db pg_dump -U vibeprint vibeprint > backup.sql</code></pre>
+
+<h2>Reverse Proxy (Optional)</h2>
+<p>If you need HTTPS or want to serve on a custom domain, place a reverse proxy (nginx or Caddy) in front of the containers. The backend listens on port 8000 and the frontend on port 5173 by default.</p>
+`;
+---
+
+<BaseLayout title="Deployment — VibePrint OS Docs">
+  <div style="max-width: 72rem; margin: 0 auto; padding: 4rem 1.5rem;">
+    <div class="doc-layout" style="display: flex; flex-direction: column;">
+      <DocSidebar currentPage={currentPage} />
+      <DocContent title={title} content={content} currentPage={currentPage} />
+    </div>
+  </div>
+  <style>
+  @media (min-width: 1024px) {
+    .doc-layout { flex-direction: row !important; }
+  }
+</style>
+</BaseLayout>
