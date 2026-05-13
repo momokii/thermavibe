@@ -116,28 +116,37 @@ echo "────────────────────────�
 # Create a temporary compose override with detected devices
 OVERRIDE_FILE=".docker-compose.devices.yml"
 
-cat > "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
+# Collect device mappings
+DEVICE_ENTRIES=()
+if [ -d /dev/bus/usb ]; then
+    DEVICE_ENTRIES+=("/dev/bus/usb:/dev/bus/usb")
+fi
+for dev in ${VIDEO_DEVICES[@]+"${VIDEO_DEVICES[@]}"}; do
+    DEVICE_ENTRIES+=("${dev}:${dev}")
+done
+
+if [ ${#DEVICE_ENTRIES[@]} -gt 0 ]; then
+    cat > "$OVERRIDE_FILE" <<OVERRIDE_EOF
 services:
   app:
     devices:
 OVERRIDE_EOF
+    for entry in "${DEVICE_ENTRIES[@]}"; do
+        echo "      - ${entry}" >> "$OVERRIDE_FILE"
+    done
 
-# Always include USB bus for thermal printer
-echo "      - /dev/bus/usb:/dev/bus/usb" >> "$OVERRIDE_FILE"
-
-# Add each detected video device
-for dev in ${VIDEO_DEVICES[@]+"${VIDEO_DEVICES[@]}"}; do
-    echo "      - ${dev}:${dev}" >> "$OVERRIDE_FILE"
-done
-
-# Add cgroup rules for hot-plug support
-cat >> "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
+    # Add cgroup rules for hot-plug support
+    cat >> "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
     device_cgroup_rules:
       - 'c 81:* rwm'
       - 'c 189:* rwm'
 OVERRIDE_EOF
 
-COMPOSE_FILES+=(-f "$OVERRIDE_FILE")
+    COMPOSE_FILES+=(-f "$OVERRIDE_FILE")
+else
+    # No devices at all — skip override file
+    rm -f "$OVERRIDE_FILE"
+fi
 
 echo ""
 echo "Starting containers..."
