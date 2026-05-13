@@ -8,50 +8,29 @@ interface Props {
 }
 
 const { id, type, title, description, image } = Astro.props;
-
-const gradients: Record<string, string> = {
-  'vibe-1': 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-  'vibe-2': 'linear-gradient(135deg, #ec4899, #8b5cf6)',
-  'vibe-3': 'linear-gradient(135deg, #f59e0b, #ef4444)',
-  'vibe-4': 'linear-gradient(135deg, #1e3a5f, #0f0a1a)',
-  'photo-1': 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-  'photo-2': 'linear-gradient(135deg, #06b6d4, #ec4899)',
-  'photo-3': 'linear-gradient(135deg, #334155, #1e293b)',
-  'photo-4': 'linear-gradient(135deg, #f97316, #ec4899)',
-};
-
-const gradient = gradients[id] || 'linear-gradient(135deg, #8b5cf6, #ec4899)';
 ---
 
 <div
   class="gallery-item"
   data-type={type}
-  style="aspect-ratio: 1; border-radius: 0.75rem; overflow: hidden; position: relative; border: 1px solid var(--border); cursor: pointer;"
+  style="border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border); background: var(--bg-elevated);"
 >
-  <!-- Background -->
-  <div
-    style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem; background: {gradient};"
-  >
-    <span style="font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: rgba(255,255,255,0.85);">
-      {title}
-    </span>
-    <span style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.375rem; color: rgba(255,255,255,0.4);">
+  <div style="aspect-ratio: 16/10; overflow: hidden; position: relative; background: var(--bg-elevated);">
+    <img
+      src={image}
+      alt={title}
+      loading="lazy"
+      style="width: 100%; height: 100%; object-fit: cover; display: block;"
+    />
+    <span
+      style="position: absolute; top: 0.75rem; left: 0.75rem; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.25rem 0.625rem; border-radius: 9999px; background: rgba(0,0,0,0.6); color: rgba(255,255,255,0.8); backdrop-filter: blur(4px);"
+    >
       {type === 'vibe-check' ? 'Vibe Check' : 'Photobooth'}
     </span>
   </div>
 
-  <!-- Hover overlay -->
-  <div
-    class="gallery-hover"
-    style="position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 1.5rem; opacity: 0; transition: opacity 300ms; background: linear-gradient(to top, rgba(9,9,11,0.9), transparent);"
-  >
-    <div>
-      <p style="font-size: 0.9375rem; font-weight: 600; color: var(--text);">{title}</p>
-      <p style="font-size: 0.8125rem; color: var(--text-3); margin-top: 0.25rem;">{description}</p>
-    </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.9375rem; font-weight: 600; color: var(--text); line-height: 1.4;">{title}</p>
+    <p style="font-size: 0.8125rem; color: var(--text-3); margin-top: 0.375rem; line-height: 1.5;">{description}</p>
   </div>
 </div>
-
-<style>
-  .gallery-item:hover .gallery-hover { opacity: 1; }
-</style>
