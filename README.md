@@ -195,7 +195,7 @@ sudo systemctl status thermavibe
 ### Stop production
 
 ```bash
-make dev-down
+make prod-down
 ```
 
 ### Update to a new version
@@ -203,6 +203,13 @@ make dev-down
 ```bash
 git pull
 make prod
+```
+
+For a clean rebuild (removes stale Docker images):
+
+```bash
+git pull
+make prod-restart
 ```
 
 ---
