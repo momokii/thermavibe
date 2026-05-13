@@ -37,6 +37,20 @@ dev-down: ## Stop all containers
 prod-down: ## Stop production containers
 	./scripts/start-docker.sh down
 
+.PHONY: prod-restart
+prod-restart: ## Full clean restart: down, remove images, rebuild production from scratch
+	./scripts/start-docker.sh down
+	@echo "Removing Docker images..."
+	docker compose down --rmi local 2>/dev/null || true
+	./scripts/start-docker.sh prod
+
+.PHONY: dev-restart
+dev-restart: ## Full clean restart: down, remove images, rebuild dev from scratch
+	./scripts/start-docker.sh down
+	@echo "Removing Docker images..."
+	docker compose down --rmi local 2>/dev/null || true
+	./scripts/start-docker.sh dev
+
 .PHONY: dev-logs
 dev-logs: ## Tail development environment logs
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f

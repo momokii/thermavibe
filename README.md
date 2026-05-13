@@ -277,8 +277,11 @@ All commands are run from the repository root. Run `make help` for the full list
 |---------|-------------|
 | `make deploy` | Validate env, build, start production, verify health |
 | `make prod` | Start production mode (auto-detects hardware) |
+| `make prod-down` | Stop production containers |
+| `make prod-restart` | Full clean restart: down, remove images, rebuild from scratch |
 | `make dev` | Start dev environment (Docker + hot-reload) |
 | `make dev-down` | Stop all containers |
+| `make dev-restart` | Full clean restart: down, remove images, rebuild from scratch |
 | `make dev-logs` | Tail dev environment logs |
 
 ### Testing & Quality

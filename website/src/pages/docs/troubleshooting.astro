@@ -97,7 +97,8 @@ const content = `
 <p><strong>Solutions:</strong></p>
 <ul>
   <li>Check the current migration version: <code>docker compose exec app alembic current</code></li>
-  <li>For a fresh start: <code>make clean</code> (warning: deletes all data) then <code>make prod</code></li>
+  <li>For a fresh start without data loss: <code>make prod-restart</code> (rebuilds images, preserves database volume)</li>
+<li>For a full reset including data: <code>make clean</code> (warning: deletes all data) then <code>make prod</code></li>
   <li>Never change database column types without creating a new Alembic migration</li>
 </ul>
 `;

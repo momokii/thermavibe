@@ -51,6 +51,9 @@ sudo systemctl start thermavibe</code></pre>
 <p>To update to the latest version:</p>
 <pre><code>git pull
 make prod</code></pre>
+<p>For a clean rebuild (removes old images and rebuilds from scratch):</p>
+<pre><code>git pull
+make prod-restart</code></pre>
 
 <h2>Backup</h2>
 <p>The database stores all session data, analytics, and configuration. Back it up regularly:</p>
