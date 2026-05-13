@@ -1,0 +1,42 @@
+---
+---
+
+<div class="gallery-filter" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem;">
+  <button class="filter-btn active" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="vibe-check">Vibe Check</button>
+  <button class="filter-btn" data-filter="photobooth">Photobooth</button>
+  <button class="filter-btn" data-filter="general">General</button>
+</div>
+
+<style>
+  .filter-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.25rem 0;
+    color: #64748b;
+    transition: color 200ms;
+  }
+  .filter-btn:hover { color: #94a3b8; }
+  .filter-btn.active { color: #8b5cf6; }
+</style>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.filter-btn');
+  const items = document.querySelectorAll<HTMLElement>('.gallery-item');
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = btn.dataset.filter;
+      items.forEach((item) => {
+        const type = item.dataset.type;
+        item.style.display = (filter === 'all' || type === filter) ? '' : 'none';
+      });
+    });
+  });
+</script>

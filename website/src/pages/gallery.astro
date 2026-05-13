@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SectionHeading from '../components/SectionHeading.astro';
-import GalleryFilter from '../components/GalleryFilter.tsx';
+import GalleryFilter from '../components/GalleryFilter.astro';
 import GalleryGrid from '../components/GalleryGrid.astro';
 ---
 
@@ -13,8 +13,8 @@ import GalleryGrid from '../components/GalleryGrid.astro';
         subtitle="See what VibePrint OS can create — from AI personality readings to multi-photo strips."
       />
 
-      <div style="display: flex; justify-content: center; margin-bottom: 3rem;">
-        <GalleryFilter client:load />
+      <div style="margin-bottom: 3rem;">
+        <GalleryFilter />
       </div>
 
       <GalleryGrid />
