@@ -37,7 +37,7 @@ VibePrint OS turns a basic computer, a USB webcam, and a thermal receipt printer
 
 ## Prerequisites
 
-- **OS**: Linux (Ubuntu/Debian recommended)
+- **OS**: Linux (Ubuntu/Debian recommended). Windows supported via WSL2 (hardware passthrough requires [usbipd-win](https://learn.microsoft.com/en-us/windows/wsl/connect-usb))
 - **Docker**: Docker Engine 24+ and Docker Compose v2
 - **Hardware** (for production):
   - USB webcam (UVC-compliant)

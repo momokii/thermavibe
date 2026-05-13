@@ -7,18 +7,40 @@
 #   ./scripts/start-docker.sh dev          # Start in dev mode (hot-reload)
 #   ./scripts/start-docker.sh down         # Stop all containers
 #
-# Automatically detects all connected /dev/video* devices and USB thermal
-# printers, then passes them to Docker. If no camera/printer is plugged in,
-# the app starts normally and services fall back to mock/offline mode.
+# Automatically detects connected cameras and USB thermal printers, then
+# passes them to Docker. If no camera/printer is plugged in, the app
+# starts normally and services fall back to mock/offline mode.
 #
-# On first run, installs a broad USB udev rule so Docker can access thermal
-# printers without manual setup.
+# Platform support:
+#   Linux  — Full hardware detection and udev setup
+#   WSL2   — Hardware passthrough via usbipd-win (auto-detected)
+#   Other  — Mock mode (no hardware paths available)
+#
+# On first run (Linux), installs a broad USB udev rule so Docker can
+# access thermal printers without manual setup.
 # =============================================================================
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 MODE="${1:-prod}"
+
+# ── Platform detection ──────────────────────────────────────────────────────
+detect_platform() {
+    local kernel_name
+    kernel_name="$(uname -s)"
+    if [ "$kernel_name" = "Linux" ]; then
+        if echo "$(uname -r)" | grep -qiE "microsoft|wsl"; then
+            echo "wsl2"
+        else
+            echo "linux"
+        fi
+    else
+        echo "other"
+    fi
+}
+
+PLATFORM="$(detect_platform)"
 
 # ── Stop / down ──────────────────────────────────────────────────────────────
 if [ "$MODE" = "down" ]; then
@@ -27,7 +49,7 @@ if [ "$MODE" = "down" ]; then
     exit 0
 fi
 
-# ── Setup USB permissions ────────────────────────────────────────────────────
+# ── Setup USB permissions (Linux only) ──────────────────────────────────────
 setup_usb_permissions() {
     UDEV_RULE_FILE="/etc/udev/rules.d/99-thermavibe-usb.rules"
 
@@ -60,30 +82,70 @@ UDEV_EOF
     fi
 }
 
-setup_usb_permissions || echo " USB:     Could not set up udev rules (run with sudo or set up manually)"
+case "$PLATFORM" in
+    linux)
+        setup_usb_permissions || echo " USB:     Could not set up udev rules (run with sudo or set up manually)"
+        ;;
+    wsl2)
+        echo " USB:     Skipping udev setup (not applicable in WSL2)"
+        echo "          For USB passthrough, install usbipd-win on the Windows host:"
+        echo "          https://learn.microsoft.com/en-us/windows/wsl/connect-usb"
+        ;;
+    *)
+        echo " USB:     Skipping udev setup (not applicable on this platform)"
+        ;;
+esac
 
 # ── Detect video devices ─────────────────────────────────────────────────────
 VIDEO_DEVICES=()
-if ls /dev/video* >/dev/null 2>&1; then
-    for dev in /dev/video*; do
-        VIDEO_DEVICES+=("$dev")
-    done
-fi
+
+detect_video_devices() {
+    if ls /dev/video* >/dev/null 2>&1; then
+        for dev in /dev/video*; do
+            VIDEO_DEVICES+=("$dev")
+        done
+    fi
+}
+
+case "$PLATFORM" in
+    linux|wsl2)
+        detect_video_devices
+        ;;
+esac
 
 # ── Detect USB thermal printers ──────────────────────────────────────────────
 PRINTERS=()
-if command -v lsusb &> /dev/null; then
-    while IFS= read -r line; do
-        PRINTERS+=("$line")
-    done < <(lsusb 2>/dev/null | grep -iE "printer|pos|thermal|epson|xprinter|bixolon|0fe6|custom|star" || true)
-fi
 
+detect_printers() {
+    if command -v lsusb &> /dev/null; then
+        while IFS= read -r line; do
+            PRINTERS+=("$line")
+        done < <(lsusb 2>/dev/null | grep -iE "printer|pos|thermal|epson|xprinter|bixolon|0fe6|custom|star" || true)
+    fi
+}
+
+case "$PLATFORM" in
+    linux|wsl2)
+        detect_printers
+        ;;
+esac
+
+# ── Hardware detection banner ────────────────────────────────────────────────
 echo "──────────────────────────────────────────────────"
 echo " VibePrint OS — Dynamic Hardware Detection"
+echo " Platform: $PLATFORM"
+if [ "$PLATFORM" = "wsl2" ]; then
+    echo " Note:     Hardware requires usbipd-win passthrough"
+fi
 echo "──────────────────────────────────────────────────"
 if [ ${#VIDEO_DEVICES[@]} -eq 0 ]; then
     echo " Camera:  ⚠  No /dev/video* devices found"
-    echo "          Camera features will use mock mode"
+    if [ "$PLATFORM" = "wsl2" ]; then
+        echo "          Attach a webcam via usbipd-win:"
+        echo "          usbipd wsl attach --busid <BUSID>"
+    else
+        echo "          Camera features will use mock mode"
+    fi
 else
     echo " Camera:  ✓  Found ${#VIDEO_DEVICES[@]} device(s):"
     for dev in "${VIDEO_DEVICES[@]}"; do
@@ -93,7 +155,12 @@ fi
 
 if [ ${#PRINTERS[@]} -eq 0 ]; then
     echo " Printer: ⚠  No thermal printers detected"
-    echo "          Will auto-detect when plugged in (hot-plug)"
+    if [ "$PLATFORM" = "wsl2" ]; then
+        echo "          Attach a printer via usbipd-win:"
+        echo "          usbipd wsl attach --busid <BUSID>"
+    else
+        echo "          Will auto-detect when plugged in (hot-plug)"
+    fi
 else
     echo " Printer: ✓  Detected ${#PRINTERS[@]} potential printer(s):"
     for p in "${PRINTERS[@]}"; do
@@ -135,12 +202,14 @@ OVERRIDE_EOF
         echo "      - ${entry}" >> "$OVERRIDE_FILE"
     done
 
-    # Add cgroup rules for hot-plug support
-    cat >> "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
+    # Add cgroup rules for hot-plug support (Linux only)
+    if [ "$PLATFORM" = "linux" ]; then
+        cat >> "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
     device_cgroup_rules:
       - 'c 81:* rwm'
       - 'c 189:* rwm'
 OVERRIDE_EOF
+    fi
 
     COMPOSE_FILES+=(-f "$OVERRIDE_FILE")
 else

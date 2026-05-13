@@ -93,6 +93,18 @@ wsl --install -d Ubuntu-22.04
 # Settings > Resources > WSL Integration > Enable for your Ubuntu distro
 ```
 
+> **Hardware on WSL2:** `make dev` and `make prod` work in WSL2, but USB webcams and printers are **not** visible by default. To pass through hardware, install [usbipd-win](https://learn.microsoft.com/en-us/windows/wsl/connect-usb) on the Windows host, then attach devices from an Administrator PowerShell:
+>
+> ```powershell
+> # List USB devices available for passthrough
+> usbipd wsl list
+>
+> # Attach a webcam or printer by bus ID
+> usbipd wsl attach --busid <BUSID>
+> ```
+>
+> After attaching, `/dev/video*` and `/dev/bus/usb` appear inside WSL2 and `start-docker.sh` detects them automatically. Without usbipd-win, the app runs fully in **mock mode** (suitable for software development without hardware).
+
 ---
 
 ## 2. Clone and Configure

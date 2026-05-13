@@ -16,6 +16,7 @@
 6. [Updating](#6-updating)
 7. [Backup](#7-backup)
 8. [Troubleshooting](#8-troubleshooting)
+9. [Windows / WSL2 Deployment](#9-windows--wsl2-deployment)
 
 ---
 
@@ -1146,3 +1147,72 @@ docker system df
 # Clean up unused Docker resources (be careful)
 docker system prune -f
 ```
+
+---
+
+## 9. Windows / WSL2 Deployment
+
+VibePrint OS can run on Windows via WSL2 (Windows Subsystem for Linux). The application works in mock mode without any hardware, and full hardware support is available by attaching USB devices through `usbipd-win`.
+
+### Prerequisites
+
+1. **Docker Desktop** with WSL2 backend enabled
+   - Settings > General > "Use the WSL 2 based engine"
+   - Settings > Resources > WSL Integration > Enable for your distro
+2. **WSL2** with Ubuntu 22.04+ (`wsl --install -d Ubuntu-22.04`)
+3. **usbipd-win** (for hardware passthrough)
+   ```powershell
+   # Install from PowerShell (Administrator)
+   winget install usbipd
+   ```
+
+### Starting Without Hardware (Mock Mode)
+
+Without USB passthrough, `make dev` and `make prod` work normally. The app starts with mock camera and printer services — fully functional for software development and testing.
+
+```bash
+# Inside WSL2
+cd thermavibe
+cp .env.example .env
+make dev    # or make prod
+```
+
+The startup script auto-detects WSL2 and skips Linux-only setup (udev rules, usblp blacklist).
+
+### Attaching USB Devices (Hardware Passthrough)
+
+To pass a USB webcam or thermal printer through to WSL2:
+
+```powershell
+# From PowerShell (Administrator) on the Windows host:
+
+# 1. List all USB devices
+usbipd wsl list
+
+# 2. Attach a device by bus ID (find it from the list above)
+usbipd wsl attach --busid <BUSID>
+
+# Example: attaching a webcam
+usbipd wsl attach --busid 1-2
+```
+
+After attaching:
+- The device appears inside WSL2 at `/dev/video*` (cameras) or `/dev/bus/usb` (printers)
+- `start-docker.sh` detects it automatically on next run
+- No changes to `.env` or Docker configuration needed
+
+To detach:
+```powershell
+usbipd wsl detach --busid <BUSID>
+```
+
+### Limitations on WSL2
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Backend + Frontend | Fully working | No differences from Linux |
+| USB Webcam | Working with usbipd | Must be attached before starting containers |
+| Thermal Printer | Working with usbipd | Must be attached before starting containers |
+| Hot-plug detection | Limited | Newly plugged devices require `usbipd wsl attach` + container restart |
+| Chromium kiosk mode | Not available | No display server in WSL2; use browser on Windows host instead |
+| systemd auto-start | Not available | Use Windows Task Scheduler or Docker Desktop startup instead |
