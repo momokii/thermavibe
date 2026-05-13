@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
-type FilterType = 'all' | 'vibe-check' | 'photobooth';
+type FilterType = 'all' | 'vibe-check' | 'photobooth' | 'general';
 
 const filters: { label: string; value: FilterType }[] = [
   { label: 'All', value: 'all' },
   { label: 'Vibe Check', value: 'vibe-check' },
   { label: 'Photobooth', value: 'photobooth' },
+  { label: 'General', value: 'general' },
 ];
 
 export default function GalleryFilter() {

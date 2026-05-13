@@ -1,6 +1,6 @@
 export interface GalleryItem {
   id: string;
-  type: 'vibe-check' | 'photobooth';
+  type: 'vibe-check' | 'photobooth' | 'general';
   title: string;
   description: string;
   image: string;
@@ -30,35 +30,35 @@ export const galleryItems: GalleryItem[] = [
   },
   {
     id: 'vibe-demo-3',
-    type: 'vibe-check',
+    type: 'general',
     title: 'Analytics Dashboard',
     description: 'Real-time session analytics with drop-off funnel, period-over-period comparisons, and CSV/PDF export.',
     image: '/images/gallery/thermavibe3-3-analytics.gif',
   },
   {
     id: 'photo-demo-2',
-    type: 'photobooth',
+    type: 'general',
     title: 'Print Template Config',
     description: 'Customize receipt footers with brand name, timezone-aware timestamps, and per-element toggles.',
     image: '/images/gallery/thermavibe3-4-print-template.gif',
   },
   {
     id: 'photo-demo-3',
-    type: 'photobooth',
+    type: 'general',
     title: 'Access Code System',
     description: 'Generate batches of pre-paid codes with QR codes, track redemptions, and print physical receipts for event distribution.',
     image: '/images/gallery/thermavibe3-5-access-code.gif',
   },
   {
     id: 'photo-demo-4',
-    type: 'photobooth',
+    type: 'general',
     title: 'Gallery Management',
     description: 'Browse, view, and manage all past sessions. Delete items or manually reprint directly from the admin panel.',
     image: '/images/gallery/thermavibe3-5-gallery.gif',
   },
   {
     id: 'photo-demo-5',
-    type: 'photobooth',
+    type: 'general',
     title: 'Access Code QR & Print',
     description: 'Each access code gets a scannable QR code. Print them as physical receipts to hand out at events.',
     image: '/images/gallery/thermavibe3-6-test-access-code.gif',
