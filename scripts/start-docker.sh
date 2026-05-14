@@ -108,10 +108,16 @@ auto_attach_wsl2_usb() {
 
     # Check usbipd is installed on Windows host
     if ! powershell.exe -NoProfile -Command "Get-Command usbipd -ErrorAction SilentlyContinue" 2>/dev/null | grep -qi "usbipd"; then
-        echo " USB:     usbipd-win not installed on Windows host"
-        echo "          Install from Administrator PowerShell: winget install usbipd"
-        echo "          https://learn.microsoft.com/en-us/windows/wsl/connect-usb"
-        return
+        echo " USB:     usbipd-win not found — attempting auto-install..."
+        if powershell.exe -NoProfile -NonInteractive -Command "winget install usbipd --accept-source-agreements --accept-package-agreements" 2>/dev/null; then
+            echo " USB:     ✓ usbipd-win installed"
+        else
+            echo " USB:     Auto-install failed (needs Administrator elevation)"
+            echo "          Run from Administrator PowerShell:"
+            echo "          winget install usbipd"
+            echo "          Then re-run this script."
+            return
+        fi
     fi
 
     # List USB devices from Windows host
