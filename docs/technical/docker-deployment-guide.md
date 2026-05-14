@@ -1187,13 +1187,13 @@ To pass a USB webcam or thermal printer through to WSL2:
 # From PowerShell (Administrator) on the Windows host:
 
 # 1. List all USB devices
-usbipd wsl list
+usbipd list
 
 # 2. Attach a device by bus ID (find it from the list above)
-usbipd wsl attach --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
 
 # Example: attaching a webcam
-usbipd wsl attach --busid 1-2
+usbipd attach --wsl --busid 1-2
 ```
 
 After attaching:
@@ -1203,7 +1203,7 @@ After attaching:
 
 To detach:
 ```powershell
-usbipd wsl detach --busid <BUSID>
+usbipd detach --busid <BUSID>
 ```
 
 ### Limitations on WSL2
@@ -1213,6 +1213,6 @@ usbipd wsl detach --busid <BUSID>
 | Backend + Frontend | Fully working | No differences from Linux |
 | USB Webcam | Working with usbipd | Must be attached before starting containers |
 | Thermal Printer | Working with usbipd | Must be attached before starting containers |
-| Hot-plug detection | Limited | Newly plugged devices require `usbipd wsl attach` + container restart |
+| Hot-plug detection | Limited | Newly plugged devices require `usbipd attach --wsl` + container restart |
 | Chromium kiosk mode | Not available | No display server in WSL2; use browser on Windows host instead |
 | systemd auto-start | Not available | Use Windows Task Scheduler or Docker Desktop startup instead |

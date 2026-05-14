@@ -147,22 +147,24 @@ auto_attach_wsl2_usb() {
         fi
     fi
 
-    # List USB devices from Windows host (with refreshed PATH)
+    # List USB devices from Windows host
+    # usbipd v5+ removed the "wsl" subcommand. Use "usbipd list" instead.
     local usb_list
-    usb_list=$(run_usbipd "wsl list")
+    usb_list=$(run_usbipd "list")
 
-    # Strip common error lines so we only parse the device table
-    usb_list=$(echo "$usb_list" | grep -v "^PS " | grep -v "error" | grep -vi "not found")
+    # Strip non-device lines (headers, persisted section, errors)
+    usb_list=$(echo "$usb_list" | grep -v "^PS " | grep -viE "^error|^Persisted|^$|^GUID|^Connected")
 
     if [ -z "$usb_list" ]; then
         echo " USB:     Could not list Windows USB devices"
-        echo "          Try manually: powershell> usbipd wsl list"
+        echo "          Try manually from PowerShell: usbipd list"
         set -e
         return
     fi
 
     # Parse output and auto-attach cameras and printers
-    # Format: "BUSID  DEVICE_NAME  STATE"
+    # usbipd list format: "BUSID  VID:PID    DEVICE   STATE"
+    # State can be: "Not shared", "Shared", or "Attached"
     local attached=0
     local tried=0
     while IFS= read -r line; do
@@ -173,26 +175,37 @@ auto_attach_wsl2_usb() {
 
         local busid state
         busid=$(echo "$line" | awk '{print $1}')
-        state=$(echo "$line" | awk '{print $NF}')
+
+        # State is the last field(s): "Attached", "Shared", or "Not shared"
+        # Check from the end of the line
+        if echo "$line" | grep -qE "Not shared$"; then
+            state="Not shared"
+        elif echo "$line" | grep -qE "Shared$"; then
+            state="Shared"
+        elif echo "$line" | grep -qE "Attached$"; then
+            state="Attached"
+        else
+            continue
+        fi
 
         # Skip already attached devices
         [[ "$state" == "Attached" ]] && continue
-        # Skip devices that aren't shared/attachable
-        [[ "$state" != "Not shared" && "$state" != "Shared" ]] && continue
 
         # Only attach devices that look like cameras or printers
         if echo "$line" | grep -qiE "camera|webcam|integrated.*cam|printer|pos|thermal|epson|xprinter|bixolon"; then
             local device_name
-            device_name=$(echo "$line" | sed 's/^[^ ]*  *//' | sed 's/  *[^ ]*$//')
+            # Extract device name: between VID:PID and STATE
+            device_name=$(echo "$line" | sed 's/^[^ ]*  *[^ ]*  *//' | sed 's/  *\(Not shared\|Shared\|Attached\)$//')
             echo " USB:     Attaching: $device_name ($busid)"
             ((tried++))
+            # usbipd v5 syntax: attach --wsl --busid X-Y
             local result
-            result=$(run_usbipd "wsl attach --busid $busid") || true
-            if echo "$result" | grep -qi "error\|fail\|denied\|not shared"; then
+            result=$(run_usbipd "attach --wsl --busid $busid") || true
+            if echo "$result" | grep -qi "error\|fail\|denied\|not shared\|not accessible"; then
                 echo " USB:     ✗ Failed to attach $busid"
                 echo "          $result"
                 echo "          Try from an Administrator PowerShell:"
-                echo "          usbipd wsl attach --busid $busid"
+                echo "          usbipd attach --wsl --busid $busid"
             else
                 echo " USB:     ✓ Attached $busid"
                 ((attached++))
@@ -205,7 +218,7 @@ auto_attach_wsl2_usb() {
     elif [ "$attached" -eq 0 ]; then
         echo " USB:     Could not auto-attach (needs Administrator elevation)"
         echo "          Run from Administrator PowerShell:"
-        echo "          usbipd wsl attach --busid <BUSID>"
+        echo "          usbipd attach --wsl --busid <BUSID>"
     else
         echo " USB:     Attached $attached device(s) via usbipd-win"
         # Give WSL2 a moment to create /dev nodes
@@ -267,7 +280,7 @@ if [ ${#VIDEO_DEVICES[@]} -eq 0 ]; then
     echo "          Camera features will use mock mode"
     if [ "$PLATFORM" = "wsl2" ]; then
         echo "          Tip: Install usbipd-win and re-run, or attach manually:"
-        echo "          usbipd wsl attach --busid <BUSID>"
+        echo "          usbipd attach --wsl --busid <BUSID>"
     fi
 else
     echo " Camera:  ✓  Found ${#VIDEO_DEVICES[@]} device(s):"
@@ -281,7 +294,7 @@ if [ ${#PRINTERS[@]} -eq 0 ]; then
     echo "          Will auto-detect when plugged in (hot-plug)"
     if [ "$PLATFORM" = "wsl2" ]; then
         echo "          Tip: Attach via usbipd-win and re-run, or:"
-        echo "          usbipd wsl attach --busid <BUSID>"
+        echo "          usbipd attach --wsl --busid <BUSID>"
     fi
 else
     echo " Printer: ✓  Detected ${#PRINTERS[@]} potential printer(s):"

@@ -97,10 +97,10 @@ wsl --install -d Ubuntu-22.04
 >
 > ```powershell
 > # List USB devices available for passthrough
-> usbipd wsl list
+> usbipd list
 >
 > # Attach a webcam or printer by bus ID
-> usbipd wsl attach --busid <BUSID>
+> usbipd attach --wsl --busid <BUSID>
 > ```
 >
 > After attaching, `/dev/video*` and `/dev/bus/usb` appear inside WSL2 and `start-docker.sh` detects them automatically. Without usbipd-win, the app runs fully in **mock mode** (suitable for software development without hardware).
