@@ -98,6 +98,20 @@ esac
 # Calls powershell.exe from within WSL2 to run usbipd-win commands.
 # This makes Windows USB devices (webcams, printers) appear as /dev/video* and
 # /dev/bus/usb inside WSL2, so the normal Linux detection can find them.
+#
+# Uses a helper function that refreshes the Windows PATH from registry before
+# each call — this is critical because winget install updates the system PATH
+# but the current PowerShell session inherits the stale PATH from WSL2.
+
+# Run a usbipd command via PowerShell with refreshed PATH.
+# Usage: run_usbipd "wsl list"   (prefix "usbipd" is added automatically)
+# Prints combined stdout+stderr so callers can see actual error messages.
+run_usbipd() {
+    powershell.exe -NoProfile -NonInteractive -Command \
+        "\$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User'); usbipd $1" \
+        2>&1 | tr -d '\r'
+}
+
 auto_attach_wsl2_usb() {
     # Check Windows interop is available
     if ! command -v powershell.exe &> /dev/null; then
@@ -106,11 +120,14 @@ auto_attach_wsl2_usb() {
         return
     fi
 
-    # Check usbipd is installed on Windows host
-    if ! powershell.exe -NoProfile -Command "Get-Command usbipd -ErrorAction SilentlyContinue" 2>/dev/null | grep -qi "usbipd"; then
+    # Check usbipd is installed on Windows host (with refreshed PATH)
+    local check
+    check=$(run_usbipd "version" 2>/dev/null) || true
+    if [ -z "$check" ]; then
         echo " USB:     usbipd-win not found — attempting auto-install..."
-        if powershell.exe -NoProfile -NonInteractive -Command "winget install usbipd --accept-source-agreements --accept-package-agreements" 2>/dev/null; then
-            echo " USB:     ✓ usbipd-win installed"
+        if powershell.exe -NoProfile -NonInteractive -Command "winget install usbipd --accept-source-agreements --accept-package-agreements" 2>&1 | tr -d '\r' | tail -1 | grep -qi "successfully\|installed"; then
+            echo " USB:     ✓ usbipd-win installed — waiting for service..."
+            sleep 3
         else
             echo " USB:     Auto-install failed (needs Administrator elevation)"
             echo "          Run from Administrator PowerShell:"
@@ -120,12 +137,16 @@ auto_attach_wsl2_usb() {
         fi
     fi
 
-    # List USB devices from Windows host
+    # List USB devices from Windows host (with refreshed PATH)
     local usb_list
-    usb_list=$(powershell.exe -NoProfile -NonInteractive -Command "usbipd wsl list" 2>/dev/null | tr -d '\r') || true
+    usb_list=$(run_usbipd "wsl list") || true
+
+    # Strip common error lines so we only parse the device table
+    usb_list=$(echo "$usb_list" | grep -v "^PS " | grep -v "error" | grep -vi "not found")
 
     if [ -z "$usb_list" ]; then
         echo " USB:     Could not list Windows USB devices"
+        echo "          Try manually: powershell> usbipd wsl list"
         return
     fi
 
@@ -154,13 +175,16 @@ auto_attach_wsl2_usb() {
             device_name=$(echo "$line" | sed 's/^[^ ]*  *//' | sed 's/  *[^ ]*$//')
             echo " USB:     Attaching: $device_name ($busid)"
             ((tried++))
-            if powershell.exe -NoProfile -NonInteractive -Command "usbipd wsl attach --busid $busid" 2>/dev/null; then
-                echo " USB:     ✓ Attached $busid"
-                ((attached++))
-            else
+            local result
+            result=$(run_usbipd "wsl attach --busid $busid") || true
+            if echo "$result" | grep -qi "error\|fail\|denied\|not shared"; then
                 echo " USB:     ✗ Failed to attach $busid"
+                echo "          $result"
                 echo "          Try from an Administrator PowerShell:"
                 echo "          usbipd wsl attach --busid $busid"
+            else
+                echo " USB:     ✓ Attached $busid"
+                ((attached++))
             fi
         fi
     done <<< "$usb_list"
