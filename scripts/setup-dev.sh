@@ -2,6 +2,13 @@
 # =============================================================================
 # setup-dev.sh — Bootstrap the VibePrint OS development environment
 # =============================================================================
+# This script performs ONE-TIME setup only:
+#   - Checks prerequisites
+#   - Creates .env from template
+#   - Installs frontend dependencies
+#
+# After running this, start the app with:  make dev
+# =============================================================================
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,7 +31,6 @@ echo "Checking prerequisites..."
 ERRORS=0
 
 check_command docker "Install: https://docs.docker.com/get-docker/" || ((ERRORS++))
-check_command "docker" "Docker Compose v2 is included with Docker Engine." || true
 
 if docker compose version &> /dev/null; then
     echo "  Found: docker compose (v2)"
@@ -55,35 +61,6 @@ else
     echo "  .env already exists, skipping."
 fi
 
-# ---- Start PostgreSQL ----
-echo ""
-echo "Starting PostgreSQL via Docker Compose..."
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
-
-echo "Waiting for PostgreSQL to be ready..."
-RETRIES=30
-until docker compose exec -T postgres pg_isready -U thermavibe &> /dev/null || [ "${RETRIES}" -eq 0 ]; do
-    ((RETRIES--))
-    sleep 1
-done
-
-if [ "${RETRIES}" -eq 0 ]; then
-    echo "ERROR: PostgreSQL did not become ready in time."
-    exit 1
-fi
-echo "  PostgreSQL is ready."
-
-# ---- Run database migrations ----
-echo ""
-echo "Running database migrations..."
-if [ -d "backend/alembic/versions" ]; then
-    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app
-    sleep 3
-    docker compose exec -T app alembic upgrade head 2>/dev/null || echo "  Note: Migrations will run when backend is fully implemented."
-else
-    echo "  Skipping migrations (not yet available)."
-fi
-
 # ---- Install frontend dependencies ----
 echo ""
 echo "Installing frontend dependencies..."
@@ -101,12 +78,12 @@ echo ""
 echo "=== Development environment ready! ==="
 echo ""
 echo "Next steps:"
-echo "  1. Start the backend:    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app"
-echo "  2. Start the frontend:   cd frontend && npm run dev"
-echo "  3. Open in browser:      http://localhost:5173"
-echo "  4. API documentation:    http://localhost:8000/docs"
+echo "  1. Start the app:         make dev"
+echo "  2. Open kiosk UI:         http://localhost:5173"
+echo "  3. Open admin dashboard:  http://localhost:5173/admin"
+echo "  4. API documentation:     http://localhost:8000/docs"
 echo ""
-echo "Or use the Makefile shortcuts:"
-echo "  make dev          # Start everything"
-echo "  make dev-down     # Stop everything"
-echo "  make test         # Run all tests"
+echo "Other commands:"
+echo "  make dev-down       # Stop everything"
+echo "  make dev-restart    # Clean rebuild (remove images + restart)"
+echo "  make test           # Run all tests"
