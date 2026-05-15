@@ -319,6 +319,53 @@ else
 fi
 echo "──────────────────────────────────────────────────"
 
+# ── WSL2: Verify cameras are actually accessible ────────────────────────────────
+# On WSL2, the camera device might exist but be locked by Windows.
+# If Windows Camera/Teams/Zoom is using it, WSL2 can't read from it.
+if [ "$PLATFORM" = "wsl2" ] && [ ${#VIDEO_DEVICES[@]} -gt 0 ]; then
+    echo " Camera:  Checking if cameras are accessible..."
+    local accessible=0
+    local inaccessible=""
+
+    for dev in "${VIDEO_DEVICES[@]}"; do
+        # Try to query the camera format — this fails if Windows has it locked
+        if command -v v4l2-ctl &> /dev/null; then
+            if v4l2-ctl -d "$dev" --all >/dev/null 2>&1; then
+                ((accessible++))
+            else
+                inaccessible="$inaccessible$dev "
+            fi
+        # Fallback: try reading one frame with ffmpeg if available
+        elif command -v ffmpeg &> /dev/null; then
+            if timeout 2 ffmpeg -f video4linux2 -i "$dev" -frames:v 1 -f null - 2>/dev/null >/dev/null; then
+                ((accessible++))
+            else
+                inaccessible="$inaccessible$dev "
+            fi
+        else
+            # No tools available, assume accessible (will fail at runtime with clear error)
+            ((accessible++))
+        fi
+    done
+
+    if [ "$accessible" -eq 0 ]; then
+        echo "          ⚠  Camera(s) detected but NOT accessible:"
+        echo "          $inaccessible"
+        echo ""
+        echo "          This usually means a Windows app is using the camera."
+        echo "          Close Windows Camera, Teams, Zoom, browsers, then:"
+        echo "          1. Run: usbipd detach --busid <BUSID>"
+        echo "          2. Run: make prod again"
+        echo ""
+        echo "          Continuing anyway — camera will fall back to mock mode."
+    elif [ -n "$inaccessible" ]; then
+        echo "          ✓ $accessible accessible, $inaccessible locked (will use available)"
+    else
+        echo "          ✓ All $accessible camera(s) accessible"
+    fi
+    echo "──────────────────────────────────────────────────"
+fi
+
 # ── Build docker compose command ─────────────────────────────────────────────
 COMPOSE_FILES=(-f docker-compose.yml)
 
