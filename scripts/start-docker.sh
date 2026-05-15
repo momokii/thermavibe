@@ -352,6 +352,14 @@ OVERRIDE_EOF
         echo "      - ${entry}" >> "$OVERRIDE_FILE"
     done
 
+    # Add video group access when cameras are present
+    # GID 44 = video group on Debian (the base image)
+    # Without this, the container process can't read from /dev/video*
+    if [ ${#VIDEO_DEVICES[@]} -gt 0 ]; then
+        echo "    group_add:" >> "$OVERRIDE_FILE"
+        echo "      - '44'" >> "$OVERRIDE_FILE"
+    fi
+
     # Add cgroup rules for hot-plug support (Linux only)
     if [ "$PLATFORM" = "linux" ]; then
         cat >> "$OVERRIDE_FILE" <<'OVERRIDE_EOF'
