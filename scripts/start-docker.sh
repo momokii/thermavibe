@@ -198,14 +198,29 @@ auto_attach_wsl2_usb() {
             device_name=$(echo "$line" | sed 's/^[^ ]*  *[^ ]*  *//' | sed 's/  *\(Not shared\|Shared\|Attached\)$//')
             echo " USB:     Attaching: $device_name ($busid)"
             ((tried++))
-            # usbipd v5 syntax: attach --wsl --busid X-Y
+
+            # Step 1: Bind (share) the device — requires admin
+            if [[ "$state" == "Not shared" ]]; then
+                local bind_result
+                bind_result=$(run_usbipd "bind --busid $busid") || true
+                if echo "$bind_result" | grep -qi "error\|fail\|denied\|not accessible\|administrator"; then
+                    echo " USB:     ✗ Failed to bind $busid (needs admin)"
+                    echo "          $bind_result"
+                    echo "          Run from Administrator PowerShell:"
+                    echo "          usbipd bind --busid $busid && usbipd attach --wsl --busid $busid"
+                    continue
+                fi
+                echo " USB:     ✓ Bound $busid"
+            fi
+
+            # Step 2: Attach to WSL2
             local result
             result=$(run_usbipd "attach --wsl --busid $busid") || true
             if echo "$result" | grep -qi "error\|fail\|denied\|not shared\|not accessible"; then
                 echo " USB:     ✗ Failed to attach $busid"
                 echo "          $result"
                 echo "          Try from an Administrator PowerShell:"
-                echo "          usbipd attach --wsl --busid $busid"
+                echo "          usbipd bind --busid $busid && usbipd attach --wsl --busid $busid"
             else
                 echo " USB:     ✓ Attached $busid"
                 ((attached++))
