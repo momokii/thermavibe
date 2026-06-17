@@ -94,7 +94,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.app.models.session import Session
+    from app.models.session import KioskSession
 ```
 
 ### 1.3 Docstrings
@@ -102,55 +102,58 @@ if TYPE_CHECKING:
 All public functions, classes, and modules must have docstrings in **Google style** format.
 
 ```python
-class KioskService:
-    """Manages kiosk session lifecycle and state transitions.
+async def create_session(
+    db: AsyncSession,
+    payment_enabled: bool = False,
+) -> KioskSession:
+    """Create a new kiosk session in the IDLE state.
 
-    This service handles creating new sessions, transitioning between
-    kiosk states, and cleaning up expired sessions.
+    Generates a unique session ID, persists the session to the database,
+    and returns the created KioskSession object.
 
-    Attributes:
+    Args:
         db: Async SQLAlchemy database session for persistence operations.
+        payment_enabled: Whether the session requires payment before capture.
+
+    Returns:
+        KioskSession: The newly created session with state set to IDLE.
+
+    Raises:
+        DatabaseError: If the session cannot be persisted due to a
+            database connection issue.
     """
+    session = KioskSession(state=KioskState.IDLE)
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
 
-    async def create_session(self) -> Session:
-        """Create a new kiosk session in the IDLE state.
 
-        Generates a unique session ID, persists the session to the database,
-        and returns the created Session object.
+async def transition_state(
+    db: AsyncSession,
+    session_id: uuid.UUID,
+    new_state: KioskState,
+) -> KioskSession:
+    """Transition a session to a new state.
 
-        Returns:
-            Session: The newly created session with state set to IDLE.
+    Validates that the transition is allowed based on the current state
+    and the state machine rules. Raises an exception if the transition
+    is invalid.
 
-        Raises:
-            DatabaseError: If the session cannot be persisted due to a
-                database connection issue.
-        """
-        session = Session(state=KioskState.IDLE)
-        self.db.add(session)
-        await self.db.commit()
-        await self.db.refresh(session)
-        return session
+    Args:
+        db: Async SQLAlchemy database session.
+        session_id: The unique identifier of the session to transition.
+        new_state: The target state to transition to.
 
-    async def transition(self, session_id: str, new_state: KioskState) -> Session:
-        """Transition a session to a new state.
+    Returns:
+        KioskSession: The updated session object.
 
-        Validates that the transition is allowed based on the current state
-        and the state machine rules. Raises an exception if the transition
-        is invalid.
-
-        Args:
-            session_id: The unique identifier of the session to transition.
-            new_state: The target state to transition to.
-
-        Returns:
-            Session: The updated session object.
-
-        Raises:
-            SessionNotFoundError: If no session exists with the given ID.
-            InvalidStateTransition: If the transition from the current state
-                to the new state is not allowed.
-        """
-        ...
+    Raises:
+        SessionNotFoundError: If no session exists with the given ID.
+        StateTransitionError: If the transition from the current state
+            to the new state is not allowed.
+    """
+    ...
 ```
 
 ### 1.4 Async/Await
@@ -262,19 +265,21 @@ Services and shared resources (database sessions, configuration) are injected in
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.api.deps import get_db, get_settings, get_kiosk_service
-from backend.app.services.kiosk_service import KioskService
-from backend.app.schemas.session import SessionResponse
+from app.api.deps import get_db, get_settings
+from app.schemas.kiosk import SessionResponse
+from app.services import session_service
+from app.services import session_service
 
 router = APIRouter()
 
 
 @router.post("/session", response_model=SessionResponse, status_code=201)
 async def create_session(
-    kiosk_service: KioskService = Depends(get_kiosk_service),
+    payment_enabled: bool = False,
+    db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
     """Create a new kiosk session."""
-    session = await kiosk_service.create_session()
+    session = await session_service.create_session(db, payment_enabled=payment_enabled)
     return SessionResponse.model_validate(session)
 ```
 
@@ -285,9 +290,8 @@ from functools import lru_cache
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backend.app.core.config import Settings
-from backend.app.core.database import async_session_factory
-from backend.app.services.kiosk_service import KioskService
+from app.core.config import Settings
+from app.core.database import async_session_factory
 
 
 @lru_cache
@@ -303,12 +307,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
-
-
-def get_kiosk_service(
-    db: AsyncSession = Depends(get_db),
-) -> KioskService:
-    return KioskService(db=db)
 ```
 
 ### 1.7 Service Layer Pattern
@@ -316,49 +314,46 @@ def get_kiosk_service(
 Route handlers (endpoints) must never contain business logic. Routes are responsible only for:
 
 1. Receiving and validating the request (via Pydantic schemas)
-2. Calling the appropriate service method
+2. Calling the appropriate service function
 3. Returning the response (via Pydantic response models)
 
-All business logic lives in the service layer.
+All business logic lives in the service layer as **module-level async functions**.
 
 ```python
 # backend/app/api/v1/endpoints/kiosk.py
 
 @router.post("/session/{session_id}/capture")
 async def capture_photo(
-    session_id: str,
-    kiosk_service: KioskService = Depends(get_kiosk_service),
-    camera_service: CameraService = Depends(get_camera_service),
+    session_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
     # Route handler: thin, delegates to services
-    image_bytes = await camera_service.capture_frame()
-    session = await kiosk_service.transition_with_capture(session_id, image_bytes)
+    session = await session_service.capture_photo(db, session_id)
     return SessionResponse.model_validate(session)
 
 
-# backend/app/services/kiosk_service.py
+# backend/app/services/session_service.py
 
-class KioskService:
-    async def transition_with_capture(
-        self, session_id: str, image_bytes: bytes
-    ) -> Session:
-        # Service: contains the business logic
-        session = await self._get_session_or_raise(session_id)
-        self._validate_transition(session.state, KioskState.CAPTURE)
+async def capture_photo(
+    db: AsyncSession, session_id: uuid.UUID
+) -> KioskSession:
+    # Service: contains the business logic
+    session = await get_session(db, session_id)
+    _validate_transition(session.state, KioskState.CAPTURE)
 
-        session.captured_image = image_bytes
-        session.state = KioskState.CAPTURE
-        session.captured_at = datetime.utcnow()
-        await self.db.commit()
-        await self.db.refresh(session)
-        return session
+    session.photo_path = save_photo(image_bytes)
+    session.state = KioskState.CAPTURE
+    await db.commit()
+    await db.refresh(session)
+    return session
 
-    def _validate_transition(self, current: KioskState, target: KioskState) -> None:
-        valid = VALID_TRANSITIONS.get(current, set())
-        if target not in valid:
-            raise InvalidStateTransition(
-                f"Cannot transition from {current} to {target}"
-            )
+
+def _validate_transition(current: KioskState, target: KioskState) -> None:
+    valid = VALID_TRANSITIONS.get(current, set())
+    if target not in valid:
+        raise StateTransitionError(
+            f"Cannot transition from {current} to {target}"
+        )
 ```
 
 ### 1.8 Error Handling
@@ -413,7 +408,7 @@ Exception handlers registered in `backend/app/core/middleware.py` convert applic
 ```python
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from backend.app.core.exceptions import VibePrintError
+from app.core.exceptions import VibePrintError
 
 async def vibeprint_exception_handler(request: Request, exc: VibePrintError) -> JSONResponse:
     return JSONResponse(
@@ -886,9 +881,9 @@ Summary of the technical approach taken.
 backend/tests/
 |-- conftest.py              # Shared fixtures
 |-- unit/                    # Fast tests, no external dependencies
-|   |-- test_kiosk_service.py
+|   |-- test_session_service.py
 |   |-- test_ai_service.py
-|   |-- test_dithering.py
+|   |-- test_printer_service.py
 |   `-- ...
 `-- integration/             # Tests with real database, mocked external services
     |-- test_kiosk_endpoints.py
@@ -904,8 +899,8 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from backend.app.main import app
-from backend.app.core.database import Base, get_db
+from app.main import app
+from app.core.database import Base, get_db
 
 # Test database (in-memory SQLite for speed, or test PostgreSQL)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///test.db"
@@ -943,21 +938,22 @@ def mock_ai_provider():
 **Unit test example:**
 
 ```python
-from backend.app.services.kiosk_service import KioskService
-from backend.app.core.exceptions import InvalidStateTransition
+from app.services import session_service
+from app.models.session import KioskState
+from app.core.exceptions import StateTransitionError
 
-class TestKioskService:
+class TestSessionService:
     async def test_create_session_returns_idle_state(self, db_session):
-        service = KioskService(db=db_session)
-        session = await service.create_session()
-        assert session.state == "IDLE"
+        session = await session_service.create_session(db_session)
+        assert session.state == KioskState.IDLE
         assert session.id is not None
 
     async def test_invalid_transition_raises_error(self, db_session):
-        service = KioskService(db=db_session)
-        session = await service.create_session()
-        with pytest.raises(InvalidStateTransition):
-            await service.transition(session.id, "REVEAL")
+        session = await session_service.create_session(db_session)
+        with pytest.raises(StateTransitionError):
+            await session_service.transition_state(
+                db_session, session.id, KioskState.REVEAL
+            )
 ```
 
 **Integration test example:**
@@ -1082,7 +1078,7 @@ Use factory functions for generating test data rather than hardcoded fixtures:
 ```python
 # backend/tests/factories.py
 from datetime import datetime, timezone
-from backend.app.models.session import Session, KioskState
+from app.models.session import KioskSession, KioskState
 import uuid
 
 

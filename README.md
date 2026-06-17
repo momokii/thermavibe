@@ -251,7 +251,7 @@ make local-lint              # Lint code
 make test
 ```
 
-### Backend tests only (249 tests)
+### Backend tests only (284 tests)
 
 ```bash
 # Inside Docker
@@ -431,15 +431,15 @@ thermavibe/
 ├── backend/                  # FastAPI Python application
 │   ├── app/
 │   │   ├── ai/              # AI provider adapters (OpenAI, Anthropic, Google, Ollama, Mock)
-│   │   ├── api/v1/endpoints/# REST API route handlers (7 modules, 40+ endpoints)
+│   │   ├── api/v1/endpoints/# REST API route handlers (6 modules, 65 endpoints)
 │   │   ├── core/            # Config, database, security, middleware, exceptions
-│   │   ├── models/          # SQLAlchemy ORM models (8 tables)
+│   │   ├── models/          # SQLAlchemy ORM models (7 tables)
 │   │   ├── payment/         # Payment provider adapters (Midtrans, Xendit, Mock)
-│   │   ├── schemas/         # Pydantic request/response schemas (11 modules)
-│   │   ├── services/        # Business logic (15 services)
+│   │   ├── schemas/         # Pydantic request/response schemas (10 modules)
+│   │   ├── services/        # Business logic (14 services)
 │   │   └── utils/           # Utilities (dithering, ESC/POS, image processing, validators)
-│   ├── alembic/             # Database migrations
-│   ├── tests/               # Unit + integration tests (249 tests)
+│   ├── alembic/             # Database migrations (5 revisions)
+│   ├── tests/               # Unit + integration tests (284 tests)
 │   └── pyproject.toml       # Python dependencies
 ├── frontend/                 # React TypeScript SPA
 │   ├── src/
@@ -496,8 +496,9 @@ Full documentation is in the [`docs/`](docs/) directory:
 ## Known Limitations
 
 - **No CI/CD pipeline**: No automated build/test/deploy pipeline yet.
-- **Test coverage**: Backend is well-tested (250+ tests). Frontend has basic coverage (32 tests) — admin components and most hooks lack tests.
+- **Test coverage**: Backend is well-tested (284 tests). Frontend has basic coverage (32 tests) — admin components and most hooks lack tests.
 - **Single kiosk**: Currently supports one kiosk instance per deployment. Multi-kiosk architecture is planned (see `docs/technical/multi-kiosk-architecture.md`).
+- **Container runs as root**: The Dockerfile has no `USER` directive (audit finding SEC-001). acceptable for a dedicated kiosk host but should be hardened for shared deployments.
 
 ---
 

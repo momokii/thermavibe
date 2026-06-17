@@ -461,7 +461,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec backend pyth
 Run a specific test file:
 
 ```bash
-docker compose exec app python -m pytest tests/unit/test_kiosk_service.py -v
+docker compose exec app python -m pytest tests/unit/test_session_service.py -v
 ```
 
 Run tests with coverage report:

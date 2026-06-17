@@ -19,7 +19,7 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 ## Remaining Work (Priority Order)
 
 1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. Only open item from the Phase 1 security audit.
-2. **Expand frontend test coverage** — Only 34 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests.
+2. **Expand frontend test coverage** — Only 32 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests.
 3. **Backend test coverage gaps** — New services added since the last snapshot (`access_code_service`, `photobooth_service`, `theme_service`, `image_composition_service`, `retention_service`, `share_service`) have unit tests but the integration test suite (4 files) does not yet exercise the photobooth flow end-to-end.
 4. **Wave 5 — E2E & hardware testing** — Not started. Full kiosk flow in Docker with mock providers, real camera capture, real thermal printer, real AI provider, performance benchmarks.
 5. **CI/CD pipeline** — No automated testing or deployment.
@@ -99,7 +99,7 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
   - Unit (12 files): ai, analytics, camera, config, exceptions, hardware, payment, printer, security, session, access_code, retention
   - Integration (4 files): admin_flow, ai_flow, kiosk_flow, payment_flow
   - Database: SQLite in-memory with PostgreSQL compat patches
-- [x] **Frontend: 34 tests** (up from 32)
+- [x] **Frontend: 32 tests**
   - Stores: kioskStore, adminStore
   - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
   - Hooks: useCountdown
@@ -133,7 +133,7 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 ## Known Gaps
 
 1. **SEC-001: Docker container runs as root** — Dockerfile has no `USER` directive. Only remaining item from the Phase 1 security audit.
-2. **Frontend test coverage thin** — 34 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
+2. **Frontend test coverage thin** — 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
 3. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine.
 4. **No CI/CD pipeline** — Tests run only locally.
 5. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
@@ -179,8 +179,8 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 ## Test Results
 
 - **Backend**: 284 tests across 12 unit + 4 integration files — should all pass
-- **Frontend**: 34 tests — should all pass
-- **Total**: ~318 tests
+- **Frontend**: 32 tests — should all pass
+- **Total**: ~316 tests
 
 Run with:
 ```bash

@@ -104,13 +104,12 @@ backend/
 |   |-- models/                 # SQLAlchemy ORM models (database tables)
 |   |   |-- __init__.py         # Exports all models for Alembic auto-generation
 |   |   |-- base.py             # SQLAlchemy DeclarativeBase, common mixins (timestamps, ID)
-|   |   |-- session.py          # Session model (kiosk session state, timestamps, analysis)
-|   |   |-- payment.py          # Payment model (transaction ID, amount, status, provider)
-|   |   |-- configuration.py    # Config model (key-value configuration with categories)
-|   |   |-- device.py           # Device model (camera/printer status, capabilities)
-|   |   |-- access_code.py      # Access code model (code, price, usage tracking)
-|   |   |-- analytics.py        # Analytics model (aggregated session/event data)
-|   |   `-- photobooth_theme.py # Photobooth theme model (frame templates, layouts)
+|   |   |-- session.py          # KioskSession model (state, photos, payment fields, timestamps)
+|   |   |-- configuration.py    # OperatorConfig model (key-value configuration with categories)
+|   |   |-- device.py           # Device model (USB camera/printer registry, capabilities)
+|   |   |-- access_code.py      # AccessCode model (code, type, price, usage tracking)
+|   |   |-- analytics.py        # AnalyticsEvent + PrintJob models (events, print lifecycle)
+|   |   `-- photobooth_theme.py # PhotoboothTheme model (frame templates, JSONB styling config)
 |   |
 |   |-- schemas/                # Pydantic schemas (request/response validation)
 |   |   |-- __init__.py
@@ -200,47 +199,49 @@ backend/
 
 ### Endpoint File Convention
 
-Each file in `backend/app/api/v1/endpoints/` corresponds to one API domain. The file defines an `APIRouter` with a prefix and tags, and contains one route function per endpoint. Route functions are thin: they validate request data (via Pydantic), call the appropriate service method, and return the response.
+Each file in `backend/app/api/v1/endpoints/` corresponds to one API domain. The file defines an `APIRouter` with a prefix and tags, and contains one route function per endpoint. Route functions are thin: they validate request data (via Pydantic), inject an `AsyncSession` via `Depends(get_db)`, call the appropriate service function, and return the response.
 
 ```python
 # backend/app/api/v1/endpoints/kiosk.py
 
 from fastapi import APIRouter, Depends
-from backend.app.schemas.session import SessionResponse, SessionCreate
-from backend.app.services.session_service import SessionService
-from backend.app.api.deps import get_session_service
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_db
+from app.schemas.kiosk import SessionResponse
+from app.services import session_service
 
 router = APIRouter(prefix="/kiosk", tags=["kiosk"])
 
 @router.post("/session", response_model=SessionResponse, status_code=201)
 async def create_session(
-    service: SessionService = Depends(get_session_service),
+    payment_enabled: bool = False,
+    db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
-    session = await service.create_session()
+    session = await session_service.create_session(db, payment_enabled=payment_enabled)
     return SessionResponse.model_validate(session)
 ```
 
 ### Service File Convention
 
-Each file in `backend/app/services/` contains one service class. Service classes are instantiated per-request via FastAPI's dependency injection. Services accept database sessions and other dependencies through their constructor, enabling easy mocking in tests.
+Each file in `backend/app/services/` exposes **module-level async functions** (not classes). Functions receive an `AsyncSession` as the first argument plus any domain parameters. This keeps services trivially mockable in tests via `get_db` dependency overrides.
 
 ```python
 # backend/app/services/session_service.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.app.models.session import Session
-from backend.app.core.database import get_db_session
 
-class SessionService:
-    def __init__(self, db: AsyncSession | None = None):
-        self.db = db
+from app.models.session import KioskSession, KioskState
 
-    async def create_session(self) -> Session:
-        session = Session(state="IDLE")
-        self.db.add(session)
-        await self.db.commit()
-        await self.db.refresh(session)
-        return session
+async def create_session(
+    db: AsyncSession,
+    payment_enabled: bool = False,
+) -> KioskSession:
+    session = KioskSession(state=KioskState.IDLE)
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+    return session
 ```
 
 ### Model File Convention
@@ -496,14 +497,14 @@ thermavibe/
 | Element | Convention | Example |
 |---------|-----------|---------|
 | Files and directories | `snake_case` | `session_service.py`, `ai_service.py` |
-| Classes | `PascalCase` | `SessionService`, `AIProvider`, `SessionResponse` |
+| Classes | `PascalCase` | `KioskSession`, `AIProvider`, `PhotoboothTheme` |
 | Functions and methods | `snake_case` | `create_session()`, `analyze_image()` |
 | Variables | `snake_case` | `session_id`, `printer_connection` |
 | Constants | `UPPER_SNAKE_CASE` | `MAX_RETRIES`, `DEFAULT_TIMEOUT` |
 | Private methods | Leading underscore | `_validate_transition()`, `_build_escpos_commands()` |
 | Async functions | `snake_case` with `async` keyword | `async def create_session()` |
 | Pydantic models | `PascalCase` with suffix | `SessionCreate`, `SessionResponse`, `ConfigUpdate` |
-| SQLAlchemy models | `PascalCase` | `Session`, `Payment`, `DeviceConfig` |
+| SQLAlchemy models | `PascalCase` | `KioskSession`, `OperatorConfig`, `PhotoboothTheme` |
 | Test files | `test_` prefix | `test_session_service.py` |
 | Test functions | `test_` prefix, descriptive | `test_create_session_returns_idle_state()` |
 
@@ -552,11 +553,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 # 3. Local application imports
-from backend.app.models.session import Session
-from backend.app.schemas.session import SessionResponse
-from backend.app.services.session_service import SessionService
-from backend.app.core.config import Settings
-from backend.app.core.exceptions import SessionNotFoundError
+from app.models.session import KioskSession, KioskState
+from app.schemas.kiosk import SessionResponse
+from app.services import session_service
+from app.core.config import Settings
+from app.core.exceptions import SessionNotFoundError
 ```
 
 ### Python Module Boundaries

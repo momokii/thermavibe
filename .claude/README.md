@@ -78,11 +78,11 @@ This starts PostgreSQL + backend + frontend in Docker containers with hot-reload
 Verify the backend is healthy:
 ```bash
 curl http://localhost:8000/health
-# Expected: {"status":"healthy","version":"0.1.0","uptime_seconds":...}
+# Expected: {"status":"ok","version":"0.1.0","uptime_seconds":...}
 ```
 
 Other key commands:
-- `make test` — Run all tests (284 backend + 34 frontend)
+- `make test` — Run all tests (284 backend + 32 frontend)
 - `make lint` — Run all linters
 - `make help` — See all available commands
 - See `.claude/ENVIRONMENT_GUIDE.md` for the complete command reference

@@ -447,17 +447,20 @@ The backend follows a strict layered architecture to separate concerns and maint
 |                      SERVICE LAYER (Business Logic)              |
 |                                                                  |
 |  backend/app/services/                                           |
-|  - kiosk_service.py     (session lifecycle, state transitions)  |
-|  - camera_service.py    (camera management, frame capture)       |
-|  - ai_service.py        (AI provider orchestration, retry logic) |
-|  - payment_service.py   (payment creation, verification, status) |
-|  - print_service.py     (print job assembly, printer management) |
-|  - config_service.py    (configuration CRUD, validation)         |
-|  - analytics_service.py (session aggregation, revenue reports, feature breakdown) |
-|  - retention_service.py (automated cleanup of expired files and sessions) |
-|  - theme_service.py     (photobooth theme CRUD, enable/disable)  |
-|  - access_code_service.py (access code generation, validation, redemption, CRUD) |
-|  - share_service.py     (time-limited share URLs for composites) |
+|  - session_service.py     (Vibe Check state machine, transitions)  |
+|  - photobooth_service.py  (Photobooth flow, multi-photo capture)   |
+|  - camera_service.py      (camera management, frame capture)       |
+|  - ai_service.py          (AI provider orchestration, retry logic) |
+|  - payment_service.py     (payment creation, verification, status) |
+|  - printer_service.py     (ESC/POS print assembly, printer mgmt)   |
+|  - config_service.py      (configuration CRUD, validation)         |
+|  - analytics_service.py   (session aggregation, revenue reports)   |
+|  - retention_service.py   (automated cleanup of expired files)     |
+|  - theme_service.py       (photobooth theme CRUD)                  |
+|  - access_code_service.py (access code generation, redemption)     |
+|  - share_service.py       (time-limited share URLs for composites) |
+|  - image_composition_service.py (photobooth strip composition)     |
+|  - hardware_service.py    (aggregate hardware status for admin)    |
 +--------------------------------+---------------------------------+
                                  |
                                  | Direct instantiation / DI
@@ -470,10 +473,11 @@ The backend follows a strict layered architecture to separate concerns and maint
 |                |               |                 |     |                   |
 | models/        |               | ai/             |     | utils/            |
 | - session.py   |               | - base.py       |     | - dithering.py    |
-| - payment.py   |               | - openai.py     |     | - escpos.py       |
-| - config.py    |               | - anthropic.py  |     | - image.py        |
-| - device.py    |               | - google.py     |     | - validators.py   |
-| - access_code  |               | - ollama.py     |     |                   |
+| - access_code  |               | - openai_provider.py  | - escpos.py       |
+| - configuration|               | - anthropic_provider.py  | - image.py        |
+| - analytics    |               | - google_provider.py  | - validators.py   |
+| - device       |               | - ollama_provider.py  |                   |
+| - photobooth_theme |           | - mock_provider.py  |                   |
 |                |               |                 |     |                   |
 |                |               | payment/        |     |                   |
 |                |               | - base.py       |     |                   |
@@ -488,106 +492,92 @@ The backend follows a strict layered architecture to separate concerns and maint
 
 ### Service Responsibilities
 
-| Service | Primary Responsibility | External Dependencies |
+All services live in `backend/app/services/` and expose **module-level async functions** (not classes). They receive an `AsyncSession` as the first argument from the route handler, plus any domain parameters.
+
+| Service module | Primary Responsibility | External Dependencies |
 |---------|----------------------|----------------------|
-| `KioskService` | Create, update, and transition session states. Enforce valid state transitions. Clean up expired sessions. | PostgreSQL (Session model) |
-| `CameraService` | Enumerate USB cameras, set active device, capture frames, generate MJPEG stream. On startup, auto-selects the first available camera if the configured device index is unavailable. | OpenCV, V4L2 |
-| `AIService` | Accept image bytes, select active provider, send to AI API, parse response, handle retries and fallbacks. | AI providers (OpenAI, Anthropic, Google, Ollama) |
-| `PaymentService` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit), PostgreSQL (Payment model) |
-| `PrintService` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. On startup, auto-detects thermal printers via pyusb enumeration using a three-tier strategy: (1) USB printer class matching, (2) known ESC/POS vendor IDs, (3) keyword matching on device descriptions. Runs a background hot-plug scanner at 30-second intervals to detect newly connected printers and auto-reconnects after printer disconnect. | python-escpos, pyusb, USB device |
-| `ConfigService` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code, print), validate config values, apply config changes at runtime. | PostgreSQL (Config model) |
-| `AnalyticsService` | Aggregate session data, calculate revenue totals across all entry methods (confirmed payments AND access-code redemptions with price), generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (Session, Payment, AccessCode models) |
-| `AccessCodeService` | Access code lifecycle: generate, batch generate, validate, redeem, revoke, delete, list, and summary stats. Codes are typed (vibe_check, photobooth, universal) and track usage. Supports expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (AccessCode model) |
-| `RetentionService` | Automated cleanup of expired photos and composite images based on per-feature retention periods configured in operator settings. Runs as a background task on app startup. | PostgreSQL (Config, Session models), filesystem |
-| `ThemeService` | Photobooth theme CRUD: list, create, update, toggle enabled/disabled, set default theme, delete. Built-in themes cannot be deleted. | PostgreSQL (Theme model) |
-| `ShareService` | Generates time-limited share URLs for photobooth composite images. | PostgreSQL (Session model), filesystem |
+| `session_service` | Vibe Check state machine: create, transition, capture, snap, retake, select, finish. Enforces valid transitions across the 12-state FSM. | PostgreSQL (`KioskSession`) |
+| `photobooth_service` | Photobooth flow: multi-photo capture, frame selection, arrangement, composite generation, retake. | PostgreSQL (`KioskSession`), `theme_service`, `image_composition_service` |
+| `camera_service` | Enumerate USB cameras, set active device, capture frames, generate MJPEG stream. On startup, auto-selects the first available camera if the configured device index is unavailable. | OpenCV, V4L2 |
+| `ai_service` | Accept image bytes, select active provider, send to AI API, parse response, handle retries and fallbacks. | AI providers (OpenAI, Anthropic, Google, Ollama) |
+| `payment_service` | Create QRIS payment, verify webhook signatures, update payment status, handle timeout/expiry. | Payment gateways (Midtrans, Xendit) |
+| `printer_service` | Assemble ESC/POS receipt (text + dithered image), manage printer connection, execute print jobs. Auto-detects thermal printers via pyusb enumeration. Uses progressive retry with increasing waits for USB-to-parallel bridge chips. Background hot-plug scanner at 30-second intervals. | python-escpos, pyusb, USB device |
+| `config_service` | Read/write configuration categories (hardware, ai, payment, kiosk, general, photobooth, vibe_check, access_code, print), validate config values, apply config changes at runtime. | PostgreSQL (`OperatorConfig`) |
+| `analytics_service` | Aggregate session data, calculate revenue totals across all entry methods (confirmed payments AND access-code redemptions with price), generate time-series reports, per-feature breakdown (Vibe Check vs Photobooth). | PostgreSQL (`KioskSession`, `AnalyticsEvent`, `AccessCode`) |
+| `access_code_service` | Access code lifecycle: generate, batch generate, validate, redeem, revoke, delete, list, and summary stats. Codes are typed (vibe_check, photobooth, universal) and track usage. Supports expiration, usage limits, optional pricing per code, and revocation. On redemption, the code's price is copied to the session for revenue tracking. | PostgreSQL (`AccessCode`) |
+| `theme_service` | Photobooth theme CRUD: list, create, update, toggle enabled/disabled, set default theme, delete. Built-in themes cannot be deleted. | PostgreSQL (`PhotoboothTheme`) |
+| `image_composition_service` | Lays out captured photos into the selected grid, applies theme background/borders/watermark, returns a composite image. | Pillow |
+| `retention_service` | Automated cleanup of expired photos and composite images based on per-feature retention periods configured in operator settings. Runs as a background task on app startup. | PostgreSQL (`OperatorConfig`, `KioskSession`), filesystem |
+| `share_service` | Generates time-limited share URLs for photobooth composite images. | PostgreSQL (`KioskSession`), filesystem |
+| `hardware_service` | Aggregates camera + printer + system status for the admin hardware dashboard. | `camera_service`, `printer_service` |
 
-### Orchestration Flow: Complete Kiosk Session
+### Orchestration Flow: Complete Vibe Check Session
 
-The following shows how services interact during a complete kiosk session:
+The following shows how services interact during a complete Vibe Check session:
 
 ```
-1. KioskService.create_session()
-   └── Inserts new Session record (state=IDLE) into PostgreSQL
-   └── Returns session with unique ID
+1. session_service.create_session(db, payment_enabled=...)
+   └── Inserts new KioskSession record (state=IDLE) into PostgreSQL
+   └── Returns session with unique UUID
 
-2. PaymentService.create_qris(session_id)
-   └── Calls Midtrans API to create QRIS transaction
-   └── Inserts Payment record (status=PENDING) into PostgreSQL
-   └── Returns QR code URL
+2. payment_service.create_qr(db, session_id, amount, currency)
+   └── Calls Midtrans/Xendit API to create QRIS transaction
+   └── Returns QR code URL + payment reference
 
-3. PaymentService.verify_webhook(payload, signature)
-   └── Verifies webhook signature using server key
-   └── Updates Payment record (status=PAID)
-   └── Calls KioskService.transition(session_id, CAPTURE)
+3. payment_service.check_status(session_id)  (polled by kiosk every 3s)
+   └── On confirmation: session_service.record_payment() + transition to CAPTURE
 
-4. CameraService.capture_frame()
+4. camera_service.capture_frame()
    └── Opens VideoCapture on active camera device
    └── Reads frame, resizes, compresses to JPEG
    └── Returns JPEG bytes
 
-5. AIService.analyze_image(jpeg_bytes, prompt)
-   └── Selects active provider (e.g., OpenAI)
+5. ai_service.analyze_image(db, session_id, image_bytes)
+   └── Selects active provider (e.g., OpenAI) via fallback chain
    └── Sends HTTP POST with base64-encoded image
    └── Parses text response from JSON
    └── On failure: retries, then falls back to mock provider
-   └── Returns analysis text
+   └── session_service.store_ai_response() + transition to REVEAL
 
-6. KioskService.transition(session_id, REVEAL)
-   └── Updates Session record (state=REVEAL, analysis_text=...)
-   └── Stores analysis text and image reference
-
-7. PrintService.print_receipt(session_id)
-   └── Loads session data from KioskService
-   └── Formats text (header, analysis, footer)
-   └── Loads captured image, applies dithering
-   └── Assembles ESC/POS byte stream
+6. printer_service.print_session(session_id)
+   └── Loads session data
+   └── Formats text (header, analysis, footer) using print template config
+   └── Loads captured image, applies Floyd-Steinberg dithering + ESC/POS raster
    └── Sends to printer via python-escpos
-   └── Calls KioskService.transition(session_id, RESET)
+   └── session_service.finish_session() + transition to RESET
 
-8. KioskService.reset_session(session_id)
-   └── Updates Session record (state=IDLE)
-   └── Removes temporary image files
-   └── Releases camera if held
-   └── Returns to IDLE state
+7. session_service transitions back to IDLE
+   └── Updates KioskSession record (state=IDLE, cleared_at=now())
+   └── Retains photo on disk for gallery until retention TTL expires
 ```
+
+The Photobooth flow swaps steps 4-6 for: multi-photo capture (`photobooth_service.snap_photobooth_photo`) → frame selection (`select_frame`) → arrangement (`arrange_photos`) → composite generation (`generate_composite` via `image_composition_service`) → ESC/POS print.
 
 ### Dependency Injection Pattern
 
-FastAPI's `Depends()` mechanism is used to inject services into route handlers:
+FastAPI's `Depends()` injects the async database session into route handlers, which then pass it to service functions:
 
 ```python
 # backend/app/api/v1/endpoints/kiosk.py
 
 from fastapi import APIRouter, Depends
-from backend.app.services.kiosk_service import KioskService
-from backend.app.services.camera_service import CameraService
-from backend.app.services.ai_service import AIService
-from backend.app.services.print_service import PrintService
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_db
+from app.services import session_service, camera_service, ai_service, printer_service
 
 router = APIRouter()
 
-def get_kiosk_service() -> KioskService:
-    return KioskService()
-
-def get_camera_service() -> CameraService:
-    return CameraService()
-
-def get_ai_service() -> AIService:
-    return AIService()
-
-def get_print_service() -> PrintService:
-    return PrintService()
-
 @router.post("/session")
 async def create_session(
-    kiosk_service: KioskService = Depends(get_kiosk_service),
+    payment_enabled: bool = False,
+    db: AsyncSession = Depends(get_db),
 ):
-    session = await kiosk_service.create_session()
+    session = await session_service.create_session(db, payment_enabled=payment_enabled)
     return session
 ```
 
-This pattern allows services to be easily mocked in tests by providing alternative dependency overrides.
+Mocks in tests are wired by overriding the `get_db` dependency and any external clients (AI provider, payment gateway, OpenCV) — see `backend/tests/conftest.py`.
 
 ---
 
@@ -618,18 +608,19 @@ This pattern allows services to be easily mocked in tests by providing alternati
 |  |    - AI_PROVIDER=openai                                  |   |
 |  |    - OPENAI_API_KEY=sk-...                               |   |
 |  |    - PAYMENT_ENABLED=false                               |   |
-|  |    - PRINTER_VENDOR_ID=0x04b8  (optional, auto-detect)   |   |
-|  |    - PRINTER_PRODUCT_ID=0x0202 (optional, auto-detect)   |   |
+|  |    - PRINTER_AUTO_DETECT=true                            |   |
 |  |    - CAMERA_DEVICE_INDEX=0                               |   |
 |  |    - ADMIN_PIN=1234                                      |   |
 |  |    - APP_SECRET_KEY=<random>                             |   |
+|  |    - LOG_LEVEL=WARNING (prod) / INFO (dev)               |   |
 |  |                                                           |   |
 |  |  Ports:                                                   |   |
 |  |    - 8000:8000 (HTTP, bound to 127.0.0.1 only)           |   |
 |  |                                                           |   |
 |  |  Volumes:                                                 |   |
-|  |    - ./backend:/app (dev only, for HMR and hot reload)   |   |
-|  |    - printer_data:/tmp/printer (temp print files)        |   |
+|  |    - ./backend/app:/app/app (dev only, for HMR)          |   |
+|  |    - app-composites:/tmp/vibeprint (composites + photos) |   |
+|  |    - app-logs:/app/logs                                  |   |
 |  |                                                           |   |
 |  +-----------------------------------------------------------+   |
 |                              |                                   |
@@ -641,15 +632,15 @@ This pattern allows services to be easily mocked in tests by providing alternati
 |  |  PostgreSQL 16 on port 5432 (internal only)               |   |
 |  |                                                           |   |
 |  |  Environment:                                             |   |
-|  |    - POSTGRES_DB=vibeprint                               |   |
-|  |    - POSTGRES_USER=vibeprint                             |   |
+|  |    - POSTGRES_DB=thermavibe                              |   |
+|  |    - POSTGRES_USER=thermavibe                            |   |
 |  |    - POSTGRES_PASSWORD=<from .env>                       |   |
 |  |                                                           |   |
 |  |  Volumes:                                                 |   |
-|  |    - postgres_data:/var/lib/postgresql/data               |   |
+|  |    - vibeprint-postgres-data:/var/lib/postgresql/data     |   |
 |  |                                                           |   |
 |  |  Healthcheck:                                             |   |
-|  |    - pg_isready -U vibeprint (every 5s, 3 retries)       |   |
+|  |    - pg_isready -U thermavibe (every 5s, 3 retries)      |   |
 |  |                                                           |   |
 |  +-----------------------------------------------------------+   |
 |                                                                   |

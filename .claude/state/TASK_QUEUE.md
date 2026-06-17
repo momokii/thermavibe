@@ -19,7 +19,7 @@ These are the items still needing implementation, ordered by priority.
 
 ### Hardening & Test Coverage
 
-2. **Expand frontend test coverage** — Only 34 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
+2. **Expand frontend test coverage** — Only 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
 3. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
 4. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
 
@@ -279,7 +279,7 @@ These must be completed first. Everything else depends on them.
 
 | | **Priority:** P1 | **Complexity:** M | **Dependencies:** Wave 3 | **Status:** PARTIAL |
 |---|---|
-| **Scope:** | 34 tests:
+| **Scope:** | 32 tests:
   - Stores: kioskStore, adminStore
   - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
   - Hooks: useCountdown

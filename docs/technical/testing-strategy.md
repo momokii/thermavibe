@@ -214,18 +214,15 @@ def mock_ai_provider() -> MockAIProvider:
 
 # Override AI provider in tests
 @pytest.fixture
-async def client_with_mock_ai(client: AsyncClient, mock_ai_provider: AIProvider):
-    from app.api.deps import get_ai_service
-    from app.services.ai_service import AIService
+async def client_with_mock_ai(client: AsyncClient, mock_ai_provider: AIProvider, monkeypatch):
+    # Force the fallback chain to the mock provider by patching settings + module state
+    from app.services import ai_service
 
-    async def override_ai_service():
-        service = AIService()
-        service._provider = mock_ai_provider
-        return service
-
-    app.dependency_overrides[get_ai_service] = override_ai_service
+    async def _mock_analyze(db, session_id, image_bytes, **kwargs):
+        # forward to the mock provider's analyze path
+        ...
+    monkeypatch.setattr(ai_service, "analyze_image", _mock_analyze)
     yield client
-    app.dependency_overrides.clear()
 ```
 
 **MockAIProvider implementation:**
@@ -328,30 +325,19 @@ class MockPaymentProvider:
 
 ### 2.6 Mocking the Thermal Printer
 
-Printer tests capture the ESC/POS byte stream for assertion without requiring physical hardware:
+Printer tests capture the ESC/POS byte stream for assertion without requiring physical hardware. The mock lives inline in `conftest.py` (there is no `tests/utils/` directory) and is monkey-patched onto `printer_service` via the `_SafeUsbPrinter` connection seam.
 
 ```python
-# backend/tests/conftest.py
-@pytest.fixture
-def mock_printer():
-    printer = MockPrinter()
-    return printer
-
-
-# backend/tests/utils/mock_printer.py (test utility)
-class MockPrinter:
+# backend/tests/conftest.py (excerpt)
+class _MockPrinter:
     """Mock thermal printer that captures ESC/POS bytes instead of printing."""
 
     def __init__(self):
         self.captured_data: list[bytes] = []
         self._is_connected = True
-        self._paper_ok = True
 
     def set_connected(self, connected: bool) -> None:
         self._is_connected = connected
-
-    def set_paper_out(self, paper_out: bool) -> None:
-        self._paper_ok = not paper_out
 
     @property
     def is_connected(self) -> bool:
@@ -363,11 +349,9 @@ class MockPrinter:
         self.captured_data.append(data)
 
     def text(self, text: str) -> None:
-        encoded = text.encode("cp437", errors="replace")
-        self.write(encoded)
+        self.write(text.encode("cp437", errors="replace"))
 
     def image(self, img) -> None:
-        # Capture that an image was sent (without actual dithering)
         self.write(b"[IMAGE]")
 
     def cut(self) -> None:
@@ -377,106 +361,105 @@ class MockPrinter:
     def all_bytes(self) -> bytes:
         return b"".join(self.captured_data)
 
-    def reset(self) -> None:
-        self.captured_data.clear()
+
+@pytest.fixture
+def mock_printer(monkeypatch):
+    printer = _MockPrinter()
+    # Inject the mock at the printer_service connection seam
+    monkeypatch.setattr(
+        "app.services.printer_service._connect_usb_printer",
+        lambda *args, **kwargs: printer,
+    )
+    return printer
 ```
 
 **Example test using mock printer:**
 
 ```python
-from backend.tests.utils.mock_printer import MockPrinter
-from app.services.print_service import PrintService
+# backend/tests/unit/test_printer_service.py
+import pytest
+from app.services import printer_service
+from app.core.exceptions import PrinterError
 
 
-class TestPrintService:
-    async def test_print_receipt_includes_header_and_footer(self, mock_printer: MockPrinter):
-        service = PrintService(printer=mock_printer)
-
-        await service.print_receipt(
-            title="VibePrint OS",
-            body_lines=["Your vibe is electric!", "Confidence: 92%"],
-            session_id="test-123",
-            include_image=False,
-        )
+class TestPrinterService:
+    async def test_print_session_includes_header_and_footer(self, mock_printer):
+        # call the module-level function; it routes through the mocked _connect_usb_printer
+        await printer_service.print_session(session_id=uuid.uuid4(), ...)
 
         output = mock_printer.all_bytes
         assert b"VibePrint OS" in output
-        assert b"Your vibe is electric!" in output
-        # Verify cut command was sent
-        assert b"\x1d\x56" in output
+        assert b"\x1d\x56" in output  # cut command
 
-    async def test_print_receipt_disconnected_raises_error(self, mock_printer: MockPrinter):
+    async def test_print_session_disconnected_raises_error(self, mock_printer):
         mock_printer.set_connected(False)
-        service = PrintService(printer=mock_printer)
 
         with pytest.raises(PrinterError, match="not connected"):
-            await service.print_receipt(
-                title="Test",
-                body_lines=["Line 1"],
-                session_id="test-456",
-                include_image=False,
-            )
+            await printer_service.print_session(session_id=uuid.uuid4(), ...)
 ```
 
-### 2.7 Example Unit Test: Kiosk Service
+### 2.7 Example Unit Test: Session Service
 
 ```python
 # backend/tests/unit/test_session_service.py
 import pytest
-from app.services.session_service import SessionService, VALID_TRANSITIONS
-from app.core.exceptions import InvalidStateTransition, SessionNotFoundError
+from app.services import session_service
+from app.models.session import KioskState
+from app.core.exceptions import StateTransitionError
 
 
-class TestKioskServiceCreate:
+class TestSessionServiceCreate:
     async def test_create_session_returns_idle_state(self, db_session):
-        service = SessionService(db=db_session)
-        session = await service.create_session(payment_enabled=False)
+        session = await session_service.create_session(db_session, payment_enabled=False)
 
         assert session.id is not None
-        assert session.state == "IDLE"
-        assert session.payment_enabled is False
+        assert session.state == KioskState.IDLE
 
     async def test_create_session_with_payment_enabled(self, db_session):
-        service = SessionService(db=db_session)
-        session = await service.create_session(payment_enabled=True)
+        session = await session_service.create_session(db_session, payment_enabled=True)
 
-        assert session.payment_enabled is True
-        assert session.state == "IDLE"
+        assert session.payment_status is not None
+        assert session.state == KioskState.IDLE
 
 
-class TestKioskServiceTransition:
+class TestSessionServiceTransition:
     async def test_valid_transition_succeeds(self, db_session):
-        service = SessionService(db=db_session)
-        session = await service.create_session()
+        session = await session_service.create_session(db_session)
 
-        updated = await service.transition(session.id, "CAPTURE")
-        assert updated.state == "CAPTURE"
+        updated = await session_service.transition_state(
+            db_session, session.id, KioskState.CAPTURE
+        )
+        assert updated.state == KioskState.CAPTURE
 
     async def test_invalid_transition_raises_error(self, db_session):
-        service = SessionService(db=db_session)
-        session = await service.create_session()
+        session = await session_service.create_session(db_session)
 
-        with pytest.raises(InvalidStateTransition, match="Cannot transition from IDLE to REVEAL"):
-            await service.transition(session.id, "REVEAL")
+        with pytest.raises(StateTransitionError, match="Cannot transition from IDLE to REVEAL"):
+            await session_service.transition_state(
+                db_session, session.id, KioskState.REVEAL
+            )
 
     async def test_transition_nonexistent_session_raises_error(self, db_session):
-        service = SessionService(db=db_session)
+        import uuid
 
         with pytest.raises(SessionNotFoundError):
-            await service.transition("nonexistent-id", "CAPTURE")
+            await session_service.transition_state(
+                db_session, uuid.uuid4(), KioskState.CAPTURE
+            )
 
 
-class TestKioskServiceReset:
-    async def test_reset_clears_session_data(self, db_session):
-        service = SessionService(db=db_session)
-        session = await service.create_session()
-        await service.transition(session.id, "CAPTURE")
+class TestSessionServiceReset:
+    async def test_finish_session_clears_session_data(self, db_session):
+        session = await session_service.create_session(db_session)
+        await session_service.transition_state(
+            db_session, session.id, KioskState.CAPTURE
+        )
 
-        await service.reset_session(session.id)
+        await session_service.finish_session(db_session, session.id)
 
         # Verify session was returned to IDLE
-        updated = await service.get_session(session.id)
-        assert updated.state == "IDLE"
+        updated = await session_service.get_session(db_session, session.id)
+        assert updated.state == KioskState.IDLE
 ```
 
 ### 2.8 Example Integration Test: API Endpoints
@@ -1117,7 +1100,7 @@ For integration tests that require pre-populated data (e.g., analytics queries, 
 
 ```python
 # backend/tests/seed.py
-from backend.tests.factories import create_test_session, create_test_payment  # noqa: I001
+from tests.factories import create_test_session, create_test_payment  # noqa: I001
 
 
 def seed_sessions(db, count: int = 10, state: str = "REVEAL"):

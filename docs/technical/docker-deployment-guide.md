@@ -184,7 +184,7 @@ COPY backend/alembic/ ./alembic/
 COPY backend/alembic.ini ./
 
 # Run migrations on startup, then start the application
-CMD ["sh", "-c", "alembic upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
 ```
 
 ---

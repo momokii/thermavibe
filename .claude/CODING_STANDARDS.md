@@ -27,7 +27,7 @@ backend/
 │   │   ├── config.py           # Pydantic BaseSettings
 │   │   ├── database.py         # SQLAlchemy async engine
 │   │   ├── exceptions.py       # Custom exception hierarchy
-│   │   ├── middleware.py       # CORS, error handling, request ID
+│   │   ├── middleware.py       # CORS, rate limit, request size limit, error handling, request ID
 │   │   ├── security.py         # PIN auth + JWT
 │   │   ├── events.py           # Startup/shutdown events
 │   │   └── lifecycle.py        # Lifecycle management
@@ -57,7 +57,8 @@ frontend/
 │   │   ├── kioskApi.ts
 │   │   ├── paymentApi.ts
 │   │   ├── adminApi.ts
-│   │   └── cameraApi.ts
+│   │   ├── cameraApi.ts
+│   │   └── photoboothApi.ts
 │   ├── components/
 │   │   ├── admin/              # Admin dashboard components
 │   │   ├── kiosk/              # Kiosk UI components (one per state)
@@ -211,7 +212,7 @@ logger.error('ai_provider_failed', provider='openai', error=str(exc))
 
 ### API Integration
 - All API calls go through `frontend/src/api/client.ts` (Axios instance)
-- One file per domain: `kioskApi.ts`, `paymentApi.ts`, `adminApi.ts`, `cameraApi.ts`
+- One file per domain: `kioskApi.ts`, `paymentApi.ts`, `adminApi.ts`, `cameraApi.ts`, `photoboothApi.ts`
 - Frontend NEVER calls external APIs directly (AI, payment gateways) — always proxied through backend
 
 ---
@@ -295,7 +296,11 @@ These patterns are explicitly disallowed:
 
 ### State Machine Pattern
 - Kiosk session uses explicit state transitions with validation
-- 7 states: IDLE -> PAYMENT -> CAPTURE -> REVIEW -> PROCESSING -> REVEAL -> RESET
+- 12 states across two flows, selected by `KioskSession.session_type`:
+  - **Shared:** `IDLE`, `PAYMENT`, `CAPTURE`, `ACCESS_CODE`, `RESET`
+  - **Vibe Check (`vibe_check`):** `REVIEW`, `PROCESSING`, `REVEAL`
+  - **Photobooth (`photobooth`):** `FRAME_SELECT`, `ARRANGE`, `COMPOSITING`, `PHOTOBOOTH_REVEAL`
+- A `FeatureSelectScreen` chooses the flow at session start (or an access code pre-selects it)
 - Invalid transitions raise `StateTransitionError`
 - State diagram in `docs/prd/04-user-flows.md`
 

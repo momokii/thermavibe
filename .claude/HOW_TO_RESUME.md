@@ -81,11 +81,12 @@ Start the development environment:
 make dev
 ```
 
-This starts PostgreSQL + backend (with hot-reload) + frontend (with HMR) in Docker containers.
+This starts PostgreSQL + backend (with hot-reload) in Docker containers. The frontend is **not** in Docker during dev — run it separately with `cd frontend && npm install && npm run dev` (HMR on port 5173).
 
 Verify the backend is healthy:
 ```bash
 curl http://localhost:8000/health
+# Expected: {"status":"ok","version":"0.1.0","uptime_seconds":...}
 ```
 
 Verify all services are running:
@@ -94,9 +95,9 @@ make dev-logs
 ```
 
 You should see:
-- PostgreSQL accepting connections on port 5432
-- Backend uvicorn running on port 8000
-- Frontend Vite dev server running on port 5173
+- PostgreSQL accepting connections on container port 5432 (host port 5433 in dev)
+- Backend uvicorn running on port 8000 (localhost only)
+- Frontend Vite dev server running on port 5173 (started separately)
 
 ---
 

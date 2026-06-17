@@ -54,7 +54,7 @@ make dev-logs
 # Run all tests (backend + frontend)
 make test
 
-# Run backend tests only (249 tests)
+# Run backend tests only (284 tests)
 cd backend && python -m pytest tests/ -v
 
 # Run frontend tests only (32 tests)
@@ -92,7 +92,7 @@ cd frontend && npm run dev
 curl http://localhost:8000/health
 
 # Expected response:
-# {"status":"healthy","version":"0.1.0","uptime_seconds":...}
+# {"status":"ok","version":"0.1.0","uptime_seconds":...}
 
 # Verify PostgreSQL is accepting connections
 make shell-db
@@ -164,6 +164,8 @@ make build      # production build
 - Dev environment exposes PostgreSQL on port **5433** (not 5432) to avoid conflicts with local PostgreSQL
 - USB device passthrough: `/dev/bus/usb` must exist; camera devices are auto-detected from `/dev/video*` by the startup script
 - The Dockerfile uses a multi-stage build (Node 20 for frontend build, Python 3.12 for runtime)
+- On WSL2, `scripts/start-docker.sh` auto-installs `usbipd-win` via winget, binds the USB device on Windows, then attaches it to the WSL VM using the v5 `usbipd attach` syntax (the legacy `usbipd wsl attach` subcommand was removed in v5)
+- The Dockerfile has no `USER` directive — the app container runs as root (audit finding SEC-001). Acceptable on a dedicated kiosk host; flag if deploying to a shared machine
 
 ---
 
@@ -171,10 +173,9 @@ make build      # production build
 
 | File | Committed | Purpose |
 |------|-----------|---------|
-| `.env.example` | Yes | All keys with placeholder values + comments — template for developers |
+| `.env.example` | Yes | Minimal dev keys with placeholder values — template for development |
 | `.env` | No | Actual development secrets — created from `.env.example` |
-| `.env.staging` | No | Staging secrets (if applicable) |
-| `.env.production` | No | Production secrets (if applicable) |
+| `.env.production` | Yes | Production template with all deployment-time keys — copy to `.env` for production |
 
 **Gitignore status:** `.env`, `.env.local`, and `.env.*.local` are properly excluded in `.gitignore`. The `.env.example` file is committed.
 
