@@ -20,12 +20,13 @@ These are the items still needing implementation, ordered by priority.
 ### Hardening & Test Coverage
 
 2. **Expand frontend test coverage** — Only 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
-3. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
-4. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
+3. **Fix RevealScreen test regression (P1)** — All 3 tests in `frontend/src/__tests__/components/RevealScreen.test.tsx` fail with `Element type is invalid: ... got: undefined`. Likely cause: `RevealScreen.tsx` uses a `framer-motion` element (e.g. `motion.button`, `motion.span`) not stubbed by the test's mock at `frontend/src/__tests__/components/RevealScreen.test.tsx:11-23`, which only covers `motion.div`, `motion.img`, `motion.p`. Either expand the mock to cover all motion elements used, or use `vi.mock('framer-motion', () => ({ motion: new Proxy({}, ...) }))`. Frontend currently reports **29 pass / 3 fail** out of 32.
+4. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
+5. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
 
 ### Documentation
 
-5. **Add `photobooth_themes` and `devices` tables to `docs/prd/05-data-models.md`** — Both models exist in `backend/app/models/` and have migrations but are not documented in the data models PRD.
+~~5. **Add `photobooth_themes` and `devices` tables to `docs/prd/05-data-models.md`**~~ — **DONE.** Sections 7 (PhotoboothTheme) and 8 (Device) are now documented.
 
 ### Wave 5 — E2E & Hardware (not started)
 

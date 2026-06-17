@@ -134,11 +134,11 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 
 1. **SEC-001: Docker container runs as root** — Dockerfile has no `USER` directive. Only remaining item from the Phase 1 security audit.
 2. **Frontend test coverage thin** — 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
-3. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine.
-4. **No CI/CD pipeline** — Tests run only locally.
-5. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
-6. **In-memory rate limiter and payment store** — Acceptable for single-kiosk; would need Redis for multi-kiosk.
-7. **`docs/prd/05-data-models.md` is missing `photobooth_themes` and `devices` tables** — Documented tables cover KioskSession, AccessCode, OperatorConfig, AnalyticsEvent, PrintJob only.
+3. **RevealScreen tests are failing (regression)** — All 3 tests in `frontend/src/__tests__/components/RevealScreen.test.tsx` fail with `Element type is invalid: ... got: undefined`, meaning a component used by `RevealScreen.tsx` is missing or wrongly imported (likely a `framer-motion` element not covered by the test's mock, which only stubs `motion.div`, `motion.img`, `motion.p`). Investigation needed; current state is **29 pass / 3 fail** out of 32.
+4. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine.
+5. **No CI/CD pipeline** — Tests run only locally.
+6. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
+7. **In-memory rate limiter and payment store** — Acceptable for single-kiosk; would need Redis for multi-kiosk.
 
 ---
 
@@ -179,7 +179,7 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 ## Test Results
 
 - **Backend**: 284 tests across 12 unit + 4 integration files — should all pass
-- **Frontend**: 32 tests — should all pass
+- **Frontend**: 32 tests — **29 pass / 3 fail** (see Known Gap #3: RevealScreen regression)
 - **Total**: ~316 tests
 
 Run with:

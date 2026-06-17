@@ -982,6 +982,22 @@ describe('kioskStore', () => {
 })
 ```
 
+### 3.7 Known Test Failures
+
+The frontend suite currently reports **29 pass / 3 fail** out of 32 tests. The failures are isolated to a single file and represent a regression to investigate before adding new frontend tests on top.
+
+| File | Failing tests | Error | Likely cause |
+|------|---------------|-------|--------------|
+| `frontend/src/__tests__/components/RevealScreen.test.tsx` | `renders the captured photo`, `renders the hint text`, `displays typewriter text progressively` | `Element type is invalid: expected a string ... but got: undefined. Check the render method of RevealScreen.` | The test mocks `framer-motion` with only `motion.div`, `motion.img`, `motion.p`, and `AnimatePresence` (see `RevealScreen.test.tsx:11-23`). `RevealScreen.tsx` likely renders another `motion.*` element (e.g. `motion.button`, `motion.span`) that resolves to `undefined` under the partial mock. Expand the mock to cover every motion element used, or replace it with a Proxy-based catch-all stub. |
+
+Reproduce locally:
+
+```bash
+cd frontend && npx vitest run src/__tests__/components/RevealScreen.test.tsx
+```
+
+Track in `.claude/state/TASK_QUEUE.md` (Hardening & Test Coverage, item 3).
+
 ---
 
 ## 4. Test Data Management
