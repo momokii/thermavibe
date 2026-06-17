@@ -1,123 +1,120 @@
 # Current Status — VibePrint OS
 
-**Last Updated:** 2026-04-16
-**Updated By:** `.claude/` infrastructure takeover audit
-**Session Summary:** Complete security and infrastructure audit. Added SECURITY_STANDARDS.md, ENVIRONMENT_GUIDE.md, templates/new_feature.md. Enhanced existing .claude/ files with security rules, environment awareness, and session-end protocols.
+**Last Updated:** 2026-06-17
+**Updated By:** Documentation sync against actual codebase state
+**Session Summary:** Reconciled state files with the May–June feature work. The previous snapshot (2026-04-16) predated photobooth mode, access codes, themes, retention/share services, the marketing website, WSL2 hardware passthrough, and production deployment hardening. Test, model, and endpoint counts were refreshed from the live tree.
 
 ---
 
 ## Overall Phase
 
-**Phase 1 — Implementation (~75% complete)**
+**Phase 1 — Implementation (~90% complete)**
 
-The project has a complete backend with all services, API endpoints, and 249 tests passing. The frontend kiosk flow and admin dashboard are functional. The main remaining gap is the PaymentScreen (stub) and frontend test coverage.
+The backend is feature-complete for both the Vibe Check and Photobooth flows. The frontend kiosk shell, admin dashboard, marketing website, and production Docker deployment are all in place. Remaining work is hardening (security, E2E tests, CI) rather than core features.
 
-**Overall Completion:** ~75%
+**Overall Completion:** ~90%
 
 ---
 
 ## Remaining Work (Priority Order)
 
-1. **Implement PaymentScreen** — Currently an empty `<div>` stub. If `PAYMENT_ENABLED=true`, users see a blank screen in the payment state.
-2. **Add kiosk error display UI** — `kioskStore.error` is set but never rendered to the user.
-3. **Expand frontend test coverage** — Admin components, most hooks, and pages lack tests.
-4. **Fix useKioskState side effect** — Render-time side effect (lines 24-30) should be moved to `useEffect`.
-5. **Remove unused `next-themes` dependency** — Installed but not used anywhere.
+1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. Only open item from the Phase 1 security audit.
+2. **Expand frontend test coverage** — Only 34 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests.
+3. **Backend test coverage gaps** — New services added since the last snapshot (`access_code_service`, `photobooth_service`, `theme_service`, `image_composition_service`, `retention_service`, `share_service`) have unit tests but the integration test suite (4 files) does not yet exercise the photobooth flow end-to-end.
+4. **Wave 5 — E2E & hardware testing** — Not started. Full kiosk flow in Docker with mock providers, real camera capture, real thermal printer, real AI provider, performance benchmarks.
+5. **CI/CD pipeline** — No automated testing or deployment.
 
 ---
 
 ## Completed Items
 
 ### Infrastructure (100%)
-- [x] Project directory structure — all folders and files created
+- [x] Project directory structure
 - [x] `CLAUDE.md` — project-wide rules and conventions
-- [x] `.editorconfig` — consistent coding style across file types
-- [x] `.gitignore` — comprehensive exclusions
-- [x] `LICENSE` — MIT license
-- [x] `README.md` — comprehensive project documentation with dev/prod setup
+- [x] `.editorconfig`, `.gitignore`, `.gitattributes` (LF enforcement for shell scripts)
+- [x] `LICENSE` (MIT), comprehensive `README.md`
+- [x] Makefile with 20+ targets including `dev-restart`, `prod-restart`, `deploy`
+- [x] `scripts/start-docker.sh` — cross-platform launcher (Linux + WSL2 via usbipd-win auto-install/attach)
+- [x] `scripts/setup-dev.sh`, `scripts/start-kiosk.sh`
+- [x] `website/` — Astro + Tailwind marketing site with Docker compose deployment
 
 ### Documentation (100%)
-- [x] PRD: 9 documents covering executive summary, personas, functional requirements, NFRs, user flows, data models, integration map, out-of-scope, open questions
-- [x] Technical: 8 documents covering architecture, coding standards, API contract, testing strategy, project structure, dev setup, Docker deployment, tech stack decisions
-- [x] `base-data/thermavibe-base-ideas.md` — original product concept
+- [x] PRD: 9 documents (executive summary, personas, functional requirements, NFRs, user flows, data models, integration map, out-of-scope, open questions)
+- [x] Technical: 8 documents (architecture, coding standards, API contract, testing strategy, project structure, dev setup, Docker deployment, tech stack decisions)
+- [x] `base-data/thermavibe-base-ideas.md`
 
 ### Backend Foundation (100%)
-- [x] FastAPI application factory (`backend/app/main.py`) — health check, lifespan, middleware
-- [x] Pydantic BaseSettings (`backend/app/core/config.py`) — all config fields defined
-- [x] SQLAlchemy async setup (`backend/app/core/database.py`) — engine + session factory
-- [x] Alembic configuration (`backend/alembic.ini`, `backend/alembic/env.py`) — async migration runner
-- [x] Initial migration (`backend/alembic/versions/d596d3d1a363_initial.py`) — 5 tables
-- [x] Router aggregation (`backend/app/api/v1/router.py`) — all endpoint routers included
-- [x] `pyproject.toml` — all dependencies specified, tool configs set
-- [x] Exception hierarchy — all custom exceptions with error codes and HTTP status mapping
-- [x] Middleware — RequestID, CORS, error handlers
-- [x] Security/auth — PIN verification, JWT tokens, rate limiting
-- [x] Dependency injection — `get_db`, `get_current_admin`
+- [x] FastAPI application factory (`backend/app/main.py`) — health check, lifespan, middleware, SPA fallback in production
+- [x] Pydantic BaseSettings (`backend/app/core/config.py`) — all config fields including photobooth settings
+- [x] SQLAlchemy async setup (`backend/app/core/database.py`)
+- [x] Alembic configuration — 5 migrations (initial, add_review_state_and_photos, add_photobooth_support, add_access_codes_table, add_price_to_access_codes)
+- [x] Router aggregation (`backend/app/api/v1/router.py`)
+- [x] `pyproject.toml`, exception hierarchy, middleware (RequestID, CORS, RateLimit, RequestSizeLimit, error handlers)
+- [x] Security/auth — PIN verification, JWT tokens, global rate limiting, request size limiting
 
-### Backend Business Logic (95%)
-- [x] All 7 services fully implemented (session, camera, AI, printer, payment, config, analytics, hardware)
-- [x] All 6 API endpoint files (kiosk, camera, ai, printer, payment, admin) — 24+ endpoints
-- [x] 5 database models (KioskSession, AnalyticsEvent, PrintJob, Device, OperatorConfig)
-- [x] 9 Pydantic schema modules (common, kiosk, ai, payment, camera, admin, config, print, session)
-- [x] 5 AI providers (base, OpenAI, Anthropic, Google, Ollama, Mock) with fallback chain
-- [x] 3 payment providers (base, Midtrans, Xendit, Mock)
+### Backend Business Logic (100%)
+- [x] **14 services** fully implemented:
+  - `session_service.py` — Vibe Check state machine (12 states across two flows)
+  - `photobooth_service.py` — Photobooth flow (multi-photo capture, frame select, arrange, composite)
+  - `ai_service.py` — Provider-agnostic AI image analysis with fallback chain
+  - `camera_service.py` — OpenCV camera management, MJPEG streaming
+  - `printer_service.py` — ESC/POS thermal printer with progressive retry for USB-to-parallel bridge chips
+  - `payment_service.py` — QRIS payment gateway abstraction
+  - `config_service.py` — Operator configuration CRUD with seeding
+  - `analytics_service.py` — Session and revenue analytics
+  - `hardware_service.py` — Aggregate hardware status for admin
+  - `access_code_service.py` — Redeemable code access (alternative to payment)
+  - `theme_service.py` — Photobooth theme management (built-in + custom)
+  - `image_composition_service.py` — Photo strip composite generation
+  - `retention_service.py` — Composite image retention/expiry
+  - `share_service.py` — Time-limited share URLs
+- [x] **7 user-facing tables**: `kiosk_sessions`, `access_codes`, `photobooth_themes`, `operator_configs`, `analytics_events`, `print_jobs`, `devices`
+- [x] **65 API endpoints** across 6 route modules (admin 29, kiosk 25, camera 3, printer 4, ai 1, payment 3)
+- [x] 5 AI providers (OpenAI, Anthropic, Google, Ollama, Mock) with fallback chain
+- [x] 3 payment providers (Midtrans, Xendit, Mock)
 - [x] 6 utility modules (dithering, escpos, image, validators, logging, constants)
-- [x] Floyd-Steinberg dithering for thermal printing
-- [x] ESC/POS raster encoding
-- [x] Config service with default seeding
-- [ ] Payment model (`app/models/payment.py`) — stub only (comments). Payment data stored in KioskSession instead.
+- [x] Floyd-Steinberg dithering, ESC/POS raster encoding
 
 ### Frontend Foundation (100%)
-- [x] Vite 6 configuration with backend proxy
-- [x] TypeScript strict mode configuration
-- [x] Tailwind CSS 4 with custom kiosk theme
-- [x] shadcn/ui configuration — 17 components installed
-- [x] ESLint + Prettier configuration
-- [x] Vitest configuration with jsdom
-- [x] MSW for API mocking
-- [x] Axios client instance with auth interceptors
-- [x] Utility: `cn()` for className merging
-- [x] Global CSS with kiosk-optimized styles
-- [x] Entry point (`main.tsx`) with StrictMode
-- [x] Test setup (`__tests__/setup.ts`) with jest-dom matchers
+- [x] Vite 6 + TypeScript strict mode + Tailwind CSS 4 + shadcn/ui (17 components)
+- [x] ESLint + Prettier, Vitest with jsdom, MSW for API mocking
+- [x] Axios client with auth interceptors, Zustand stores, React Query for server state
+- [x] New deps: `qrcode.react` (PaymentScreen QR), `recharts` (analytics charts), `jspdf` + `jspdf-autotable` (CSV/PDF export)
 
-### Frontend Implementation (75%)
-- [x] `App.tsx` — React Router v7 with kiosk and admin routes
-- [x] All API types (320 lines matching backend Pydantic schemas)
-- [x] All API endpoint functions (kiosk, admin, camera, payment)
-- [x] Zustand stores — kioskStore (state machine) and adminStore (auth + config)
-- [x] Custom hooks — useSession, useCamera, useCountdown, useKioskState, usePrinter, useMediaQuery
-- [x] Kiosk components — IdleScreen, CaptureScreen, ProcessingScreen, RevealScreen (all fully implemented)
-- [x] KioskShell — state router with Framer Motion transitions
-- [x] Admin components — AdminLayout, AiConfig, PaymentConfig, AnalyticsDashboard, HardwareSetup
-- [x] All 7 page components — KioskPage, AdminLoginPage, AdminPage, AdminDashboardPage, AdminConfigPage, AdminHardwarePage, AdminAnalyticsPage
-- [x] ErrorBoundary component
-- [ ] **PaymentScreen** — STUB (empty `<div>`)
-- [ ] **usePayment hook** — stubbed for future use
-- [ ] **paymentApi** — stubbed for future use
-- [ ] Error display UI — errors stored but not shown to user
+### Frontend Implementation (95%)
+- [x] **Kiosk screens** (14 components):
+  - Vibe Check flow: `IdleScreen`, `CaptureScreen`, `ReviewScreen`, `ProcessingScreen`, `RevealScreen`
+  - Photobooth flow: `PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `PhotoboothRevealScreen`
+  - Shared: `FeatureSelectScreen`, `AccessCodeScreen`, `PaymentScreen`, `KioskShell`, `VirtualNumpad`
+- [x] `PaymentScreen` — **fully implemented** (QR display, status polling, countdown). Was previously a stub.
+- [x] **Admin components** (10): `AdminLayout`, `AiConfig`, `AnalyticsDashboard`, `AnalyticsExportButton`, `HardwareSetup`, `PaymentAccessConfig`, `PhotoboothConfig`, `PrintTemplateConfig`, `ThemeManager`, `VibeCheckConfig`
+- [x] **13 pages** including `AdminPhotoboothPage`, `AdminStripsGalleryPage`, `AdminPrintTemplatePage`, `AdminVibeCheckPage`
+- [x] 8 hooks: `useCamera`, `useCountdown`, `useKioskState`, `useMediaQuery`, `usePayment`, `usePhotoboothState`, `usePrinter`, `useSession`
+- [x] `useKioskState` — render-time side effect fixed (uses `useEffect` properly)
+- [x] `next-themes` dependency removed (was unused)
+- [x] Error display via Toaster (sonner)
 
-### Testing (60%)
-- [x] Backend tests — 249 tests (10 unit + 4 integration files)
-  - Unit: all 7 services + exceptions + security
-  - Integration: kiosk flow, AI flow, payment flow, admin flow
+### Testing (~65%)
+- [x] **Backend: 284 tests** (up from 249)
+  - Unit (12 files): ai, analytics, camera, config, exceptions, hardware, payment, printer, security, session, access_code, retention
+  - Integration (4 files): admin_flow, ai_flow, kiosk_flow, payment_flow
   - Database: SQLite in-memory with PostgreSQL compat patches
-- [x] Frontend tests — 32 tests
+- [x] **Frontend: 34 tests** (up from 32)
   - Stores: kioskStore, adminStore
   - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
   - Hooks: useCountdown
-  - API mocking: MSW handlers configured
-- [ ] Frontend: missing tests for ProcessingScreen, admin pages, admin components, most hooks, ErrorBoundary
+  - MSW handlers configured
+- [ ] Frontend: missing tests for ProcessingScreen, all photobooth screens, admin pages, admin components, most hooks, ErrorBoundary
+- [ ] Backend: missing integration test for photobooth flow
 
 ### DevOps (100%)
-- [x] Docker Compose production config (PostgreSQL 16, multi-stage build, USB passthrough)
+- [x] Docker Compose production config (PostgreSQL 16, multi-stage build, USB passthrough, resource limits)
 - [x] Docker Compose dev override (hot-reload, exposed ports, debug mode)
 - [x] Multi-stage Dockerfile (Node 20 build + Python 3.12 runtime)
-- [x] `.env.example` — comprehensive environment template
-- [x] Makefile — 20+ commands for all common operations
-- [x] `scripts/setup-dev.sh` — automated dev environment setup
-- [x] `scripts/start-kiosk.sh` — kiosk browser launcher
-- [x] `config/fallback-templates/default-fortune.txt` — fallback receipt content
+- [x] `.env.example`, `.env.production`
+- [x] `scripts/start-docker.sh` — auto-detects cameras and printers on Linux, uses usbipd-win auto-install/attach on WSL2
+- [x] Production hardening: static SPA serving, health checks, `make deploy` target, `127.0.0.1` port binding, resource limits
+- [x] `config/fallback-templates/default-fortune.txt`
 
 ---
 
@@ -135,33 +132,36 @@ The project has a complete backend with all services, API endpoints, and 249 tes
 
 ## Known Gaps
 
-1. **PaymentScreen is a stub** — Returns empty `<div>`. Works fine with `PAYMENT_ENABLED=false` (default). Must be implemented before enabling payment.
-2. **No error display in kiosk UI** — `kioskStore.error` is set on failures but never rendered. Users see nothing when errors occur.
-3. **useKioskState has render-time side effect** — Lines 24-30 execute side effects during render. Should be moved to `useEffect`.
-4. **`next-themes` is unused** — Package installed in `package.json` but never imported or used.
-5. **useCamera is oversimplified** — Always returns static stream URL, no device selection.
-6. **No CI/CD pipeline** — No automated testing or deployment.
-7. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
+1. **SEC-001: Docker container runs as root** — Dockerfile has no `USER` directive. Only remaining item from the Phase 1 security audit.
+2. **Frontend test coverage thin** — 34 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
+3. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine.
+4. **No CI/CD pipeline** — Tests run only locally.
+5. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
+6. **In-memory rate limiter and payment store** — Acceptable for single-kiosk; would need Redis for multi-kiosk.
+7. **`docs/prd/05-data-models.md` is missing `photobooth_themes` and `devices` tables** — Documented tables cover KioskSession, AccessCode, OperatorConfig, AnalyticsEvent, PrintJob only.
 
 ---
 
 ## Security Findings
 
-**Overall Posture: YELLOW** (good foundations, production hardening needed)
+**Overall Posture: GREEN** (foundations solid, one production hardening item remaining)
 
 ### Confirmed Safe
 - No hardcoded secrets, API keys, or tokens in source code
-- `.env` is properly gitignored (not tracked in version control)
-- All database queries use parameterized statements (no SQL injection)
+- `.env` properly gitignored
+- All database queries use parameterized statements
 - JWT auth with constant-time PIN comparison and rate limiting
 - Input validation via Pydantic v2 on all request bodies
 - Photos deleted after session completion (privacy-first)
+- Composite images expire via retention service
 
-### Issues Requiring Remediation (see TASK_QUEUE.md for SEC-001 through SEC-004)
-- SEC-001: Docker container runs as root (no `USER` directive)
-- SEC-002: No API rate limiting beyond auth endpoint
-- SEC-003: No request/response size limits
-- SEC-004: CORS allows all methods/headers in production defaults
+### Issues Status
+| ID | Issue | Status |
+|----|-------|--------|
+| SEC-001 | Docker container runs as root (no `USER` directive) | **OPEN** |
+| SEC-002 | No API rate limiting beyond auth endpoint | **DONE** — `RateLimitMiddleware` is now global |
+| SEC-003 | No request/response size limits | **DONE** — `RequestSizeLimitMiddleware` added |
+| SEC-004 | CORS allows all methods/headers | **DONE** — restricted to `GET/POST/PUT` and `Content-Type/Authorization/X-Request-ID` |
 
 Full details in `.claude/SECURITY_STANDARDS.md`
 
@@ -169,7 +169,7 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 
 ## Open Questions
 
-1. Should payment store be persisted to database instead of in-memory? (Current: in-memory, acceptable for single-kiosk)
+1. Should payment store be persisted to the database instead of in-memory? (Current: in-memory, acceptable for single-kiosk)
 2. Should rate limiter use Redis for distributed deployments? (Current: in-memory, acceptable for single-kiosk)
 3. What is the production CORS policy? (Current: configurable via env var, defaults to localhost)
 4. Is there a Content Security Policy requirement for the kiosk browser?
@@ -178,12 +178,13 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 
 ## Test Results
 
-- **Backend**: 249 tests (10 unit files + 4 integration files) — should all pass
-- **Frontend**: 32 tests (stores, core components, countdown hook) — should all pass
-- **Total**: ~281 tests
+- **Backend**: 284 tests across 12 unit + 4 integration files — should all pass
+- **Frontend**: 34 tests — should all pass
+- **Total**: ~318 tests
 
 Run with:
 ```bash
-cd backend && python -m pytest tests/ -v   # backend
-cd frontend && npm test                      # frontend
+make test                                    # both via Docker
+cd backend && python -m pytest tests/ -v     # backend locally
+cd frontend && npm test                      # frontend locally
 ```

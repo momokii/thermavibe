@@ -264,3 +264,201 @@ Record of key architectural and implementation decisions. Each entry documents w
 - **MySQL:** Less feature-rich for JSON and indexing needs
 
 **Source:** `docs/prd/03-nonfunctional-requirements.md` (NFR-SCALE-002)
+
+---
+
+## D-015: Dual Kiosk Flows — Vibe Check + Photobooth
+
+**Decision:** The kiosk supports two distinct session types via a single state machine: the original **Vibe Check** flow (single photo + AI reading) and a new **Photobooth** flow (multi-photo strip with frame selection, arrangement, and composite printing). A `SessionType` discriminator (`vibe_check` / `photobooth`) was added to `KioskSession`.
+
+**Rationale:**
+- Photobooth strips are a different value proposition than AI readings — operators wanted both
+- Sharing the IDLE/PAYMENT/CAPTURE/RESET states avoids duplication
+- A `FeatureSelectScreen` at session start lets the user (or an access code) choose the flow
+- New states `FRAME_SELECT`, `ARRANGE`, `COMPOSITING`, `PHOTOBOOTH_REVEAL` are scoped to the photobooth flow and unreachable from Vibe Check
+
+**Alternatives Rejected:**
+- **Separate kiosk apps per flow:** Doubles deployment burden, contradicts single-kiosk NFR
+- **Single flow with a "mode" flag inside states:** State explosion; harder to reason about transitions
+
+**Source:** `backend/app/models/session.py` (`KioskState`, `SessionType`), `backend/app/services/photobooth_service.py`
+
+---
+
+## D-016: Access Codes as Payment Alternative
+
+**Decision:** Operators can mint redeemable codes (`AccessCode` model) that grant kiosk access without payment. Codes have a type (`vibe_check` / `photobooth` / `universal`), a `max_uses`, an optional `expires_at`, and an optional `price` that is copied to `session.payment_amount` on redemption.
+
+**Rationale:**
+- Event organizers (conferences, weddings, brand activations) want to underwrite prints for guests without running QRIS per session
+- Per-code use tracking enables "X prints per ticket" offers
+- Storing `price` on the code lets operators charge a notional amount (for analytics/revenue) even when the guest doesn't pay
+- The `access_code_id` FK on `KioskSession` is `SET NULL` on delete so historical sessions survive code revocation
+
+**Alternatives Rejected:**
+- **Free-mode toggle only:** Too coarse — operators want per-event control
+- **Discount codes on the payment flow:** Adds complexity; many events don't want any payment UI at all
+
+**Source:** `backend/app/models/access_code.py`, `backend/app/services/access_code_service.py`, migration `7bf4bbccb2f1_add_access_codes_table.py`
+
+---
+
+## D-017: Photobooth Themes Stored as JSONB Config
+
+**Decision:** Photobooth themes are stored as a `photobooth_themes` table row with a `config: JSONB` field holding background/border/decoration/font/watermark styling. Built-in themes are seeded on first startup (`is_builtin=true`, immutable); admins can create custom themes.
+
+**Rationale:**
+- Themes are inherently nested/recursive (colors, fonts, decoration positions) — JSONB fits naturally
+- New visual knobs can be added without schema migrations
+- Only one theme can be `is_default=true` at a time; enforced at the service layer (`theme_service.set_default`)
+- A `preview_image_path` allows the admin UI to render a thumbnail without regenerating the composite
+
+**Alternatives Rejected:**
+- **One column per styling property:** Proliferates migrations; rigid
+- **External YAML/TOML files:** No admin UI; harder to audit
+- **Templates directory with code:** Operators cannot edit through the admin panel
+
+**Source:** `backend/app/models/photobooth_theme.py`, `backend/app/services/theme_service.py`, migration `a3f7c2e1b8d4_add_photobooth_support.py`
+
+---
+
+## D-018: Floyd-Steinberg Dithering + PIL Composite for Strips
+
+**Decision:** Photobooth composites are generated server-side with Pillow. The image composition service lays out the captured photos into the selected grid (e.g. 4 rows × 1 column), applies the theme background/borders/watermark, and the existing Floyd-Steinberg dithering utility converts the result to 1-bit for ESC/POS raster printing.
+
+**Rationale:**
+- Reuses the existing dithering + ESC/POS raster pipeline (D-012) — no parallel code path
+- Server-side composition means the printer receives a deterministic byte stream regardless of kiosk browser
+- Pillow is already a dependency for AI image preprocessing
+- Composites are persisted to `/tmp/vibeprint/...` and surfaced via the share service with a TTL
+
+**Alternatives Rejected:**
+- **Client-side canvas rendering:** Browser canvas DPI and font rendering vary; harder to match print output
+- **Per-provider print templates:** Vendor lock-in, violates provider-agnostic principle
+
+**Source:** `backend/app/services/image_composition_service.py`, `backend/app/utils/dithering.py`, `backend/app/utils/escpos.py`
+
+---
+
+## D-019: Composite Retention with TTL Sweep
+
+**Decision:** Generated photobooth composites are written to a named Docker volume (`app-composites` → `/tmp/vibeprint`) and a retention service expires them after `photobooth_composite_retention_hours` (default 168h = 7 days). The share URL has a separate, shorter TTL (`photobooth_share_url_ttl_seconds`, default 300s).
+
+**Rationale:**
+- Composites are needed briefly for share URLs and reprint-from-gallery, but privacy law (PDP) and disk hygiene require eventual deletion
+- Decoupling share-URL TTL from on-disk retention lets the share link die before the file is purged (no 404s mid-share)
+- A `cleared_at` partial index on `kiosk_sessions` supports the sweep without a full table scan
+
+**Alternatives Rejected:**
+- **Delete immediately after print:** Breaks share-from-gallery and reprint flows
+- **Indefinite retention:** Privacy violation, disk growth
+- **Database BLOB storage:** Performance and backup cost
+
+**Source:** `backend/app/services/retention_service.py`, `backend/app/services/share_service.py`, `docker-compose.yml` (`app-composites` volume)
+
+---
+
+## D-020: Payment Screen Polls via createQR + Status Polling
+
+**Decision:** The kiosk `PaymentScreen` calls `POST /api/v1/payment/qr` on mount to create a QR, then polls `GET /api/v1/payment/{session_id}/status` every 3 seconds until the status is `confirmed` or `expired`, with a 120s countdown sourced from `payment_timeout_seconds`.
+
+**Rationale:**
+- QRIS (Midtrans/Xendit) webhooks are inbound-only — the kiosk cannot accept callbacks
+- Polling is simple, works through NAT, and 3s is fast enough for a 120s payment window without hammering the gateway
+- The countdown is driven client-side from the same `payment_timeout_seconds` config the backend uses, so the two stay in sync
+- On expiry the screen transitions to a recovery state; on confirmation it advances to CAPTURE
+
+**Alternatives Rejected:**
+- **WebSocket push:** Adds infra; the gateway already polls via webhook
+- **Server-Sent Events:** Same complexity cost as WebSocket for a single one-shot transition
+
+**Source:** `frontend/src/components/kiosk/PaymentScreen.tsx`, `frontend/src/api/paymentApi.ts`, `backend/app/api/v1/endpoints/payment.py`
+
+---
+
+## D-021: Astro for the Marketing Website (Not the Kiosk App)
+
+**Decision:** A separate `website/` directory ships a static marketing site built with Astro + Tailwind, deployed via its own Docker compose + nginx. It is **not** part of the kiosk or admin React app.
+
+**Rationale:**
+- Marketing pages (gallery, docs, CTA) are content-heavy and benefit from SSG
+- Astro ships zero JS by default — fast LCP, no React runtime tax
+- Keeping it separate from the kiosk SPA means marketing deploys never touch the running kiosk
+- Docs in the website mirror `docs/` but are reconciled against actual code in commits like "fix(website): reconcile all docs pages with actual codebase"
+
+**Alternatives Rejected:**
+- **Fold marketing into the React SPA:** Heavier bundle, slower LCP, couples release cadence
+- **Next.js:** Overkill for a static marketing site
+
+**Source:** `website/` (Astro + Tailwind), `website/docker-compose.yml`, `website/nginx.conf`
+
+---
+
+## D-022: WSL2 Hardware Passthrough via usbipd-win Auto-Install
+
+**Decision:** `scripts/start-docker.sh` detects WSL2 (`uname -r` matches `microsoft|wsl`) and, when USB devices are expected but missing, auto-installs `usbipd-win` on the Windows host (via `winget`), binds the device on Windows, then attaches it to the WSL VM using the v5 `usbipd attach` syntax (the `wsl` subcommand was removed in v5).
+
+**Rationale:**
+- The reference dev machine is WSL2 — hardware must reach the container for real-camera/real-printer testing
+- Earlier attempts called `usbipd wsl attach`, which silently failed on v5; the script now binds explicitly then attaches
+- Auto-installing usbipd-win removes a per-machine setup step that was a frequent onboarding blocker
+- The script is defensive: `set -e` no longer kills the run when PowerShell calls fail, the Windows PATH is refreshed after install, and camera accessibility is verified before container start (group `video` is added when cameras are detected)
+
+**Alternatives Rejected:**
+- **Document-only (manual setup):** Tried first; recurring breakage on usbipd version bumps
+- **Skip WSL2 support:** Would block the primary dev environment
+
+**Source:** `scripts/start-docker.sh`, commits `3da2643` through `d864865` (May 13–15)
+
+---
+
+## D-023: Progressive Retry for USB-to-Parallel Bridge Chips
+
+**Decision:** The printer service uses a progressive retry strategy with increasing waits for USB-to-parallel bridge chips (e.g. the `0fe6` bridge). The initial connection attempt waits up to 15 seconds to absorb power-cycle recovery, and subsequent reconnects back off progressively. `is_online()` status queries are never used for bridge chips (they don't implement ESC/POS status correctly); sysfs presence checks are used instead.
+
+**Rationale:**
+- Bridge-chip printers report offline even when mechanically fine — `is_online()` returns false negatives
+- Power-cycling the printer (common at events) makes the device briefly unavailable to the host; a single quick retry fails
+- Empirically, a 15s initial wait recovers ~all power-cycle cases without blocking normal operation
+- sysfs (`/sys/bus/usb/devices/...`) is the ground truth for "is the device enumerated"
+
+**Alternatives Rejected:**
+- **Simple retry with fixed 1s wait:** Power-cycle case fails (commit `ff867be` reverted this)
+- **Strict ESC/POS communication test on connect:** Rejects healthy bridge-chip printers (commit `dd57616` removed this)
+
+**Source:** `backend/app/services/printer_service.py`, commits `bbeb061` through `7b19dcf` (May 9), `feedback_printer_usb_bridge.md` memory
+
+---
+
+## D-024: Global Rate Limit + Request Size Limit Middleware
+
+**Decision:** Phase 1 security findings SEC-002, SEC-003, and SEC-004 were resolved by adding `RateLimitMiddleware` (global, not just admin login), `RequestSizeLimitMiddleware`, and narrowing CORS to methods `GET/POST/PUT` and headers `Content-Type/Authorization/X-Request-ID`.
+
+**Rationale:**
+- The original audit only rate-limited the admin login endpoint; a public kiosk needs blanket protection against abusive traffic
+- Request size limits block oversized payloads (and accidental image dumps) at the edge
+- CORS method/header narrowing reduces the attack surface without breaking the kiosk SPA (which only uses those three methods and three headers)
+
+**Alternatives Rejected:**
+- **Per-route rate limiting:** Higher maintenance, easy to forget on new endpoints
+- **Redis-backed limiter now:** Premature for single-kiosk; in-memory limiter is sufficient until multi-kiosk
+
+**Source:** `backend/app/core/middleware.py` (`RateLimitMiddleware`, `RequestSizeLimitMiddleware`, `setup_cors`), `backend/app/main.py`
+
+---
+
+## D-025: Production SPA Serving from FastAPI
+
+**Decision:** In production, the Dockerfile multi-stage build copies `frontend/dist` into `/app/static` inside the backend image, and FastAPI serves the SPA via a catch-all `/{full_path:path}` route registered **after** `/api/v1/*`, `/health`, and `/docs`. In development, this path is inert (no `static/` dir) and the Vite dev server handles the frontend on port 5173.
+
+**Rationale:**
+- Single-container deployment simplifies the production docker-compose (one image, one port)
+- Registering the catch-all last means API routes match first — no shadowing
+- Health check (`/health`) is independent of the SPA, so container orchestrators get a real signal
+- Port binding is `127.0.0.1` only — the kiosk browser connects locally, no external exposure
+
+**Alternatives Rejected:**
+- **Separate nginx container for the SPA:** More moving parts; the backend can serve static files fine
+- **CDN-hosted SPA:** Kiosk is offline-first; CDN adds a failure mode
+
+**Source:** `backend/app/main.py` (SPA fallback block), `Dockerfile`, commit `08f8382`

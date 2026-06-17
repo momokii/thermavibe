@@ -1,31 +1,32 @@
 # Security Standards — VibePrint OS
 
-Derived from the Phase 1 security audit (2026-04-16). All future code must comply with these requirements.
+Derived from the Phase 1 security audit (2026-04-16). Status reconciled with the codebase on 2026-06-17. All future code must comply with these requirements.
 
 ---
 
 ## Audit Findings Summary
 
-**Overall Posture: YELLOW** (good foundations, production hardening needed)
+**Overall Posture: GREEN** (solid foundations, one production hardening item remaining)
 
 ### Confirmed Safe
 - No hardcoded secrets, API keys, or tokens in source code
 - `.env` is properly gitignored (not tracked in version control)
 - All queries use SQLAlchemy ORM with parameterized statements (no SQL injection risk)
 - JWT authentication with constant-time PIN comparison (`hmac.compare_digest`)
-- Rate limiting on admin login endpoint (5 attempts per IP per 60 seconds)
+- **Global rate limiting** via `RateLimitMiddleware` (default 60 req/60s, configurable) — covers all routes, not just admin login
+- **Request size limiting** via `RequestSizeLimitMiddleware`
 - Input validation via Pydantic v2 on all request bodies
-- Photo files saved with UUID names, deleted after session completion
+- Photo files saved with UUID names, deleted after session completion; composites expire via retention service
 - Port binding limited to localhost (`127.0.0.1:8000`)
 
-### Issues Requiring Remediation
+### Issues Status
 
-| ID | Issue | Severity | File |
-|----|-------|----------|------|
-| SEC-001 | Docker container runs as root (no `USER` directive) | Medium | `Dockerfile` |
-| SEC-002 | No API rate limiting beyond auth endpoint | Medium | `backend/app/core/middleware.py` |
-| SEC-003 | No request/response size limits | Low | FastAPI app config |
-| SEC-004 | CORS allows all methods/headers; should restrict in production | Low | `backend/app/core/middleware.py` |
+| ID | Issue | Severity | Status | Notes |
+|----|-------|----------|--------|-------|
+| SEC-001 | Docker container runs as root (no `USER` directive) | Medium | **OPEN** | Only unresolved audit item |
+| SEC-002 | No API rate limiting beyond auth endpoint | Medium | **DONE** | `RateLimitMiddleware` is now global (`backend/app/main.py`) |
+| SEC-003 | No request/response size limits | Low | **DONE** | `RequestSizeLimitMiddleware` added (`backend/app/core/middleware.py`) |
+| SEC-004 | CORS allows all methods/headers | Low | **DONE** | Restricted to `GET/POST/PUT` and `Content-Type/Authorization/X-Request-ID` (`setup_cors`) |
 
 ### Acceptable for Development, Must Change for Production
 - Default `APP_SECRET_KEY="change-me-in-production"` — acceptable for dev, mandatory to change in prod

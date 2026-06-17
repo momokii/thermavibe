@@ -8,22 +8,40 @@ Tasks are organized in dependency waves, ordered by sequence.
 
 ## Remaining Work
 
-These are the items still needing implementation, ordered by priority:
+These are the items still needing implementation, ordered by priority.
 
 ### Security Remediation (from Phase 1 audit)
 
 1. **SEC-001: Add non-root user to Dockerfile** — App container runs as root. Add `USER` directive with non-root user. Priority: High.
-2. **SEC-002: Add API rate limiting** — No rate limiting beyond admin login. Add general API rate limiting middleware. Priority: Medium.
-3. **SEC-003: Add request/response size limits** — No file upload or payload size limits configured. Priority: Medium.
-4. **SEC-004: Restrict CORS in production** — Default CORS allows all methods/headers. Should be narrowed for production. Priority: Medium.
+   ~~**SEC-002: Add API rate limiting**~~ — **DONE.** `RateLimitMiddleware` is now installed globally in `backend/app/main.py`.
+   ~~**SEC-003: Add request/response size limits**~~ — **DONE.** `RequestSizeLimitMiddleware` added.
+   ~~**SEC-004: Restrict CORS in production**~~ — **DONE.** CORS now restricts methods to `GET/POST/PUT` and headers to `Content-Type/Authorization/X-Request-ID`.
 
-### Feature Work
+### Hardening & Test Coverage
 
-5. **Implement PaymentScreen** — The kiosk payment screen is a stub (empty `<div>`). Must be completed before enabling `PAYMENT_ENABLED=true`.
-6. **Add kiosk error display UI** — `kioskStore.error` is set but never rendered. Users see nothing on errors.
-7. **Expand frontend test coverage** — Admin components, most hooks, and pages lack tests.
-8. **Fix useKioskState side effect** — Render-time side effect should be in `useEffect`.
-9. **Remove unused `next-themes` dependency** — Dead package in `package.json`.
+2. **Expand frontend test coverage** — Only 34 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
+3. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
+4. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
+
+### Documentation
+
+5. **Add `photobooth_themes` and `devices` tables to `docs/prd/05-data-models.md`** — Both models exist in `backend/app/models/` and have migrations but are not documented in the data models PRD.
+
+### Wave 5 — E2E & Hardware (not started)
+
+6. Full kiosk flow in Docker with mock providers.
+7. Real camera capture testing.
+8. Real thermal printer testing (respecting the "minimize paper waste" feedback rule).
+9. Real AI provider testing.
+10. Payment flow with mock provider.
+11. Performance benchmarks (capture-to-print < 30s).
+
+### Completed (kept for reference)
+
+- ~~**Implement PaymentScreen**~~ — **DONE.** `frontend/src/components/kiosk/PaymentScreen.tsx` now creates a QR via `paymentApi.createQR`, polls for status, and renders a countdown.
+- ~~**Add kiosk error display UI**~~ — **DONE.** Errors surface via the `sonner` Toaster mounted in `App.tsx`.
+- ~~**Fix useKioskState side effect**~~ — **DONE.** The hook now uses `useEffect` for the processing→reveal transition.
+- ~~**Remove unused `next-themes` dependency**~~ — **DONE.** No longer in `frontend/package.json`.
 
 ---
 
@@ -200,16 +218,19 @@ These must be completed first. Everything else depends on them.
 
 ### Frontend Kiosk Screens
 
-| | **Priority:** P0 | **Complexity:** L | **Dependencies:** Wave 1 | **Status:** MOSTLY DONE |
+| | **Priority:** P0 | **Complexity:** L | **Dependencies:** Wave 1 | **Status:** DONE |
 |---|---|
 | **Scope:** | Kiosk UI components:
   - IdleScreen — DONE
   - CaptureScreen — DONE (camera feed, countdown, flash)
+  - ReviewScreen — DONE (photo review + retake)
   - ProcessingScreen — DONE (loading animation)
   - RevealScreen — DONE (typewriter effect, auto-print)
   - KioskShell — DONE (state router with Framer Motion)
-  - PaymentScreen — **STUB** (empty div) |
-| **Remaining:** | Implement PaymentScreen with QR code display and payment status polling |
+  - PaymentScreen — DONE (QR display, status polling, countdown)
+  - Photobooth flow — DONE (PhotoboothCaptureScreen, FrameSelectScreen, ArrangeScreen, PhotoboothRevealScreen)
+  - AccessCodeScreen — DONE (VirtualNumpad, code redemption)
+  - FeatureSelectScreen — DONE (Vibe Check vs Photobooth chooser) |
 
 ---
 
@@ -247,11 +268,10 @@ These must be completed first. Everything else depends on them.
 
 | | **Priority:** P1 | **Complexity:** L | **Dependencies:** Wave 1-2 | **Status:** DONE |
 |---|---|
-| **Scope:** | 249 tests across unit and integration:
-  - **Unit tests (10 files):** ai_service, analytics_service, camera_service, config_service, exceptions, hardware_service, payment_service, printer_service, security, session_service
+| **Scope:** | 284 tests across unit and integration:
+  - **Unit tests (12 files):** ai_service, analytics_service, camera_service, config_service, exceptions, hardware_service, payment_service, printer_service, security, session_service, access_code_service, retention_service
   - **Integration tests (4 files):** admin_flow, ai_flow, kiosk_flow, payment_flow
   - Database: SQLite in-memory with PostgreSQL compat patches
-  - ~4,777 lines of test code |
 
 ---
 
@@ -259,12 +279,12 @@ These must be completed first. Everything else depends on them.
 
 | | **Priority:** P1 | **Complexity:** M | **Dependencies:** Wave 3 | **Status:** PARTIAL |
 |---|---|
-| **Scope:** | 32 tests:
+| **Scope:** | 34 tests:
   - Stores: kioskStore, adminStore
   - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
   - Hooks: useCountdown
   - MSW API mocking configured |
-| **Remaining:** | Tests for ProcessingScreen, admin pages, admin components, useSession, useKioskState, useCamera, usePrinter, ErrorBoundary |
+| **Remaining:** | Tests for ProcessingScreen, all photobooth screens (PhotoboothCaptureScreen, FrameSelectScreen, ArrangeScreen, ReviewScreen, PhotoboothRevealScreen), AccessCodeScreen, admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check), admin components, useSession, useKioskState, usePhotoboothState, useCamera, usePrinter, usePayment, ErrorBoundary |
 
 ---
 

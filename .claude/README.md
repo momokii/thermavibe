@@ -50,7 +50,7 @@ Then, for your task at hand, read the relevant sections from:
 | `docs/prd/02-functional-requirements.md` | All functional requirements by module |
 | `docs/prd/03-nonfunctional-requirements.md` | Performance, reliability, security NFRs |
 | `docs/prd/04-user-flows.md` | Complete kiosk and admin user flows |
-| `docs/prd/05-data-models.md` | Database schema (4 tables) constraints, indexes) |
+| `docs/prd/05-data-models.md` | Database schema (7 tables: kiosk_sessions, access_codes, photobooth_themes, operator_configs, analytics_events, print_jobs, devices) |
 | `docs/prd/06-integration-map.md` | External integration specs (AI, payment, printer, camera) |
 | `docs/prd/07-out-of-scope.md` | Explicitly out-of-scope items |
 | `docs/prd/08-open-questions.md` | Unresolved questions |
@@ -82,7 +82,7 @@ curl http://localhost:8000/health
 ```
 
 Other key commands:
-- `make test` — Run all tests (249 backend + 32 frontend)
+- `make test` — Run all tests (284 backend + 34 frontend)
 - `make lint` — Run all linters
 - `make help` — See all available commands
 - See `.claude/ENVIRONMENT_GUIDE.md` for the complete command reference
@@ -93,8 +93,9 @@ Consult `.claude/SECURITY_STANDARDS.md` for the full security posture and requir
 
 Key points:
 - No secrets in source code — all via `.env` (properly gitignored)
-- JWT auth with rate limiting on admin endpoints
-- Docker container runs as root (known issue SEC-001 — needs remediation)
+- JWT auth with global rate limiting on all routes (not just admin)
+- Request size limiting on all endpoints
+- Docker container still runs as root (known issue SEC-001 — only open audit item)
 - Default credentials in `.env.example` are for development only
 
 ## Key Files in the Repo

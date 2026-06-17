@@ -1,9 +1,9 @@
 # Data Models
 
 > **Document ID:** PRD-05
-> **Version:** 1.2
+> **Version:** 1.3
 > **Status:** Approved
-> **Last Updated:** 2026-05-01
+> **Last Updated:** 2026-06-17
 
 This document defines the data entities, field-level specifications, constraints, indexes, and relationships for the VibePrint OS persistence layer. All data is stored in PostgreSQL 15+ and managed via SQLAlchemy ORM with Alembic migrations.
 
@@ -17,7 +17,9 @@ This document defines the data entities, field-level specifications, constraints
 4. [OperatorConfig](#4-operatorconfig)
 5. [AnalyticsEvent](#5-analyticsevent)
 6. [PrintJob](#6-printjob)
-7. [Privacy Model](#7-privacy-model)
+7. [PhotoboothTheme](#7-photobooththeme)
+8. [Device](#8-device)
+9. [Privacy Model](#9-privacy-model)
 
 ---
 
@@ -661,13 +663,145 @@ class PrintJob(Base):
 
 ---
 
-## 7. Privacy Model
+## 7. PhotoboothTheme
 
-### 7.1 Core Principle
+The `PhotoboothTheme` entity stores theme configurations for the photobooth strip generator. Built-in themes are seeded on first startup (`is_builtin = true`); admins can create custom themes via the admin panel. Only one theme may be `is_default = true` at a time.
+
+### 7.1 Table Definition
+
+**Table name:** `photobooth_themes`
+
+### 7.2 Fields
+
+| Field | Type | Nullable | Default | Description |
+|-------|------|----------|---------|-------------|
+| `id` | SERIAL (PK) | No | auto-increment | Primary key |
+| `name` | VARCHAR(128) | No | — | Unique machine-readable name (e.g. `classic_black`) |
+| `display_name` | VARCHAR(255) | No | — | Human-readable name shown in admin UI |
+| `config` | JSONB | No | — | Theme styling (background, borders, decorations, font, watermark) |
+| `preview_image_path` | VARCHAR(512) | Yes | NULL | Optional path to a generated preview thumbnail |
+| `is_builtin` | BOOLEAN | No | `false` | System themes cannot be deleted |
+| `is_enabled` | BOOLEAN | No | `true` | Disabled themes are hidden from kiosk selection |
+| `is_default` | BOOLEAN | No | `false` | Only one theme can be the default at a time |
+| `sort_order` | INTEGER | No | `0` | Lower values appear first in selection UI |
+| `created_at` | TIMESTAMPTZ | No | `now()` | Timestamp when the theme was created |
+| `updated_at` | TIMESTAMPTZ | No | `now()` | Timestamp of the last update (auto-updated) |
+
+### 7.3 Constraints
+
+| Name | Type | Columns | Description |
+|------|------|---------|-------------|
+| `pk_photobooth_themes` | PRIMARY KEY | `id` | Surrogate key |
+| `uq_photobooth_themes_name` | UNIQUE | `name` | Theme names must be unique |
+
+### 7.4 Indexes
+
+| Name | Columns | Description |
+|------|---------|-------------|
+| `pk_photobooth_themes` | `id` | Primary key lookup |
+| `uq_photobooth_themes_name` | `name` | Unique name enforcement + lookup by name |
+
+### 7.5 Config JSONB Shape
+
+The `config` field holds nested styling. Example:
+
+```json
+{
+  "background": "#000000",
+  "border": { "color": "#ffffff", "width_px": 2 },
+  "decorations": ["sparkle_top", "logo_bottom"],
+  "font": { "family": "Inter", "size_px": 14, "color": "#ffffff" },
+  "watermark": { "enabled": true, "text": "VibePrint OS" }
+}
+```
+
+### 7.6 SQLAlchemy Model (Reference)
+
+```python
+class PhotoboothTheme(Base):
+    __tablename__ = "photobooth_themes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    preview_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[str] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[str] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+```
+
+---
+
+## 8. Device
+
+The `Device` entity tracks USB devices (cameras and printers) connected to the kiosk. It is a registry of what has been observed on the host, used by the admin hardware status panel and the auto-detection logic in `start-docker.sh`.
+
+### 8.1 Table Definition
+
+**Table name:** `devices`
+
+### 8.2 Fields
+
+| Field | Type | Nullable | Default | Description |
+|-------|------|----------|---------|-------------|
+| `id` | SERIAL (PK) | No | auto-increment | Primary key |
+| `device_type` | VARCHAR(16) | No | — | `camera` or `printer` |
+| `name` | VARCHAR(255) | No | — | Human-readable device name |
+| `vendor_id` | VARCHAR(16) | Yes | NULL | USB vendor ID in hex (e.g. `0x04b8`) |
+| `product_id` | VARCHAR(16) | Yes | NULL | USB product ID in hex (e.g. `0x0e15`) |
+| `capabilities` | JSONB | Yes | `{}` | Device capabilities (resolution, paper width, etc.) |
+| `is_active` | BOOLEAN | No | `true` | Whether the device is currently active |
+| `last_seen_at` | TIMESTAMPTZ | Yes | NULL | Timestamp when the device was last detected |
+
+### 8.3 Constraints
+
+| Name | Type | Columns | Description |
+|------|------|---------|-------------|
+| `pk_devices` | PRIMARY KEY | `id` | Surrogate key |
+
+### 8.4 Indexes
+
+| Name | Columns | Description |
+|------|---------|-------------|
+| `pk_devices` | `id` | Primary key lookup |
+| `ix_devices_device_type` | `device_type` | Filter by type (camera vs printer) |
+
+### 8.5 SQLAlchemy Model (Reference)
+
+```python
+class Device(Base):
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(INTEGER, primary_key=True, autoincrement=True)
+    device_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    vendor_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    product_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    capabilities: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_seen_at: Mapped[str | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+```
+
+---
+
+## 9. Privacy Model
+
+### 9.1 Core Principle
 
 VibePrint OS is designed with privacy as a primary concern. The system captures photographic images of users in public spaces and processes them through AI services. The privacy model ensures that personal data is retained for the minimum time necessary and is not used for any purpose beyond delivering the immediate service.
 
-### 7.2 Data Retention Policy
+### 9.2 Data Retention Policy
 
 | Data Type          | Storage Location    | Retention Period          | Deletion Method                          |
 |--------------------|---------------------|--------------------------|------------------------------------------|
@@ -680,7 +814,7 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 | Print job records  | PostgreSQL `print_jobs` | 30 days after session creation | Cascading delete with session |
 | Access code records | PostgreSQL `access_codes` | Indefinite (operator-controlled) | Revoked or expired codes retained for audit trail; deletion is manual via admin dashboard |
 
-### 7.3 Photo Handling
+### 9.3 Photo Handling
 
 1. **Capture:** Photo is saved to a temporary directory on the local filesystem. Vibe check photos are saved to `/tmp/` with a `vibeprint_` prefix. Photobooth photos are saved to `/tmp/` with a `vibeprint_snap_` prefix.
 2. **Processing (Vibe Check):** The photo is read from disk, converted to base64, and sent to the AI provider. The AI provider's own privacy policy governs what happens to the image on their servers.
@@ -690,21 +824,21 @@ VibePrint OS is designed with privacy as a primary concern. The system captures 
 6. **Retention:** The retention service background task runs periodically, purging files older than the configured retention period for each feature. The cleanup interval is auto-derived from the shorter of the two retention periods.
 7. **Database reference:** The `photo_path` and `composite_image_path` fields record where files are stored for gallery access.
 
-### 7.4 AI Provider Data Transmission
+### 9.4 AI Provider Data Transmission
 
 - Photos are transmitted to the AI provider over HTTPS (TLS 1.2+)
 - The system does not store AI provider responses beyond what is needed for the current session
 - The `ai_provider_used` field in the database records which provider processed the image but does not store any image data sent to the provider
 - Operators should review the privacy policy of their chosen AI provider to understand how images are handled on the provider's infrastructure
 
-### 7.5 No Facial Recognition or Biometric Storage
+### 9.5 No Facial Recognition or Biometric Storage
 
 - VibePrint OS does not perform facial recognition, face detection beyond what the AI vision model inherently does, or store any biometric data
 - No user identification, tracking, or profiling is performed
 - Sessions are anonymous; no personally identifiable information (PII) is collected beyond the photo itself
 - The AI prompt is designed to analyze the photo for "vibe reading" purposes only and is not configured to extract or store identifying information
 
-### 7.6 Automated Retention Cleanup
+### 9.6 Automated Retention Cleanup
 
 A background task (`retention_service`) starts on application boot and runs periodically to purge expired data:
 
@@ -722,7 +856,7 @@ A background task (`retention_service`) starts on application boot and runs peri
 
 Retention periods are configurable via the admin dashboard under each feature's configuration section. The system auto-derives the cleanup interval to ensure neither feature's files are retained longer than configured.
 
-### 7.7 Compliance Considerations
+### 9.7 Compliance Considerations
 
 - The kiosk should display a visible privacy notice on the attract loop or near the physical kiosk, informing users that their photo will be temporarily captured and processed
 - The notice should state that photos are not stored permanently and are deleted after the session
