@@ -28,6 +28,8 @@ These are the items still needing implementation, ordered by priority.
 
 ~~5. **Add `photobooth_themes` and `devices` tables to `docs/prd/05-data-models.md`**~~ — **DONE.** Sections 7 (PhotoboothTheme) and 8 (Device) are now documented.
 
+6. **Fix factory-pattern example in `docs/technical/testing-strategy.md` §4.1 (docs-only)** — The example imports `from app.models.payment import Payment` (nonexistent — `backend/app/models/payment.py` is a 15-line docstring stub, no SQLAlchemy class, not exported from `models/__init__.py`), uses `return Session(**defaults)` instead of `KioskSession(...)` (the import on the adjacent line is `KioskSession`), and defines a `create_test_payment()` factory that cannot work as written. Payment data currently lives as columns on `KioskSession` (`payment_provider`, `payment_amount`, `payment_reference`, `payment_status`). Two clean fix options: (a) delete the `create_test_payment` factory and the `Payment` import, leaving `create_test_session` with the `Session` → `KioskSession` typo fixed; or (b) keep the factory as aspirational with a clear note that it depends on implementing the `Payment` model. **No code changes** — this is a doc-only fix.
+
 ### Wave 5 — E2E & Hardware (not started)
 
 6. Full kiosk flow in Docker with mock providers.

@@ -139,6 +139,7 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 5. **No CI/CD pipeline** — Tests run only locally.
 6. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
 7. **In-memory rate limiter and payment store** — Acceptable for single-kiosk; would need Redis for multi-kiosk.
+8. **`docs/technical/testing-strategy.md` §4.1 example drift** — The factory-pattern example imports `from app.models.payment import Payment` (nonexistent — `payment.py` is a stub) and uses `Session(**defaults)` instead of `KioskSession(**defaults)`. Doc-only fix; no code changes needed. Flagged inline in the doc.
 
 ---
 

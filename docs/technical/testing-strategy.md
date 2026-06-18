@@ -1004,6 +1004,8 @@ Track in `.claude/state/TASK_QUEUE.md` (Hardening & Test Coverage, item 3).
 
 ### 4.1 Factory Pattern (Backend)
 
+> ⚠️ **Known drift in the example below (tracked in `.claude/state/TASK_QUEUE.md` Documentation section).** The code block imports `from app.models.payment import Payment`, but `backend/app/models/payment.py` is currently a stub (15-line docstring, no SQLAlchemy class, not exported from `models/__init__.py`). Payment data actually lives as columns on `KioskSession` (`payment_provider`, `payment_amount`, `payment_reference`, `payment_status`). The example also calls `return Session(**defaults)` on line 1041, but the import on line 1013 is `KioskSession`. Treat the `create_test_payment()` factory as aspirational until the `Payment` model is implemented; the `create_test_session()` factory is accurate except for the `Session` → `KioskSession` typo.
+
 Use factory functions to generate test data with sensible defaults and easy customization:
 
 ```python
