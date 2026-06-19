@@ -21,9 +21,6 @@ services:
       target: backend-runtime
     container_name: vibeprint-app-dev
     user: "0:0"
-    group_add:
-      - "44"   # video — for /dev/video* camera access
-      - "7"    # lp — for USB printer access
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

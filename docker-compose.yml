@@ -26,6 +26,9 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    group_add:
+      - "44"   # video — /dev/video* camera access
+      - "7"    # lp — USB printer access
     depends_on:
       postgres:
         condition: service_healthy

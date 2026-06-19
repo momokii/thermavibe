@@ -1,8 +1,8 @@
 # Current Status — VibePrint OS
 
-**Last Updated:** 2026-06-17
-**Updated By:** Documentation sync against actual codebase state
-**Session Summary:** Reconciled state files with the May–June feature work. The previous snapshot (2026-04-16) predated photobooth mode, access codes, themes, retention/share services, the marketing website, WSL2 hardware passthrough, and production deployment hardening. Test, model, and endpoint counts were refreshed from the live tree.
+**Last Updated:** 2026-06-19
+**Updated By:** Fix for docker-compose group_add duplication (Compose v5.1.1 validation)
+**Session Summary:** Fixed `make dev` failure ("services.app.group_add items at 0 and 2 are equal") caused by Docker Compose v5.1.1 rejecting a duplicate GID 44 that arose from merging `docker-compose.dev.yml` and the script-generated `.docker-compose.devices.yml`. Consolidated `group_add` to a single source of truth in `docker-compose.yml` (base/prod now has `["44","7"]`), removed the redundant block from `docker-compose.dev.yml`, and removed the group_add generation block from `scripts/start-docker.sh`. Verified: both containers come up healthy, `/health` responds, regenerated override file is device-mapping-only.
 
 ---
 
