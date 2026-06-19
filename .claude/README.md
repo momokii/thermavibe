@@ -34,6 +34,7 @@ Read these files in order:
 6. **Security standards** (`.claude/SECURITY_STANDARDS.md`) — security requirements and audit findings
 7. **Environment guide** (`.claude/ENVIRONMENT_GUIDE.md`) — environment definitions and verified commands
 8. **Root CLAUDE.md** — project-wide rules and constraints
+9. **Update roadmap** (`docs/technical/update-roadmap.md`) — the three "big update" directions (multi-kiosk, remote ops, digital sharing) with file-by-file implementation specs. **Read this if the user asks "what should I build next?" or "what are the update ideas?"** Current priority is Option 3 (Digital Sharing).
 
 Then, for your task at hand, read the relevant sections from:
 
@@ -66,6 +67,7 @@ Then, for your task at hand, read the relevant sections from:
 | `docs/technical/development-setup-guide.md` | Local development environment setup |
 | `docs/technical/docker-deployment-guide.md` | Production Docker deployment |
 | `docs/technical/tech-stack-decision-record.md` | Why each technology was chosen |
+| `docs/technical/update-roadmap.md` | **Big update directions** (Options 1/2/3) with implementation specs. Option 3 (Digital Sharing) is current priority. |
 
 ## Verify the Environment
 

@@ -10,6 +10,23 @@ Tasks are organized in dependency waves, ordered by sequence.
 
 These are the items still needing implementation, ordered by priority.
 
+### Next Big Update — Digital Sharing (Option 3, PRIORITY)
+
+> **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
+> **Effort:** 3-5 days. **Dependencies:** None. **Risk:** Low (no schema changes, no auth changes).
+
+**Why this is the priority:** Customer-facing value, mostly-built already, drives the project's central growth metric (share rate from `00-executive-summary.md` line 77), and lays tunnel groundwork reusable by future Option 2.
+
+**Current state:** Token generation, backend endpoints, frontend QR display all exist. The share URL is kiosk-LAN-only today (`window.location.origin`), so it fails for customers on mobile data — which is the majority in Indonesia.
+
+**The four gaps (in order):**
+1. **Public URL via tunnel** — add `PUBLIC_BASE_URL` env var + Cloudflare Tunnel sidecar in docker-compose. Share URLs become absolute when var is set, LAN-relative when unset.
+2. **HTML landing page** — replace raw `FileResponse` at `/share/{token}` with mobile-optimized HTML page wrapping the image (download button, branding slot, expiry hint). Move raw image to `/share/{token}/image`.
+3. **Analytics events** — fire `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` `AnalyticsEvent` rows; expose scan rate + download rate in admin dashboard.
+4. **Vibe Check parity** — **DEFAULT: SKIP.** Original "slow media" positioning argues against extending digital to Vibe Check. Only tackle if operator feedback requests it. Log the decision either way.
+
+**Acceptance criteria (full checklist in roadmap §5.8):** customer on mobile data scans QR → landing page loads → Download button works → analytics events fire → no regression on existing tests.
+
 ### Security Remediation (from Phase 1 audit)
 
 1. **SEC-001: Add non-root user to Dockerfile** — App container runs as root. Add `USER` directive with non-root user. Priority: High.

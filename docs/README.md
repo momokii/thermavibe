@@ -26,3 +26,4 @@
 | [API Contract](technical/api-contract.md) | Complete REST API specification for all V1 endpoints |
 | [Docker Deployment Guide](technical/docker-deployment-guide.md) | Production deployment, USB passthrough, troubleshooting |
 | [Testing Strategy](technical/testing-strategy.md) | Testing pyramid, tools, coverage targets, manual test checklist |
+| [Update Roadmap](technical/update-roadmap.md) | The three "big update" directions (multi-kiosk, remote ops, digital sharing) with file-by-file implementation specs. Current priority: Option 3 Digital Sharing. |

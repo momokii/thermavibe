@@ -18,6 +18,25 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 
 ## Remaining Work (Priority Order)
 
+### Big Update Direction — Option 3: Digital Sharing (PRIORITY)
+
+> **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
+
+**Next major feature work.** Give customers their photo on their phone via a public share URL + mobile landing page. The QR code on the photobooth reveal screen currently only works on the kiosk's LAN — customers on mobile data can't reach it. Option 3 fixes this and is the highest-leverage next move because:
+- Most of the code is already built (token service, endpoints, frontend QR)
+- Zero schema risk (no new tables, no migrations)
+- Customer-facing — drives the project's central growth metric (share rate)
+- Lays tunnel groundwork reusable by future Option 2 (remote ops)
+
+**Effort:** 3-5 days. **Status:** Not started. See `TASK_QUEUE.md` "Next Big Update" section for the four concrete gaps and `docs/technical/update-roadmap.md` §5 for the file-by-file implementation plan.
+
+**Also documented in the roadmap** (not current priority, but spec'd for future reference):
+- **Option 1** — Multi-kiosk architecture. Full spec already in `docs/technical/multi-kiosk-architecture.md`. Start only when concrete multi-kiosk demand exists.
+- **Option 2 MVP** — Single-kiosk remote monitoring (TOTP + push notifications). 2-3 days, only if kiosk is deployed off-site.
+- **Option 2 Full** — Multi-kiosk aggregation dashboard. Requires Option 1. Multi-month effort.
+
+### Other Remaining Work
+
 1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. Only open item from the Phase 1 security audit.
 2. **Expand frontend test coverage** — Only 32 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests.
 3. **Backend test coverage gaps** — New services added since the last snapshot (`access_code_service`, `photobooth_service`, `theme_service`, `image_composition_service`, `retention_service`, `share_service`) have unit tests but the integration test suite (4 files) does not yet exercise the photobooth flow end-to-end.
