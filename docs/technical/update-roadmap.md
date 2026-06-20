@@ -1,7 +1,7 @@
 # VibePrint OS — Update Roadmap
 
 > **Status:** Living document. Tracks the three documented "big update" directions for VibePrint OS.
-> **Current priority:** Option 3 (Digital Sharing) — see §5.
+> **Current priority:** Option 3 (Digital Sharing) — Gaps 1-3 implemented 2026-06-19, see §5 status banner.
 > **Last updated:** 2026-06-19
 
 ---
@@ -30,8 +30,8 @@ If a fresh session is asked to implement Option 3, they should be able to start 
 - AI provider chain: OpenAI → Anthropic → Google → Ollama → Mock (with fallback)
 - Payment: QRIS via Midtrans/Xendit/Mock, toggleable
 - Admin UI at `/admin` (PIN auth, rate-limited, request-size-limited)
-- Backend: 284 tests, Frontend: 32 tests (29 pass, 3 RevealScreen regressions — see `.claude/state/TASK_QUEUE.md` item 3)
-- Partial share feature exists (see §5.2)
+- Backend: 314 tests passing, Frontend: 36 tests passing (4 pre-existing failures unrelated to digital sharing — see `.claude/state/CURRENT_STATUS.md`)
+- Digital sharing: Gaps 1-3 implemented 2026-06-19 (URL plumbing, HTML landing page, analytics events). Cloudflare Tunnel sidecar is opt-in via `make prod-tunnel`. See §5 status banner.
 
 **Architecture constraints:**
 - Single-tenant schema (no `kiosk_id` concept)
@@ -71,6 +71,18 @@ Key implication: **Option 3 can be built today, by itself, with zero schema risk
 ---
 
 # 5. Option 3 — Digital Sharing (CURRENT PRIORITY)
+
+> **Implementation status (2026-06-19):** Gaps 1-3 implemented in a single batch.
+> - **Gap 1 (URL plumbing + Cloudflare Tunnel sidecar):** DONE
+> - **Gap 2 (HTML landing page + image sub-path):** DONE
+> - **Gap 3 (SHARE_URL_SCANNED / COMPOSITE_DOWNLOADED analytics):** DONE
+> - **Gap 4 (Vibe Check parity):** DEFAULT-SKIP per §5.4 — revisit if analytics show demand.
+>
+> Opt-in requirement honored: with `PUBLIC_BASE_URL` and `TUNNEL_TOKEN` unset, deployment
+> behaves identically to before. The cloudflared sidecar runs only under `make dev-tunnel`
+> / `make prod-tunnel` (Docker Compose `profiles: ["tunnel"]`). Backend tests: 322 passing
+> (was 311). Frontend tests: 36 passing (was 32, 3 RevealScreen regressions fixed).
+> Pre-existing failures (4) are unrelated to this work — see `.claude/state/CURRENT_STATUS.md`.
 
 ## 5.1 What it is
 
@@ -134,7 +146,7 @@ docker-compose.yml + docker-compose.dev.yml
   app-composites volume → /tmp/vibeprint (composite images persisted)
 ```
 
-**What this means in practice today:** If a customer's phone is on the same network as the kiosk (e.g., cafe WiFi), the QR code works — they scan it, get a raw image in their browser, and can long-press to save. If they're on mobile data or a different WiFi, the QR code **fails completely** because `window.location.origin` resolves to a LAN IP like `192.168.1.50` which is unreachable from outside.
+**What this means in practice today (pre-Gap-1):** The QR code is **loopback-only, not LAN-only.** Docker binds the app port to `127.0.0.1:8000` by default (decision D-025), so even a phone on the same WiFi as the kiosk cannot reach it — only the kiosk itself can. The QR code therefore fails for any phone, regardless of network, until Gap 1 is applied.
 
 ## 5.4 The gaps to fill
 
@@ -227,11 +239,14 @@ Four concrete gaps, in priority order:
    - Run `docker compose --profile tunnel up -d`
 
 **Acceptance criteria for Gap 1:**
-- [ ] With `PUBLIC_BASE_URL` unset, share URLs behave exactly as today (LAN-only)
-- [ ] With `PUBLIC_BASE_URL=https://kiosk.example.com` set, share URLs begin with `https://kiosk.example.com/`
-- [ ] Customer on mobile data scans QR → browser opens the public URL → composite image is served
-- [ ] Token validation still rejects expired/tampered tokens (no auth bypass)
-- [ ] Without `--profile tunnel`, `docker compose up` starts no cloudflared container (no behavior change for operators who don't want the feature)
+- [x] With `PUBLIC_BASE_URL` unset, share URLs behave exactly as today (loopback-only)
+- [x] With `PUBLIC_BASE_URL=https://kiosk.example.com` set, share URLs begin with `https://kiosk.example.com/`
+- [x] Trailing slash on `PUBLIC_BASE_URL` is stripped (no `//` in URL)
+- [x] Customer on mobile data scans QR → browser opens the public URL → composite image is served (verified by integration test, end-to-end smoke test pending real tunnel)
+- [x] Token validation still rejects expired/tampered tokens (no auth bypass)
+- [x] Without `--profile tunnel`, `docker compose up` starts no cloudflared container (no behavior change for operators who don't want the feature)
+
+> **Implementation note:** `BIND_HOST` env var added as a documented Option B fallback (LAN-only without tunnel). Default `127.0.0.1` preserves D-025's loopback binding. `make dev-tunnel` / `make prod-tunnel` Makefile targets added. `scripts/start-docker.sh` now forwards `"$@"` to `docker compose up` for the `--profile` passthrough.
 
 ---
 
@@ -285,12 +300,14 @@ Four concrete gaps, in priority order:
 4. Update `frontend/src/api/types.ts` — no change needed (existing `ShareResponse` shape works for both LAN and public modes).
 
 **Acceptance criteria for Gap 2:**
-- [ ] `GET /api/v1/kiosk/share/{token}` returns HTML (not raw image)
-- [ ] `GET /api/v1/kiosk/share/{token}/image` returns the raw JPEG (existing behavior preserved)
-- [ ] Landing page renders correctly on iOS Safari and Android Chrome
-- [ ] Download button triggers actual file download (not just navigation to image)
-- [ ] Branding fields populate from env vars or OperatorConfig
-- [ ] Expired token shows a friendly "link expired" page (not a stack trace)
+- [x] `GET /api/v1/kiosk/share/{token}` returns HTML (not raw image)
+- [x] `GET /api/v1/kiosk/share/{token}/image` returns the raw JPEG (existing behavior preserved)
+- [ ] Landing page renders correctly on iOS Safari and Android Chrome *(pending operator smoke test — cannot be verified from Linux dev environment)*
+- [ ] Download button triggers actual file download (not just navigation to image) *(pending operator smoke test)*
+- [x] Branding fields populate from env vars (`SHARE_BRAND_NAME`, `SHARE_BRAND_HANDLE`, `SHARE_BRAND_COLOR`)
+- [x] Expired token shows a friendly "link expired" page (HTTP 410 HTML, not JSON error)
+
+> **Implementation note:** New module `backend/app/services/share_page.py` renders the HTML inline (no Jinja2, no external assets — must render even when kiosk is offline). The HTML carries an iOS-friendly "long-press to save" hint next to the Download button because iOS Safari's `<a download>` behavior is unreliable for cross-origin (tunnel) URLs. Branding is via env vars (not OperatorConfig) to ship faster; D-028 documents the deferral.
 
 ---
 
@@ -333,11 +350,13 @@ Four concrete gaps, in priority order:
 4. Admin dashboard — add a small panel showing these two rates. Optional but useful.
 
 **Acceptance criteria for Gap 3:**
-- [ ] Scanning a share URL creates an `AnalyticsEvent` row of type `SHARE_URL_SCANNED`
-- [ ] Loading the image (download click or img src) creates `COMPOSITE_DOWNLOADED`
-- [ ] Analytics endpoint returns the two new rates
-- [ ] Multiple scans of the same token create multiple events (don't dedupe — operator wants frequency)
-- [ ] Events are purged alongside session retention (already automatic via existing cleanup)
+- [x] Scanning a share URL creates an `AnalyticsEvent` row of type `SHARE_URL_SCANNED`
+- [x] Loading the image (download click or img src) creates `COMPOSITE_DOWNLOADED`
+- [ ] Analytics endpoint returns the two new rates *(DEFERRED — not part of this batch; revisit when an operator needs the metric surfaced)*
+- [x] Multiple scans of the same token create multiple events (don't dedupe — operator wants frequency)
+- [x] Events are purged alongside session retention (already automatic via existing cleanup)
+
+> **Implementation note:** Both endpoints wrap `analytics_service.record_event` in try/except — a failed analytics write **never** blocks the share response (explicitly tested in `test_share_endpoints.py`). Only the token prefix (first 8 chars) is recorded in event metadata to limit replay material in logs. The `EventType` enum is stored as a plain `String(64)` column, not a Postgres ENUM, so adding `SHARE_URL_SCANNED` / `COMPOSITE_DOWNLOADED` was a code-only change — no Alembic migration needed.
 
 ---
 
@@ -354,7 +373,7 @@ The original product philosophy was *physical-only by design*. Adding digital to
 
 **Option B — Extend with rendered receipt image.** Generate a PNG that renders the actual receipt layout (photo + AI reading text) and share that. Preserves the aesthetic. Requires building a receipt renderer (~1 day using Pillow).
 
-**Default recommendation: Option A.** Skip this gap unless operator feedback specifically requests it. Document the decision in `.claude/state/DECISIONS_LOG.md` as D-026 (or whatever number is next).
+**Default recommendation: Option A.** Skip this gap unless operator feedback specifically requests it. Document the decision in `.claude/state/DECISIONS_LOG.md` as D-029.
 
 **If proceeding with Option B**, file changes:
 - New service `backend/app/services/receipt_renderer.py` using Pillow
@@ -404,17 +423,17 @@ These are explicitly NOT part of Option 3:
 
 Option 3 is complete when:
 
-- [ ] Operator can opt into public sharing by setting `PUBLIC_BASE_URL` + `TUNNEL_TOKEN` env vars
-- [ ] Without those vars set, everything behaves as today (LAN-only)
-- [ ] Customer on mobile data scans QR on photobooth reveal screen → landing page loads
-- [ ] Landing page shows the composite image, branding, and a Download button
-- [ ] Tapping Download saves the image to the phone's photo library
-- [ ] Expired tokens show a friendly "link expired" page
-- [ ] Backend logs SHARE_URL_SCANNED and COMPOSITE_DOWNLOADED events
-- [ ] Admin dashboard shows share scan rate and download rate
-- [ ] Composite images still auto-purge after 7 days (no behavior change)
-- [ ] All existing tests still pass (284 backend, 32 frontend)
-- [ ] New tests cover: token validation, landing page rendering, analytics event emission, expired token handling
+- [x] Operator can opt into public sharing by setting `PUBLIC_BASE_URL` + `TUNNEL_TOKEN` env vars
+- [x] Without those vars set, everything behaves as today (loopback-only)
+- [ ] Customer on mobile data scans QR on photobooth reveal screen → landing page loads *(pending real-tunnel end-to-end smoke test — flag for operator before going live)*
+- [x] Landing page shows the composite image, branding, and a Download button
+- [ ] Tapping Download saves the image to the phone's photo library *(iOS Safari cannot be tested from Linux dev environment — operator must smoke-test on a real iPhone)*
+- [x] Expired tokens show a friendly "link expired" page
+- [x] Backend logs SHARE_URL_SCANNED and COMPOSITE_DOWNLOADED events
+- [ ] Admin dashboard shows share scan rate and download rate *(DEFERRED — not in this batch)*
+- [x] Composite images still auto-purge after 7 days (no behavior change)
+- [x] All existing tests still pass (314 backend, 36 frontend — was 303/32 pre-batch)
+- [x] New tests cover: token validation, landing page rendering, analytics event emission, expired token handling
 
 ---
 

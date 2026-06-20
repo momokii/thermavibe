@@ -1,21 +1,28 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import RevealScreen from '@/components/kiosk/RevealScreen';
 import { useKioskStore } from '@/stores/kioskStore';
 
-vi.mock('framer-motion', () => ({
-  motion: {
+vi.mock('framer-motion', () => {
+  // Proxy-based catch-all: renders any `motion.X` as the corresponding HTML tag.
+  // Survives component churn — no whack-a-mole when new animated elements are added.
+  const motion = new Proxy({}, {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    get: (_target: Record<string, never>, tag: string) => {
+      const htmlTag = tag.toLowerCase();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return ({ children, ...props }: any) =>
+        React.createElement(htmlTag, props, children);
+    },
+  });
+  return {
+    motion,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    img: ({ children, ...props }: any) => <img {...props}>{children}</img>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    p: ({ children, ...props }: any) => <p {...props}>{children}</p>,
-  },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  AnimatePresence: ({ children }: any) => <>{children}</>,
-}));
+    AnimatePresence: ({ children }: any) => <>{children}</>,
+  };
+});
 
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({

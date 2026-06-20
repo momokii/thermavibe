@@ -33,7 +33,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${APP_PORT:-8000}:8000"
+      - "${BIND_HOST:-127.0.0.1}:${APP_PORT:-8000}:8000"
     environment:
       # --- Infrastructure (deployment-time, not in admin panel) ---
       APP_ENV: ${APP_ENV:-production}
@@ -46,6 +46,11 @@ services:
       PRINTER_AUTO_DETECT: ${PRINTER_AUTO_DETECT:-true}
       PRINTER_HOTPLUG_INTERVAL_SECONDS: ${PRINTER_HOTPLUG_INTERVAL_SECONDS:-30}
       CAMERA_DEVICE_INDEX: ${CAMERA_DEVICE_INDEX:-0}
+      # --- Digital Sharing (all optional — unset = today's LAN/loopback behavior) ---
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SHARE_BRAND_NAME: ${SHARE_BRAND_NAME:-}
+      SHARE_BRAND_HANDLE: ${SHARE_BRAND_HANDLE:-}
+      SHARE_BRAND_COLOR: ${SHARE_BRAND_COLOR:-#000000}
     volumes:
       - app-logs:/app/logs
       - app-composites:/tmp/vibeprint
@@ -67,6 +72,24 @@ services:
     # which /dev/video* devices actually exist on the host.
     # For manual docker compose up, devices are optional — the camera service
     # will fall back to mock mode if no camera is available.
+
+  # Cloudflare Tunnel sidecar — enables public share URLs (digital sharing)
+  # without exposing any inbound port. Strictly opt-in via Compose profiles:
+  #   - `make dev` / `make prod` → cloudflared is NOT started
+  #   - `make dev-tunnel` / `make prod-tunnel` → cloudflared starts alongside app
+  # Failure of this service (bad token, network down) cannot break the app:
+  # the app has no depends_on:cloudflared dependency.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    profiles: ["tunnel"]
+    depends_on:
+      - app
+    networks:
+      - vibeprint-net
 
 volumes:
   postgres-data:

@@ -7,9 +7,17 @@
 dev: ## Start the full development environment (auto-detects cameras)
 	./scripts/start-docker.sh dev
 
+.PHONY: dev-tunnel
+dev-tunnel: ## Start dev environment with Cloudflare Tunnel (digital sharing via public URL)
+	COMPOSE_PROFILES=tunnel ./scripts/start-docker.sh dev
+
 .PHONY: prod
 prod: ## Start production mode (auto-detects cameras)
 	./scripts/start-docker.sh prod
+
+.PHONY: prod-tunnel
+prod-tunnel: ## Start production with Cloudflare Tunnel (digital sharing via public URL)
+	COMPOSE_PROFILES=tunnel ./scripts/start-docker.sh prod
 
 .PHONY: deploy
 deploy: ## Validate env, build, start production, and verify health

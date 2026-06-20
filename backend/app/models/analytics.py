@@ -36,6 +36,8 @@ class EventType(str, enum.Enum):
     PHOTOBOOTH_ARRANGE = 'photobooth_arrange'
     PHOTOBOOTH_COMPOSITE_GENERATED = 'photobooth_composite_generated'
     ACCESS_CODE_VALIDATED = 'access_code_validated'
+    SHARE_URL_SCANNED = 'share_url_scanned'
+    COMPOSITE_DOWNLOADED = 'composite_downloaded'
 
 
 class PrintJobStatus(str, enum.Enum):
@@ -89,7 +91,7 @@ class AnalyticsEvent(Base):
     )
 
     # Relationships
-    session: Mapped['KioskSession | None'] = relationship(
+    session: Mapped[KioskSession | None] = relationship(
         'KioskSession',
         back_populates='analytics_events',
     )
@@ -148,7 +150,7 @@ class PrintJob(Base):
     completed_at: Mapped[str | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
     # Relationships
-    session: Mapped['KioskSession'] = relationship(
+    session: Mapped[KioskSession] = relationship(
         'KioskSession',
         back_populates='print_job',
     )

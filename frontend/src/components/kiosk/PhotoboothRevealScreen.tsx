@@ -42,11 +42,15 @@ export default function PhotoboothRevealScreen() {
     getShareUrl();
   }, []);
 
-  // Set QR data when available
+  // Set QR data when available.
+  // Backend may return either an absolute URL (when PUBLIC_BASE_URL is set, e.g. via
+  // Cloudflare Tunnel) or a relative path (dev / LAN-only). Use as-is when absolute,
+  // prepend the kiosk origin otherwise.
   useEffect(() => {
     if (shareData?.qr_data) {
-      const baseUrl = window.location.origin;
-      setQrUrl(`${baseUrl}${shareData.qr_data}`);
+      const value = shareData.qr_data;
+      const isAbsolute = /^https?:\/\//.test(value);
+      setQrUrl(isAbsolute ? value : `${window.location.origin}${value}`);
     }
   }, [shareData]);
 

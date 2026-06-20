@@ -24,6 +24,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 MODE="${1:-prod}"
+# Tunnel profile is enabled via COMPOSE_PROFILES env var (set by make *-tunnel targets),
+# not via CLI flags, because docker compose requires --profile to appear BEFORE the
+# subcommand and our up invocation builds the arg list dynamically.
 
 # ── Platform detection ──────────────────────────────────────────────────────
 detect_platform() {

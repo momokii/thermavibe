@@ -62,9 +62,15 @@ services:
       PRINTER_VENDOR_ID: ${PRINTER_VENDOR_ID:-0x04b8}
       PRINTER_PRODUCT_ID: ${PRINTER_PRODUCT_ID:-0x0e15}
 
+      # --- Digital Sharing (all optional — unset = today's LAN/loopback behavior) ---
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      SHARE_BRAND_NAME: ${SHARE_BRAND_NAME:-}
+      SHARE_BRAND_HANDLE: ${SHARE_BRAND_HANDLE:-}
+      SHARE_BRAND_COLOR: ${SHARE_BRAND_COLOR:-#000000}
+
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
-      - "127.0.0.1:${APP_PORT:-8000}:8000"
+      - "${BIND_HOST:-127.0.0.1}:${APP_PORT:-8000}:8000"
     networks:
       - vibeprint-net
 

@@ -1,8 +1,8 @@
 # Current Status — VibePrint OS
 
 **Last Updated:** 2026-06-19
-**Updated By:** Fix for docker-compose group_add duplication (Compose v5.1.1 validation)
-**Session Summary:** Fixed `make dev` failure ("services.app.group_add items at 0 and 2 are equal") caused by Docker Compose v5.1.1 rejecting a duplicate GID 44 that arose from merging `docker-compose.dev.yml` and the script-generated `.docker-compose.devices.yml`. Consolidated `group_add` to a single source of truth in `docker-compose.yml` (base/prod now has `["44","7"]`), removed the redundant block from `docker-compose.dev.yml`, and removed the group_add generation block from `scripts/start-docker.sh`. Verified: both containers come up healthy, `/health` responds, regenerated override file is device-mapping-only.
+**Updated By:** Digital Sharing (Option 3) Gaps 1-3 implementation
+**Session Summary:** Implemented the Digital Sharing feature end-to-end in a single batch (Option A Cloudflare Tunnel as default + Option B BIND_HOST LAN fallback). Gaps 1-3 complete: (1) backend now emits absolute share URLs when `PUBLIC_BASE_URL` is set; frontend handles both absolute and relative `qr_data`; cloudflared sidecar added as opt-in Docker Compose profile (`make dev-tunnel` / `make prod-tunnel`). (2) `/share/{token}` now returns an HTML landing page with mobile viewport, inline CSS, Download button, and operator branding; raw JPEG moved to `/share/{token}/image` sub-path. Expired/tampered tokens return a friendly 410 HTML page (not JSON). (3) `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` analytics events fire on each hit, wrapped in try/except so a failed analytics write can never block the share response. New module `backend/app/services/share_page.py`, 19 new tests (11 integration + 8 unit). Fixed a pre-existing test-isolation bug: the middleware rate-limiter (`_rate_limit_store`) was never reset between tests, so my share tests ran into a 429 wall after earlier tests exhausted the quota — extended the autouse `reset_rate_limiter` fixture to clear it. Backend tests: 314 passing (was 303 baseline; same 4 pre-existing failures unrelated to this work). Frontend tests: 36 passing (was 32; 3 RevealScreen regressions also fixed via Proxy-based framer-motion mock). Gap 4 (Vibe Check parity) DEFAULT-SKIP per D-029. Operator smoke-test items flagged in update-roadmap.md §5.8: iOS Safari download behavior and end-to-end via mobile data cannot be verified from Linux dev environment.
 
 ---
 
@@ -18,17 +18,31 @@ The backend is feature-complete for both the Vibe Check and Photobooth flows. Th
 
 ## Remaining Work (Priority Order)
 
-### Big Update Direction — Option 3: Digital Sharing (PRIORITY)
+### Big Update Direction — Option 3: Digital Sharing — GAPS 1-3 SHIPPED 2026-06-19
 
 > **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
 
-**Next major feature work.** Give customers their photo on their phone via a public share URL + mobile landing page. The QR code on the photobooth reveal screen currently only works on the kiosk's LAN — customers on mobile data can't reach it. Option 3 fixes this and is the highest-leverage next move because:
-- Most of the code is already built (token service, endpoints, frontend QR)
-- Zero schema risk (no new tables, no migrations)
-- Customer-facing — drives the project's central growth metric (share rate)
-- Lays tunnel groundwork reusable by future Option 2 (remote ops)
+**Status:** Gaps 1-3 implemented in one batch. Gap 4 (Vibe Check parity) DEFAULT-SKIP per D-029.
 
-**Effort:** 3-5 days. **Status:** Not started. See `TASK_QUEUE.md` "Next Big Update" section for the four concrete gaps and `docs/technical/update-roadmap.md` §5 for the file-by-file implementation plan.
+What's done:
+- **Gap 1 (URL plumbing):** `PUBLIC_BASE_URL` env var → backend emits absolute URLs when set, relative when unset. Frontend (`PhotoboothRevealScreen.tsx`) detects absolute vs relative via regex and uses as-is or prepends `window.location.origin`.
+- **Gap 1 (Tunnel sidecar):** Cloudflare Tunnel as Docker Compose opt-in profile (`profiles: ["tunnel"]`). `make dev-tunnel` / `make prod-tunnel` to enable. Default `make dev`/`make prod` unchanged.
+- **Gap 1 (LAN fallback Option B):** `BIND_HOST` env var (default `127.0.0.1`, preserves D-025). `0.0.0.0` exposes the port to LAN for offline events without a tunnel.
+- **Gap 2 (Landing page):** `/share/{token}` returns HTML with mobile viewport, inline CSS, Download button, operator branding from env vars. Raw JPEG moved to `/share/{token}/image` sub-path. New module `backend/app/services/share_page.py`. Expired/tampered tokens return 410 HTML.
+- **Gap 3 (Analytics):** `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` events fire on each hit. Try/except wraps every analytics write — share response never blocked by analytics failure (explicitly tested).
+
+**Pending before going live (operator smoke-test, not implementable from Linux dev):**
+- iOS Safari download behavior on the tunnel-served landing page
+- End-to-end reachability via mobile data with a real Cloudflare Tunnel
+
+**Deferred:**
+- Gap 4 (Vibe Check share parity) — DEFAULT-SKIP per D-029, slow-media positioning preserved
+- Admin dashboard share-rate rollups — not part of this batch; revisit when an operator needs the metric surfaced
+
+**Also documented in the roadmap** (not current priority, but spec'd for future reference):
+- **Option 1** — Multi-kiosk architecture. Full spec already in `docs/technical/multi-kiosk-architecture.md`. Start only when concrete multi-kiosk demand exists.
+- **Option 2 MVP** — Single-kiosk remote monitoring (TOTP + push notifications). 2-3 days, only if kiosk is deployed off-site. The Cloudflare Tunnel sidecar from this batch is directly reusable for the remote-admin path.
+- **Option 2 Full** — Multi-kiosk aggregation dashboard. Requires Option 1. Multi-month effort.
 
 **Also documented in the roadmap** (not current priority, but spec'd for future reference):
 - **Option 1** — Multi-kiosk architecture. Full spec already in `docs/technical/multi-kiosk-architecture.md`. Start only when concrete multi-kiosk demand exists.

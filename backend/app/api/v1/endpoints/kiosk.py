@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 import os
-import time
+from datetime import UTC
 from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session, get_settings
 from app.core.config import Settings
-from app.core.exceptions import SessionNotFoundError
+from app.core.exceptions import SessionNotFoundError, VibePrintError
+from app.models.analytics import EventType
 from app.models.session import SessionType
+from app.schemas.access_code import (
+    AccessCodeValidateRequest,
+    AccessCodeValidateResponse,
+    RedeemCodeRequest,
+)
 from app.schemas.common import SuccessMessage
 from app.schemas.kiosk import (
     CaptureResponse,
@@ -31,13 +37,9 @@ from app.schemas.photobooth import (
     PhotoboothSnapResponse,
     ShareResponse,
 )
-from app.schemas.access_code import (
-    AccessCodeValidateRequest,
-    AccessCodeValidateResponse,
-    RedeemCodeRequest,
-)
 from app.schemas.print import PrintJobRequest
 from app.services import session_service
+from app.services.share_page import render_share_page
 
 router = APIRouter()
 
@@ -151,9 +153,9 @@ async def snap_photo(
     # Calculate time remaining
     first_snap_at = existing[0].get('captured_at') if existing else session.created_at.isoformat()
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
         started = datetime.fromisoformat(first_snap_at)
-        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        elapsed = (datetime.now(UTC) - started).total_seconds()
     except (ValueError, TypeError):
         elapsed = 0.0
     time_remaining = max(0.0, settings.kiosk_capture_time_limit_seconds - elapsed)
@@ -183,8 +185,8 @@ async def select_photo(
     analysis on the selected photo, and transitions through PROCESSING to
     REVEAL.
     """
-    from app.services.ai_service import analyze_image
     from app.services import config_service
+    from app.services.ai_service import analyze_image
 
     # Select photo and transition REVIEW → PROCESSING
     session = await session_service.select_and_process(
@@ -360,8 +362,8 @@ async def capture_photo(
 
     Prefer the /snap → /select flow for multi-photo support.
     """
-    from app.services.ai_service import analyze_image
     from app.services import config_service
+    from app.services.ai_service import analyze_image
     from app.services.camera_service import capture_frame as camera_capture
 
     # Transition to CAPTURE if still in IDLE
@@ -496,8 +498,8 @@ async def photobooth_snap(
     settings: Settings = Depends(get_settings),
 ) -> PhotoboothSnapResponse:
     """Snap a photo in photobooth mode. Stays in CAPTURE state."""
-    from app.services.camera_service import capture_frame as camera_capture
     from app.services import photobooth_service
+    from app.services.camera_service import capture_frame as camera_capture
 
     session = await session_service.get_session(db, session_id)
 
@@ -533,9 +535,9 @@ async def photobooth_snap(
     time_limit = int(pb_config.get('photobooth_capture_time_limit_seconds', settings.photobooth_capture_time_limit_seconds))
     first_snap_at = existing[0].get('captured_at') if existing else session.created_at.isoformat()
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
         started = datetime.fromisoformat(first_snap_at)
-        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        elapsed = (datetime.now(UTC) - started).total_seconds()
     except (ValueError, TypeError):
         elapsed = 0.0
     time_remaining = max(0.0, time_limit - elapsed)
@@ -723,8 +725,8 @@ async def photobooth_share(
     settings: Settings = Depends(get_settings),
 ) -> ShareResponse:
     """Generate a temporary share URL for the composite image."""
-    from app.services.share_service import generate_share_token
     from app.services import config_service
+    from app.services.share_service import generate_share_token
 
     session = await session_service.get_session(db, session_id)
 
@@ -735,7 +737,9 @@ async def photobooth_share(
     ttl = int(pb_config.get('photobooth_share_url_ttl_seconds', settings.photobooth_share_url_ttl_seconds))
     token, expires_at = generate_share_token(str(session_id), ttl_seconds=ttl)
 
-    share_url = f'/api/v1/kiosk/share/{token}'
+    base = (settings.public_base_url or '').rstrip('/')
+    path = f'/api/v1/kiosk/share/{token}'
+    share_url = f'{base}{path}' if base else path
 
     return ShareResponse(
         share_url=share_url,
@@ -745,15 +749,47 @@ async def photobooth_share(
 
 
 # ---------------------------------------------------------------------------
-# Public share endpoint (no auth needed)
+# Public share endpoints (no auth; tokens are HMAC-signed and TTL-bounded)
 # ---------------------------------------------------------------------------
 
-@router.get('/share/{token}')
+@router.get('/share/{token}', response_class=HTMLResponse)
+async def share_landing_page(
+    token: str,
+    db: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> HTMLResponse:
+    """Render the mobile landing page that wraps the composite image."""
+    from app.services import analytics_service
+    from app.services.share_service import validate_share_token
+
+    try:
+        session_id = validate_share_token(token)
+    except VibePrintError:
+        return HTMLResponse(
+            content=render_share_page(token, None, settings, expired=True),
+            status_code=410,
+        )
+
+    try:
+        await analytics_service.record_event(
+            db,
+            EventType.SHARE_URL_SCANNED.value,
+            session_id,
+            {'token_prefix': token[:8]},
+        )
+    except Exception:
+        log.exception('share_scan_analytics_failed')
+
+    return HTMLResponse(content=render_share_page(token, session_id, settings))
+
+
+@router.get('/share/{token}/image')
 async def serve_shared_composite(
     token: str,
     db: AsyncSession = Depends(get_db_session),
 ):
-    """Serve a composite image via a temporary share token."""
+    """Serve the raw composite JPEG (called by the landing page's img tag)."""
+    from app.services import analytics_service
     from app.services.share_service import validate_share_token
 
     session_id = validate_share_token(token)
@@ -762,6 +798,16 @@ async def serve_shared_composite(
 
     if not session.composite_image_path or not os.path.exists(session.composite_image_path):
         raise SessionNotFoundError(session_id)
+
+    try:
+        await analytics_service.record_event(
+            db,
+            EventType.COMPOSITE_DOWNLOADED.value,
+            session_id,
+            {'token_prefix': token[:8]},
+        )
+    except Exception:
+        log.exception('share_download_analytics_failed')
 
     return FileResponse(
         session.composite_image_path,
@@ -891,8 +937,8 @@ async def list_public_themes(
     db: AsyncSession = Depends(get_db_session),
 ):
     """List enabled photobooth themes for the kiosk (public, no auth)."""
-    from app.services import theme_service
     from app.schemas.photobooth import ThemeResponse
+    from app.services import theme_service
 
     themes = await theme_service.list_themes(db, enabled_only=True)
     return [

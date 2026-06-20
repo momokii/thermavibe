@@ -10,22 +10,23 @@ Tasks are organized in dependency waves, ordered by sequence.
 
 These are the items still needing implementation, ordered by priority.
 
-### Next Big Update — Digital Sharing (Option 3, PRIORITY)
+### Next Big Update — Digital Sharing (Option 3) — GAPS 1-3 SHIPPED 2026-06-19
 
 > **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
-> **Effort:** 3-5 days. **Dependencies:** None. **Risk:** Low (no schema changes, no auth changes).
 
-**Why this is the priority:** Customer-facing value, mostly-built already, drives the project's central growth metric (share rate from `00-executive-summary.md` line 77), and lays tunnel groundwork reusable by future Option 2.
+**Status:** Gaps 1-3 implemented in one batch. Backend tests: 314 passing. Frontend tests: 36 passing (was 32; 3 RevealScreen regressions also fixed). Same 4 pre-existing backend failures unrelated to this work.
 
-**Current state:** Token generation, backend endpoints, frontend QR display all exist. The share URL is kiosk-LAN-only today (`window.location.origin`), so it fails for customers on mobile data — which is the majority in Indonesia.
+What landed:
+1. ~~**Public URL via tunnel**~~ — **DONE.** `PUBLIC_BASE_URL` env var + Cloudflare Tunnel sidecar under `profiles: ["tunnel"]` + `BIND_HOST` for LAN-only fallback. `make dev-tunnel` / `make prod-tunnel`.
+2. ~~**HTML landing page**~~ — **DONE.** New module `backend/app/services/share_page.py`; `/share/{token}` returns HTML, `/share/{token}/image` returns raw JPEG; expired/tampered tokens return 410 HTML.
+3. ~~**Analytics events**~~ — **DONE (partial).** `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` fire on each hit, try/except-wrapped. **DEFERRED:** admin-dashboard share-rate rollups not in this batch.
+4. **Vibe Check parity** — **DEFAULT-SKIP** per D-029. Revisit on operator demand.
 
-**The four gaps (in order):**
-1. **Public URL via tunnel** — add `PUBLIC_BASE_URL` env var + Cloudflare Tunnel sidecar in docker-compose. Share URLs become absolute when var is set, LAN-relative when unset.
-2. **HTML landing page** — replace raw `FileResponse` at `/share/{token}` with mobile-optimized HTML page wrapping the image (download button, branding slot, expiry hint). Move raw image to `/share/{token}/image`.
-3. **Analytics events** — fire `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` `AnalyticsEvent` rows; expose scan rate + download rate in admin dashboard.
-4. **Vibe Check parity** — **DEFAULT: SKIP.** Original "slow media" positioning argues against extending digital to Vibe Check. Only tackle if operator feedback requests it. Log the decision either way.
+**Pending before going live (operator smoke-test):**
+- iOS Safari download behavior on tunnel-served landing page (cannot verify from Linux)
+- End-to-end via mobile data with a real Cloudflare Tunnel
 
-**Acceptance criteria (full checklist in roadmap §5.8):** customer on mobile data scans QR → landing page loads → Download button works → analytics events fire → no regression on existing tests.
+**Next Big Update direction:** Option 2 MVP (single-kiosk remote monitoring via the same tunnel) is the natural follow-up if the kiosk gets deployed off-site. Otherwise, security/test-coverage hardening items below remain the priority.
 
 ### Security Remediation (from Phase 1 audit)
 
@@ -36,8 +37,8 @@ These are the items still needing implementation, ordered by priority.
 
 ### Hardening & Test Coverage
 
-2. **Expand frontend test coverage** — Only 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
-3. **Fix RevealScreen test regression (P1)** — All 3 tests in `frontend/src/__tests__/components/RevealScreen.test.tsx` fail with `Element type is invalid: ... got: undefined`. Likely cause: `RevealScreen.tsx` uses a `framer-motion` element (e.g. `motion.button`, `motion.span`) not stubbed by the test's mock at `frontend/src/__tests__/components/RevealScreen.test.tsx:11-23`, which only covers `motion.div`, `motion.img`, `motion.p`. Either expand the mock to cover all motion elements used, or use `vi.mock('framer-motion', () => ({ motion: new Proxy({}, ...) }))`. Frontend currently reports **29 pass / 3 fail** out of 32.
+2. **Expand frontend test coverage** — Only 36 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Photobooth screens other than `PhotoboothRevealScreen` (covered 2026-06-19) still have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
+3. ~~**Fix RevealScreen test regression (P1)**~~ — **DONE 2026-06-19.** Replaced whitelist framer-motion mock with a Proxy-based catch-all that renders any `motion.X` as the corresponding HTML tag. Frontend now reports **36 pass / 0 fail** out of 36.
 4. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
 5. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
 

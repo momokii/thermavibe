@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     photobooth_composite_retention_hours: int = 168
     photobooth_share_url_ttl_seconds: int = 300
 
+    # Digital Sharing
+    public_base_url: str | None = None
+    bind_host: str = "127.0.0.1"
+    share_brand_name: str = ""
+    share_brand_handle: str = ""
+    share_brand_color: str = "#000000"
+
     # CORS
     cors_allowed_origins: str = "http://localhost:5173,http://localhost:8000"
 

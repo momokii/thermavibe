@@ -462,3 +462,76 @@ Record of key architectural and implementation decisions. Each entry documents w
 - **CDN-hosted SPA:** Kiosk is offline-first; CDN adds a failure mode
 
 **Source:** `backend/app/main.py` (SPA fallback block), `Dockerfile`, commit `08f8382`
+
+---
+
+## D-026: Cloudflare Tunnel as Opt-In Sidecar via Compose Profiles
+
+**Decision (2026-06-19):** Digital sharing (Option 3 Gaps 1-3) ships with Cloudflare Tunnel as the default public-URL mechanism, exposed as an opt-in Docker Compose sidecar under `profiles: ["tunnel"]`. The default `make dev` / `make prod` commands start no cloudflared container; operators must explicitly run `make dev-tunnel` or `make prod-tunnel` (which add `--profile tunnel`) to enable it.
+
+**Rationale:**
+- Strict opt-in preserves D-025's loopback-binding default for all operators who don't want the feature
+- The tunnel is outbound-only — no inbound port opened on the kiosk, no router/NAT configuration needed
+- Failure isolation: cloudflared runs as a separate service; a bad token or network failure logs errors and restarts but cannot break the app (the app has no `depends_on: cloudflared`)
+- Operator's DNS is already at Cloudflare (DNS migrated from Hostinger), so tunnel creation is a one-click DNS setup
+- Reusable infrastructure: the same tunnel can later serve Option 2 (Remote Operations MVP) without rebuild
+
+**Alternatives Rejected:**
+- **Tailscale Funnel:** Viable, but Cloudflare accounts are more common and the operator already has one. Documented in update-roadmap.md §9.
+- **BIND_HOST=0.0.0.0 by default with reverse proxy:** Would weaken D-025 and expose admin PIN brute-force surface to the LAN. Kept as a documented Option B fallback for offline events only.
+- **Cloud relay / CDN upload of composites:** More infra (S3, credentials, expiry management) for no incremental benefit over the tunnel.
+- **Make tunnel the default (always-on):** Would silently fail for operators who don't have a Cloudflare account. Opt-in is safer.
+
+**Source:** `docker-compose.yml` (cloudflared service), `Makefile` (`dev-tunnel` / `prod-tunnel`), commit (digital sharing batch)
+
+---
+
+## D-027: BIND_HOST Env Var for LAN-Only Fallback (Option B)
+
+**Decision (2026-06-19):** Docker Compose port binding is now `"${BIND_HOST:-127.0.0.1}:${APP_PORT:-8000}:8000"` in both `docker-compose.yml` and `docker-compose.dev.yml`. Default `127.0.0.1` preserves D-025's loopback binding. Operators who want LAN-only access (no tunnel, offline events) can set `BIND_HOST=0.0.0.0`.
+
+**Rationale:**
+- Preserves the secure default for the 95% case (tunnel-based deployment)
+- Gives operators an escape hatch for venues with no internet (conferences, remote locations)
+- Documents the security tradeoff explicitly: `0.0.0.0` exposes `/admin` to the LAN, where the 4-digit PIN is the only barrier
+
+**Alternatives Rejected:**
+- **Hardcode `0.0.0.0` and rely on firewall rules:** Operators would have to manage host firewall rules — too easy to misconfigure. Env var is explicit and visible in `docker compose ps`.
+- **Two compose files (with/without LAN exposure):** Profile-based switching is cleaner than file-based switching for this single toggle.
+
+**Source:** `docker-compose.yml`, `docker-compose.dev.yml`, `.env.example`, `.env.production`, `docs/technical/docker-deployment-guide.md` §2.5
+
+---
+
+## D-028: Share Branding via Env Vars (OperatorConfig Category Deferred)
+
+**Decision (2026-06-19):** Landing-page branding (`SHARE_BRAND_NAME`, `SHARE_BRAND_HANDLE`, `SHARE_BRAND_COLOR`) ships as env vars read by Pydantic `Settings`. OperatorConfig category `sharing` deferred to a future iteration.
+
+**Rationale:**
+- Three string fields don't justify the OperatorConfig schema migration + admin UI + form validation work right now
+- Branding rarely changes (set once at venue setup) — no real ergonomic loss vs admin panel
+- Ships faster, can be migrated to OperatorConfig later without breaking the env-var path (Pydantic settings can fall back to env if the OperatorConfig value is unset)
+
+**Alternatives Rejected:**
+- **OperatorConfig category `sharing` immediately:** Correct long-term, but premature for three string fields. Will revisit if/when more sharing-related settings appear (e.g. custom CSS, multiple brand presets per venue).
+
+**Source:** `backend/app/core/config.py` (Digital Sharing section), `backend/app/services/share_page.py`, `.env.example`, `.env.production`
+
+---
+
+## D-029: Vibe Check Share Parity Default-Skip
+
+**Decision (2026-06-19):** Gap 4 from update-roadmap.md §5.4 (Vibe Check digital sharing parity) is DEFAULT-SKIP for the initial Digital Sharing batch. Only the Photobooth flow gets share URLs. The Vibe Check flow remains physical-receipt-only.
+
+**Rationale:**
+- `docs/prd/00-executive-summary.md` line 99 frames Vibe Check's physical-only receipt as a deliberate "slow media" design choice. Adding digital undermines that positioning.
+- Photobooth customers are the explicit target for the project's "20% of receipts photographed and shared" KPI (`00-executive-summary.md` line 77).
+- Building a Vibe Check share would require rendering a receipt-mimicking PNG (Pillow work, ~1 day) — out of scope for this batch.
+
+**Revisit trigger:** concrete operator feedback requesting Vibe Check digital downloads, or analytics showing photobooth scan rates high enough to justify extending the flow.
+
+**Alternatives Rejected:**
+- **Ship both now:** Premature; not requested and weakens the slow-media pitch.
+- **Never:** Too strong — should remain data-driven, not dogmatic.
+
+**Source:** `docs/technical/update-roadmap.md` §5.4 Gap 4, this batch's TASK_QUEUE deferral entry

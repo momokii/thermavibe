@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import JSON, Index
+from sqlalchemy import JSON
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # ---------------------------------------------------------------------------
@@ -23,7 +23,6 @@ from app.models.analytics import AnalyticsEvent, PrintJob  # noqa: F401
 from app.models.configuration import OperatorConfig  # noqa: F401
 from app.models.device import Device  # noqa: F401
 from app.models.session import KioskSession  # noqa: F401
-
 
 # ---------------------------------------------------------------------------
 # SQLite-compatible metadata preparation
@@ -184,14 +183,19 @@ def auth_headers(admin_token: str) -> dict[str, str]:
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
-    """Clear the security rate limiter before and after each test.
+    """Clear the security rate limiter and middleware request counter before/after each test.
 
-    Prevents state leaking between tests that call verify_pin.
+    Prevents state leaking between tests: admin-PIN attempts (security._failed_attempts)
+    and HTTP request rate limiter (middleware._rate_limit_store) both persist at module
+    scope and would otherwise accumulate across tests.
     """
+    import app.core.middleware as middleware_mod
     import app.core.security as security_mod
     security_mod._failed_attempts.clear()
+    middleware_mod._rate_limit_store.clear()
     yield
     security_mod._failed_attempts.clear()
+    middleware_mod._rate_limit_store.clear()
 
 
 @pytest.fixture
