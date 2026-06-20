@@ -10,55 +10,64 @@ Tasks are organized in dependency waves, ordered by sequence.
 
 These are the items still needing implementation, ordered by priority.
 
-### Next Big Update — Digital Sharing (Option 3) — GAPS 1-3 SHIPPED 2026-06-19
+### Next Big Update — Option 2 MVP: Remote Operations (CONDITIONAL)
 
-> **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
+> **Full spec:** [`docs/technical/update-roadmap.md` §6.2](../../docs/technical/update-roadmap.md)
 
-**Status:** Gaps 1-3 implemented in one batch. Backend tests: 314 passing. Frontend tests: 36 passing (was 32; 3 RevealScreen regressions also fixed). Same 4 pre-existing backend failures unrelated to this work.
+**Status:** Not started. **Trigger condition:** Only build this if the kiosk is deployed somewhere the operator visits weekly or less. If it lives in your home/office, skip this entirely.
 
-What landed:
-1. ~~**Public URL via tunnel**~~ — **DONE.** `PUBLIC_BASE_URL` env var + Cloudflare Tunnel sidecar under `profiles: ["tunnel"]` + `BIND_HOST` for LAN-only fallback. `make dev-tunnel` / `make prod-tunnel`.
-2. ~~**HTML landing page**~~ — **DONE.** New module `backend/app/services/share_page.py`; `/share/{token}` returns HTML, `/share/{token}/image` returns raw JPEG; expired/tampered tokens return 410 HTML.
-3. ~~**Analytics events**~~ — **DONE (partial).** `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` fire on each hit, try/except-wrapped. **DEFERRED:** admin-dashboard share-rate rollups not in this batch.
-4. **Vibe Check parity** — **DEFAULT-SKIP** per D-029. Revisit on operator demand.
+**Why this is next:** The Cloudflare Tunnel sidecar shipped in the Digital Sharing batch (2026-06-19) already gives the kiosk a public URL. The same URL unlocks remote admin access — so ~80% of the infra cost is paid. Remaining work:
 
-**Pending before going live (operator smoke-test):**
-- iOS Safari download behavior on tunnel-served landing page (cannot verify from Linux)
-- End-to-end via mobile data with a real Cloudflare Tunnel
+1. **TOTP auth on admin login** (~half a day) — Add Google Authenticator alongside existing PIN. Required before exposing admin UI to the internet.
+   - Files: `backend/app/core/security.py`, `frontend/src/components/admin/AdminLoginPage.tsx`, `frontend/src/hooks/useAuth.ts`
+2. **Push notifications for 3 critical events** (~1-2 days) — Fire webhook to NTFY.sh when: printer offline >60s, paper out >60s, camera not detected on startup.
+   - Files: `backend/app/services/*.py` (instrument error paths), `backend/app/core/config.py` (`NOTIFY_WEBHOOK_URL`, `TOTP_ISSUER`), new `docs/technical/remote-ops-setup.md`
+3. **External heartbeat watcher** (zero kiosk code) — UptimeRobot cron hitting `/health` every 5 minutes.
 
-**Next Big Update direction:** Option 2 MVP (single-kiosk remote monitoring via the same tunnel) is the natural follow-up if the kiosk gets deployed off-site. Otherwise, security/test-coverage hardening items below remain the priority.
+**Effort:** 2-3 days total. Would be 4-5 days without Digital Sharing done first.
 
-### Security Remediation (from Phase 1 audit)
+### Hygiene Items (do anytime; no dependencies)
 
-1. **SEC-001: Add non-root user to Dockerfile** — App container runs as root. Add `USER` directive with non-root user. Priority: High.
-   ~~**SEC-002: Add API rate limiting**~~ — **DONE.** `RateLimitMiddleware` is now installed globally in `backend/app/main.py`.
-   ~~**SEC-003: Add request/response size limits**~~ — **DONE.** `RequestSizeLimitMiddleware` added.
-   ~~**SEC-004: Restrict CORS in production**~~ — **DONE.** CORS now restricts methods to `GET/POST/PUT` and headers to `Content-Type/Authorization/X-Request-ID`.
+1. **SEC-001: Add non-root user to Dockerfile** — App container runs as root. Add `USER` directive with non-root user. **Only remaining item from the Phase 1 security audit.** Small change, high value, no reason to defer. Priority: High.
+   - ~~**SEC-002: Add API rate limiting**~~ — **DONE.** `RateLimitMiddleware` is global in `backend/app/main.py`.
+   - ~~**SEC-003: Add request/response size limits**~~ — **DONE.** `RequestSizeLimitMiddleware` added.
+   - ~~**SEC-004: Restrict CORS in production**~~ — **DONE.** Restricted to `GET/POST/PUT` and `Content-Type/Authorization/X-Request-ID`.
 
-### Hardening & Test Coverage
+2. **CI/CD pipeline** — No automated testing or deployment today; tests run only locally. GitHub Actions workflow running `ruff check`, `python -m pytest`, `npm run lint`, `npm test`, `npx tsc --noEmit` on every PR. File: `.github/workflows/ci.yml` (new). Priority: Medium-High.
 
-2. **Expand frontend test coverage** — Only 36 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Photobooth screens other than `PhotoboothRevealScreen` (covered 2026-06-19) still have no tests. Admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check) have no tests.
-3. ~~**Fix RevealScreen test regression (P1)**~~ — **DONE 2026-06-19.** Replaced whitelist framer-motion mock with a Proxy-based catch-all that renders any `motion.X` as the corresponding HTML tag. Frontend now reports **36 pass / 0 fail** out of 36.
-4. **Add backend integration test for photobooth flow** — Unit tests cover individual services but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`).
-5. **CI/CD pipeline** — No automated testing or deployment. GitHub Actions or equivalent needed.
+3. **Expand frontend test coverage** — 36 tests across 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Uncovered:
+   - Kiosk: `ProcessingScreen`, `PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `AccessCodeScreen`
+   - Admin: pages (Photobooth, Strips Gallery, Print Template, Vibe Check), components (`AnalyticsExportButton`, `PhotoboothConfig`, `PrintTemplateConfig`, `ThemeManager`, `VibeCheckConfig`)
+   - Hooks: `useCamera`, `useKioskState`, `useMediaQuery`, `usePayment`, `usePhotoboothState`, `usePrinter`, `useSession`
+   - `ErrorBoundary`
+   Each test is small (~15 min) but coverage compounds. Priority: Medium.
+   - ~~**PhotoboothRevealScreen**~~ — **DONE 2026-06-19.**
+   - ~~**RevealScreen regression fix**~~ — **DONE 2026-06-19.** Replaced whitelist framer-motion mock with Proxy-based catch-all.
 
-### Documentation
+4. **Backend photobooth integration test** — Unit tests cover every service individually but no end-to-end test exercises the photobooth state machine (`CAPTURE → FRAME_SELECT → ARRANGE → COMPOSITING → PHOTOBOOTH_REVEAL`). Only share endpoints have integration coverage today. File: `backend/tests/integration/test_photobooth_flow.py` (new, mirror `test_kiosk_flow.py` structure). Priority: Medium.
 
-~~5. **Add `photobooth_themes` and `devices` tables to `docs/prd/05-data-models.md`**~~ — **DONE.** Sections 7 (PhotoboothTheme) and 8 (Device) are now documented.
+5. **Fix factory-pattern example in `docs/technical/testing-strategy.md` §4.1 (docs-only)** — The example imports `from app.models.payment import Payment` (nonexistent — `backend/app/models/payment.py` is a 15-line docstring stub, no SQLAlchemy class, not exported from `models/__init__.py`), uses `return Session(**defaults)` instead of `KioskSession(...)` (the import on the adjacent line is `KioskSession`), and defines a `create_test_payment()` factory that cannot work as written. Payment data currently lives as columns on `KioskSession` (`payment_provider`, `payment_amount`, `payment_reference`, `payment_status`). Two clean fix options: (a) delete the `create_test_payment` factory and the `Payment` import, leaving `create_test_session` with the `Session` → `KioskSession` typo fixed; or (b) keep the factory as aspirational with a clear note that it depends on implementing the `Payment` model. **No code changes** — this is a doc-only fix. Priority: Low.
 
-6. **Fix factory-pattern example in `docs/technical/testing-strategy.md` §4.1 (docs-only)** — The example imports `from app.models.payment import Payment` (nonexistent — `backend/app/models/payment.py` is a 15-line docstring stub, no SQLAlchemy class, not exported from `models/__init__.py`), uses `return Session(**defaults)` instead of `KioskSession(...)` (the import on the adjacent line is `KioskSession`), and defines a `create_test_payment()` factory that cannot work as written. Payment data currently lives as columns on `KioskSession` (`payment_provider`, `payment_amount`, `payment_reference`, `payment_status`). Two clean fix options: (a) delete the `create_test_payment` factory and the `Payment` import, leaving `create_test_session` with the `Session` → `KioskSession` typo fixed; or (b) keep the factory as aspirational with a clear note that it depends on implementing the `Payment` model. **No code changes** — this is a doc-only fix.
+### Wave 5 — E2E & Hardware Validation (gated on real hardware)
 
-### Wave 5 — E2E & Hardware (not started)
+All items require physical access to the actual kiosk hardware. They are the operator's pre-launch checklist, not implementation work from a dev environment.
 
-6. Full kiosk flow in Docker with mock providers.
-7. Real camera capture testing.
-8. Real thermal printer testing (respecting the "minimize paper waste" feedback rule).
-9. Real AI provider testing.
-10. Payment flow with mock provider.
-11. Performance benchmarks (capture-to-print < 30s).
+1. Full kiosk flow in Docker with mock providers
+2. Real camera capture testing
+3. Real thermal printer testing (respecting the "minimize paper waste" feedback rule)
+4. Real AI provider testing
+5. Payment flow with mock provider
+6. Performance benchmarks (capture-to-print < 30s)
+
+### Deferred — Option 1 (Multi-Kiosk) and Option 2 Full
+
+**Option 1 — Multi-Kiosk Architecture.** Full spec already in `docs/technical/multi-kiosk-architecture.md` (622 lines). **Do not start without concrete multi-kiosk demand.** What to do meanwhile: don't hardcode "only one kiosk" assumptions; keep `session_service`, `analytics_service`, etc. compatible with a future `kiosk_id` filter. Schema is already clean.
+
+**Option 2 Full — Multi-Kiosk Aggregation Dashboard.** Blocked on Option 1. Multi-month effort. Only relevant once 2+ kiosks are deployed.
 
 ### Completed (kept for reference)
 
+- ~~**Digital Sharing (Option 3) Gaps 1-3**~~ — **DONE 2026-06-19.** `PUBLIC_BASE_URL` + Cloudflare Tunnel sidecar (`profiles: ["tunnel"]`) + `BIND_HOST` LAN fallback; `/share/{token}` HTML landing page + `/share/{token}/image` JPEG sub-path; `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` analytics events (try/except-wrapped). New module `backend/app/services/share_page.py`. Gap 4 (Vibe Check parity) DEFAULT-SKIP per D-029. Operator smoke-test items (iOS Safari download behavior, end-to-end via mobile data) flagged in `docs/technical/update-roadmap.md` §5.8.
 - ~~**Implement PaymentScreen**~~ — **DONE.** `frontend/src/components/kiosk/PaymentScreen.tsx` now creates a QR via `paymentApi.createQR`, polls for status, and renders a countdown.
 - ~~**Add kiosk error display UI**~~ — **DONE.** Errors surface via the `sonner` Toaster mounted in `App.tsx`.
 - ~~**Fix useKioskState side effect**~~ — **DONE.** The hook now uses `useEffect` for the processing→reveal transition.

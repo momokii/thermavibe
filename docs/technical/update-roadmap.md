@@ -1,8 +1,9 @@
 # VibePrint OS — Update Roadmap
 
 > **Status:** Living document. Tracks the three documented "big update" directions for VibePrint OS.
-> **Current priority:** Option 3 (Digital Sharing) — Gaps 1-3 implemented 2026-06-19, see §5 status banner.
-> **Last updated:** 2026-06-19
+> **Current priority:** Option 2 MVP (Remote Operations) — conditional on kiosk being deployed off-site. See §6.2.
+> **Last shipped:** Option 3 (Digital Sharing) Gaps 1-3 — 2026-06-19. See §5 status banner.
+> **Last updated:** 2026-06-20
 
 ---
 
@@ -30,7 +31,7 @@ If a fresh session is asked to implement Option 3, they should be able to start 
 - AI provider chain: OpenAI → Anthropic → Google → Ollama → Mock (with fallback)
 - Payment: QRIS via Midtrans/Xendit/Mock, toggleable
 - Admin UI at `/admin` (PIN auth, rate-limited, request-size-limited)
-- Backend: 322 tests passing, Frontend: 36 tests passing (4 pre-existing failures unrelated to digital sharing — see `.claude/state/CURRENT_STATUS.md`)
+- Backend: 318 passing / 4 pre-existing failures (322 total), Frontend: 36 passing / 0 failing. Pre-existing failures unrelated to digital sharing — see `.claude/state/CURRENT_STATUS.md`
 - Digital sharing: Gaps 1-3 implemented 2026-06-19 (URL plumbing, HTML landing page, analytics events). Cloudflare Tunnel sidecar is opt-in via `make prod-tunnel`. See §5 status banner.
 
 **Architecture constraints:**
@@ -46,9 +47,9 @@ If a fresh session is asked to implement Option 3, they should be able to start 
 
 | Option | Title | Beneficiary | Needs Opt 1? | Effort | Status in this doc |
 |--------|-------|-------------|---------------|--------|--------------------|
-| **1** | Multi-Kiosk Architecture | Operator (scaling) | — | Multi-month | §4 (brief, full spec in `multi-kiosk-architecture.md`) |
-| **2** | Remote Operations | Operator (offsite) | MVP: No / Full: Yes | MVP: 2-3 days / Full: 2-3 months | §6 |
-| **3** | Digital Sharing | **End customer** | No | 3-5 days | §5 (**current priority**) |
+| **1** | Multi-Kiosk Architecture | Operator (scaling) | — | Multi-month | §4 (brief, full spec in `multi-kiosk-architecture.md`). **Deferred** pending concrete demand. |
+| **2** | Remote Operations | Operator (offsite) | MVP: No / Full: Yes | MVP: 2-3 days / Full: 2-3 months | §6 — **MVP is current priority** (conditional on off-site kiosk) |
+| **3** | Digital Sharing | **End customer** | No | 3-5 days | §5 — **SHIPPED 2026-06-19** (Gaps 1-3; Gap 4 default-skip per D-029) |
 
 ---
 
@@ -66,11 +67,11 @@ Independent of Option 1:
    └── Option 3 (Digital Sharing — fully standalone)
 ```
 
-Key implication: **Option 3 can be built today, by itself, with zero schema risk.** It is the safest next move.
+Key implication: **Option 3 has been built and shipped (2026-06-19); it had zero schema risk.** Option 2 MVP can now be built on top of Option 3's tunnel infrastructure with no new schema work either.
 
 ---
 
-# 5. Option 3 — Digital Sharing (CURRENT PRIORITY)
+# 5. Option 3 — Digital Sharing (SHIPPED 2026-06-19)
 
 > **Implementation status (2026-06-19):** Gaps 1-3 implemented in a single batch.
 > - **Gap 1 (URL plumbing + Cloudflare Tunnel sidecar):** DONE
@@ -80,9 +81,10 @@ Key implication: **Option 3 can be built today, by itself, with zero schema risk
 >
 > Opt-in requirement honored: with `PUBLIC_BASE_URL` and `TUNNEL_TOKEN` unset, deployment
 > behaves identically to before. The cloudflared sidecar runs only under `make dev-tunnel`
-> / `make prod-tunnel` (Docker Compose `profiles: ["tunnel"]`). Backend tests: 322 passing
-> (was 311). Frontend tests: 36 passing (was 32, 3 RevealScreen regressions fixed).
-> Pre-existing failures (4) are unrelated to this work — see `.claude/state/CURRENT_STATUS.md`.
+> / `make prod-tunnel` (Docker Compose `profiles: ["tunnel"]`). Backend tests: 318 passing
+> / 4 pre-existing failures (322 total). Frontend tests: 36 passing (was 32; 3 RevealScreen
+> regressions also fixed). The 4 pre-existing failures are unrelated to this work — see
+> `.claude/state/CURRENT_STATUS.md`.
 
 ## 5.1 What it is
 
@@ -509,20 +511,27 @@ Already deeply planned in `docs/technical/multi-kiosk-architecture.md` (622 line
 
 Given everything above, the order in which to actually do the work:
 
-**Phase 1 — Hygiene (1-2 weeks, do first):**
-1. Fix RevealScreen test regression (3 failing tests — `.claude/state/TASK_QUEUE.md` item 3)
-2. Resolve SEC-001 (non-root Docker user — `.claude/state/TASK_QUEUE.md` item 1)
-3. Set up CI/CD (GitHub Actions for ruff/pytest/vitest)
-4. Expand frontend test coverage (low effort, high compounding value)
+**Phase 0 — Hygiene (DONE 2026-06-19):**
+1. ~~Fix RevealScreen test regression (3 failing tests)~~ — **DONE.** Proxy-based framer-motion mock.
+2. ~~Resolve SEC-001 (non-root Docker user)~~ — **STILL OPEN.** See `.claude/state/TASK_QUEUE.md` hygiene item 1. Small change, no reason to defer; included below in "Ongoing hygiene."
+3. ~~Set up CI/CD (GitHub Actions for ruff/pytest/vitest)~~ — **STILL OPEN.** Included below.
+4. ~~Expand frontend test coverage~~ — **PARTIAL.** PhotoboothRevealScreen covered 2026-06-19; many other screens still uncovered.
 
-**Phase 2 — Option 3 (3-5 days, current priority):**
-Build per §5 of this doc. Highest-leverage customer-facing work.
+**Phase 1 — Option 3: Digital Sharing (DONE 2026-06-19):**
+Shipped per §5 of this doc. Highest-leverage customer-facing work landed. Backend: 318 passing. Frontend: 36 passing.
 
-**Phase 3 — Option 2 MVP (2-3 days, conditional):**
-Only if the kiosk is deployed off-site. Reuses Option 3's tunnel.
+**Phase 2 — Option 2 MVP: Remote Operations (CURRENT PRIORITY, CONDITIONAL):**
+Only build this if the kiosk is deployed somewhere the operator visits weekly or less. If it lives in your home/office, skip this and jump to "Ongoing hygiene." Reuses Option 3's Cloudflare Tunnel — tunnel is already shipped, so the marginal effort is 2-3 days (TOTP auth, push notifications, external heartbeat watcher). Full spec in §6.2.
 
-**Phase 4 — Decision point:**
-Evaluate whether there's concrete multi-kiosk demand. If yes, start Option 1 + Option 2 Full (bundle them). If no, do other polish work (test coverage, performance benchmarks, real hardware testing — Wave 5 in task queue).
+**Phase 3 — Decision point: Option 1 and Option 2 Full:**
+Evaluate whether there's concrete multi-kiosk demand. If yes, start Option 1 (multi-kiosk schema — full spec in `multi-kiosk-architecture.md`) and bundle Option 2 Full on top. If no, do not speculate-build; keep the schema migration-ready but don't migrate.
+
+**Ongoing hygiene (do anytime, no hard ordering):**
+- SEC-001: non-root Docker user
+- CI/CD: GitHub Actions workflow
+- Frontend test coverage expansion (each missing test ~15 min)
+- Backend photobooth integration test
+- Wave 5 hardware validation (gated on real hardware access — operator's pre-launch checklist, not dev work)
 
 ---
 

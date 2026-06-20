@@ -1,61 +1,70 @@
 # Current Status — VibePrint OS
 
-**Last Updated:** 2026-06-19
-**Updated By:** Digital Sharing (Option 3) Gaps 1-3 implementation
-**Session Summary:** Implemented the Digital Sharing feature end-to-end in a single batch (Option A Cloudflare Tunnel as default + Option B BIND_HOST LAN fallback). Gaps 1-3 complete: (1) backend now emits absolute share URLs when `PUBLIC_BASE_URL` is set; frontend handles both absolute and relative `qr_data`; cloudflared sidecar added as opt-in Docker Compose profile (`make dev-tunnel` / `make prod-tunnel`). (2) `/share/{token}` now returns an HTML landing page with mobile viewport, inline CSS, Download button, and operator branding; raw JPEG moved to `/share/{token}/image` sub-path. Expired/tampered tokens return a friendly 410 HTML page (not JSON). (3) `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` analytics events fire on each hit, wrapped in try/except so a failed analytics write can never block the share response. New module `backend/app/services/share_page.py`, 19 new tests (11 integration + 8 unit). Fixed a pre-existing test-isolation bug: the middleware rate-limiter (`_rate_limit_store`) was never reset between tests, so my share tests ran into a 429 wall after earlier tests exhausted the quota — extended the autouse `reset_rate_limiter` fixture to clear it. Backend tests: 314 passing (was 303 baseline; same 4 pre-existing failures unrelated to this work). Frontend tests: 36 passing (was 32; 3 RevealScreen regressions also fixed via Proxy-based framer-motion mock). Gap 4 (Vibe Check parity) DEFAULT-SKIP per D-029. Operator smoke-test items flagged in update-roadmap.md §5.8: iOS Safari download behavior and end-to-end via mobile data cannot be verified from Linux dev environment.
+**Last Updated:** 2026-06-20
+**Updated By:** Status reconciliation — Digital Sharing shipped, roadmap re-prioritized for future dev
+**Session Summary:** Digital Sharing (Option 3) shipped 2026-06-19 — Gaps 1-3 complete and Gap 4 DEFAULT-SKIP per D-029. Project status documents reconciled to reflect this: (1) Removed duplicate "Also documented in the roadmap" section. (2) Shifted "Overall Phase" framing from "Phase 1 Implementation ~90%" to "Phase 1 complete; entering hardening + polish". (3) Reorganized Remaining Work to clearly tell the future-dev story: next big thing is Option 2 MVP (Remote Ops) because it directly reuses the Cloudflare Tunnel from the Digital Sharing batch; hygiene items (SEC-001, CI/CD, frontend test coverage) are next; Wave 5 hardware testing is gated on real hardware availability; Option 1 (multi-kiosk) is deferred indefinitely pending concrete demand. All three state docs now tell a consistent story. No code changes.
 
 ---
 
 ## Overall Phase
 
-**Phase 1 — Implementation (~90% complete)**
+**Phase 1 — Implementation: COMPLETE.**
+**Phase 2 — Hardening & Polish: IN PROGRESS.**
 
-The backend is feature-complete for both the Vibe Check and Photobooth flows. The frontend kiosk shell, admin dashboard, marketing website, and production Docker deployment are all in place. Remaining work is hardening (security, E2E tests, CI) rather than core features.
+The backend, frontend, admin dashboard, marketing site, and production Docker deployment are all feature-complete for the single-kiosk Vibe Check and Photobooth flows. Digital Sharing (Option 3) — the last major customer-facing feature on the roadmap — shipped 2026-06-19. What remains is hardening (security, CI, test coverage), real hardware validation (Wave 5), and one operator-conditional follow-up (Option 2 MVP Remote Ops).
 
-**Overall Completion:** ~90%
+**Overall Completion:** ~95% of Phase 1 vision. Remaining 5% is hygiene + Wave 5 hardware validation, not new features.
 
 ---
 
 ## Remaining Work (Priority Order)
 
-### Big Update Direction — Option 3: Digital Sharing — GAPS 1-3 SHIPPED 2026-06-19
+### Next Big Update — Option 2 MVP: Remote Operations (REUSES Digital Sharing tunnel)
 
-> **Full spec:** [`docs/technical/update-roadmap.md` §5](../../docs/technical/update-roadmap.md)
+> **Full spec:** [`docs/technical/update-roadmap.md` §6.2](../../docs/technical/update-roadmap.md)
 
-**Status:** Gaps 1-3 implemented in one batch. Gap 4 (Vibe Check parity) DEFAULT-SKIP per D-029.
+**Status:** Not started. **Condition:** Only worth building if the kiosk is deployed off-site (weekly-or-less visit frequency). If the kiosk lives in your home/office, skip this.
 
-What's done:
-- **Gap 1 (URL plumbing):** `PUBLIC_BASE_URL` env var → backend emits absolute URLs when set, relative when unset. Frontend (`PhotoboothRevealScreen.tsx`) detects absolute vs relative via regex and uses as-is or prepends `window.location.origin`.
-- **Gap 1 (Tunnel sidecar):** Cloudflare Tunnel as Docker Compose opt-in profile (`profiles: ["tunnel"]`). `make dev-tunnel` / `make prod-tunnel` to enable. Default `make dev`/`make prod` unchanged.
-- **Gap 1 (LAN fallback Option B):** `BIND_HOST` env var (default `127.0.0.1`, preserves D-025). `0.0.0.0` exposes the port to LAN for offline events without a tunnel.
-- **Gap 2 (Landing page):** `/share/{token}` returns HTML with mobile viewport, inline CSS, Download button, operator branding from env vars. Raw JPEG moved to `/share/{token}/image` sub-path. New module `backend/app/services/share_page.py`. Expired/tampered tokens return 410 HTML.
-- **Gap 3 (Analytics):** `SHARE_URL_SCANNED` and `COMPOSITE_DOWNLOADED` events fire on each hit. Try/except wraps every analytics write — share response never blocked by analytics failure (explicitly tested).
+**Why this is next:** The Cloudflare Tunnel sidecar shipped in the Digital Sharing batch gave the kiosk a public URL. That same URL unlocks remote admin access from a phone — so ~80% of the infra cost is already paid. The remaining work is narrow:
 
-**Pending before going live (operator smoke-test, not implementable from Linux dev):**
-- iOS Safari download behavior on the tunnel-served landing page
-- End-to-end reachability via mobile data with a real Cloudflare Tunnel
+1. **TOTP auth on admin login** (~half a day) — Required before exposing admin UI to the internet. Add Google Authenticator alongside the existing PIN. Files: `backend/app/core/security.py`, `frontend/src/components/admin/AdminLoginPage.tsx`, `frontend/src/hooks/useAuth.ts`.
+2. **Push notifications for 3 critical events** (~1-2 days) — When the kiosk detects printer offline >60s, paper out >60s, or camera not detected on startup, fire a webhook to NTFY.sh (free) → push to operator's phone. Files: `backend/app/services/*.py` (instrument existing error paths), `backend/app/core/config.py` (`NOTIFY_WEBHOOK_URL`, `TOTP_ISSUER`).
+3. **External heartbeat watcher** (zero kiosk code) — UptimeRobot cron hitting `/health` every 5 minutes, alerts on two consecutive failures.
+4. **Reuse Option 3's tunnel** — already done; no additional infra.
 
-**Deferred:**
-- Gap 4 (Vibe Check share parity) — DEFAULT-SKIP per D-029, slow-media positioning preserved
-- Admin dashboard share-rate rollups — not part of this batch; revisit when an operator needs the metric surfaced
+**Effort:** 2-3 days (because tunnel is already shipped). Would be 4-5 days without Option 3 done first.
 
-**Also documented in the roadmap** (not current priority, but spec'd for future reference):
-- **Option 1** — Multi-kiosk architecture. Full spec already in `docs/technical/multi-kiosk-architecture.md`. Start only when concrete multi-kiosk demand exists.
-- **Option 2 MVP** — Single-kiosk remote monitoring (TOTP + push notifications). 2-3 days, only if kiosk is deployed off-site. The Cloudflare Tunnel sidecar from this batch is directly reusable for the remote-admin path.
-- **Option 2 Full** — Multi-kiosk aggregation dashboard. Requires Option 1. Multi-month effort.
+**Trigger condition to start:** Operator confirms the kiosk will live somewhere they visit weekly or less.
 
-**Also documented in the roadmap** (not current priority, but spec'd for future reference):
-- **Option 1** — Multi-kiosk architecture. Full spec already in `docs/technical/multi-kiosk-architecture.md`. Start only when concrete multi-kiosk demand exists.
-- **Option 2 MVP** — Single-kiosk remote monitoring (TOTP + push notifications). 2-3 days, only if kiosk is deployed off-site.
-- **Option 2 Full** — Multi-kiosk aggregation dashboard. Requires Option 1. Multi-month effort.
+### Hygiene Items (do in parallel with or before Option 2 MVP)
 
-### Other Remaining Work
+1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. **Only open item from the Phase 1 security audit.** Small change, high value, no reason to defer. File: `Dockerfile`.
+2. **CI/CD pipeline** — No automated testing or deployment today. Tests run only locally. GitHub Actions workflow that runs `ruff check`, `python -m pytest`, `npm run lint`, `npm test`, `npx tsc --noEmit` on every PR. Files: `.github/workflows/ci.yml` (new).
+3. **Expand frontend test coverage** — Only 36 tests across 14 kiosk screens, 10 admin components, 13 pages, 8 hooks. Uncovered: `ProcessingScreen`, photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`), `AccessCodeScreen`, admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check), most hooks, `ErrorBoundary`. Each missing test is small (~15 min) but coverage compounds.
+4. **Photobooth integration test** — Unit tests exist for every service but the integration suite doesn't exercise the photobooth state machine end-to-end (only the share endpoints have integration coverage). Files: `backend/tests/integration/test_photobooth_flow.py` (new, mirroring `test_kiosk_flow.py` structure).
 
-1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. Only open item from the Phase 1 security audit.
-2. **Expand frontend test coverage** — Only 36 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `AccessCodeScreen`) have no tests. (`PhotoboothRevealScreen` covered 2026-06-19.)
-3. **Backend test coverage gaps** — New services added since the last snapshot (`access_code_service`, `photobooth_service`, `theme_service`, `image_composition_service`, `retention_service`, `share_service`) have unit tests but the integration test suite (4 files) does not yet exercise the photobooth flow end-to-end.
-4. **Wave 5 — E2E & hardware testing** — Not started. Full kiosk flow in Docker with mock providers, real camera capture, real thermal printer, real AI provider, performance benchmarks.
-5. **CI/CD pipeline** — No automated testing or deployment.
+### Wave 5 — E2E & Hardware Validation (gated on real hardware)
+
+Not started. All items require physical access to the actual kiosk hardware:
+
+1. Full kiosk flow in Docker with mock providers
+2. Real camera capture testing
+3. Real thermal printer testing (respecting the "minimize paper waste" rule)
+4. Real AI provider testing (OpenAI/Anthropic/Google — at least one)
+5. Payment flow with mock provider
+6. Performance benchmarks (capture-to-print < 30s target)
+
+**Note:** None of these can be done from a dev environment. They're the operator's pre-launch checklist, not implementation work.
+
+### Deferred — Option 1: Multi-Kiosk Architecture
+
+**Status:** Spec exists (`docs/technical/multi-kiosk-architecture.md`, 622 lines). **Do not start without concrete multi-kiosk demand.** Most open-source projects never reach this stage.
+
+What to do in the meantime: don't hardcode "only one kiosk" assumptions. Keep `session_service`, `analytics_service`, etc. compatible with a future `kiosk_id` filter. The schema is already clean — no immediate refactor needed.
+
+### Deferred — Option 2 Full: Multi-Kiosk Aggregation Dashboard
+
+**Status:** Blocked on Option 1. Multi-month effort. Only relevant once 2+ kiosks are deployed.
 
 ---
 
@@ -128,11 +137,12 @@ What's done:
 - [x] `next-themes` dependency removed (was unused)
 - [x] Error display via Toaster (sonner)
 
-### Testing (~70%)
-- [x] **Backend: 322 tests passing** (4 pre-existing failures in `test_kiosk_flow.py` + `test_camera_service.py` unrelated to current work)
+### Testing (~75%)
+- [x] **Backend: 318 passing / 4 pre-existing failures** (322 total) across 13 unit + 5 integration files
   - Unit (13 files): ai, analytics, camera, config, exceptions, hardware, payment, printer, security, session, access_code, retention, share_page
   - Integration (5 files): admin_flow, ai_flow, kiosk_flow, payment_flow, share_endpoints
   - Database: SQLite in-memory with PostgreSQL compat patches
+  - The 4 failures (`test_capture_photo_returns_capture_response`, `test_full_kiosk_flow_without_payment`, `test_raises_when_no_device`, `test_raises_when_no_active_device_and_none_index`) are pre-existing MagicMock patterns that need refactoring to AsyncMock — unrelated to any current feature work.
 - [x] **Frontend: 36 tests** (all passing — 3 RevealScreen regressions fixed 2026-06-19 via Proxy-based framer-motion mock)
   - Stores: kioskStore, adminStore
   - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage, PhotoboothRevealScreen
@@ -213,9 +223,9 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 
 ## Test Results
 
-- **Backend**: 322 passing / 4 failing across 13 unit + 5 integration files. The 4 failures (`test_capture_photo_returns_capture_response`, `test_full_kiosk_flow_without_payment`, `test_raises_when_no_device`, `test_raises_when_no_active_device_and_none_index`) are pre-existing and unrelated to current work — MagicMock patterns that need refactoring to AsyncMock.
-- **Frontend**: 36 tests — **36 pass / 0 fail** (RevealScreen regression fixed 2026-06-19)
-- **Total**: 362 tests
+- **Backend**: 318 passing / 4 pre-existing failures (322 total) across 13 unit + 5 integration files. The 4 failures are pre-existing MagicMock patterns that need refactoring to AsyncMock — unrelated to any current feature work.
+- **Frontend**: 36 passing / 0 failing (RevealScreen regression fixed 2026-06-19)
+- **Total**: 354 passing / 4 failing across 358 tests
 
 Run with:
 ```bash

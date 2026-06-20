@@ -67,7 +67,7 @@ Then, for your task at hand, read the relevant sections from:
 | `docs/technical/development-setup-guide.md` | Local development environment setup |
 | `docs/technical/docker-deployment-guide.md` | Production Docker deployment |
 | `docs/technical/tech-stack-decision-record.md` | Why each technology was chosen |
-| `docs/technical/update-roadmap.md` | **Big update directions** (Options 1/2/3) with implementation specs. Option 3 (Digital Sharing) is current priority. |
+| `docs/technical/update-roadmap.md` | **Big update directions** (Options 1/2/3) with implementation specs. Option 3 (Digital Sharing) shipped 2026-06-19; Option 2 MVP (Remote Ops) is next conditional priority. |
 
 ## Verify the Environment
 
