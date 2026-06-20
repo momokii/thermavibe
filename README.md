@@ -217,36 +217,197 @@ make prod-restart
 
 ## Digital Sharing (optional)
 
-By default, the photobooth reveal screen shows a QR code whose URL only works on the kiosk's own browser (Docker binds the port to `127.0.0.1`). To let customers download their photo on their phones — including on mobile data — enable digital sharing.
+By default, the photobooth reveal screen shows a QR code whose URL only works on the kiosk's own browser — Docker binds the app port to `127.0.0.1`, so even a phone on the same WiFi cannot reach it. Digital Sharing fixes this: customers scan the QR, land on a mobile-friendly page with a Download button, and save the photo to their camera roll.
 
-**Option A — Cloudflare Tunnel (recommended, works on mobile data):**
+**Default behavior is unchanged when the feature is off.** No env vars need to be set; `make prod` behaves identically to before.
+
+### Pick an approach
+
+| Approach | Works on mobile data? | Needs internet? | Best for |
+|---|---|---|---|
+| **A1. Fresh Cloudflare Tunnel** | Yes | Yes | Most operators — set it up once, works everywhere |
+| **A2. Reuse existing Cloudflare Tunnel** | Yes | Yes | You already run cloudflared on the host (e.g. for SSH) |
+| **B. LAN-only fallback** | No (same WiFi only) | No | Offline events, no Cloudflare account |
+
+A1 and A2 are recommended. B is a fallback for venues with no internet.
+
+---
+
+### Option A1: Fresh Cloudflare Tunnel setup (~15 min)
+
+**Prerequisites:** a domain managed by Cloudflare (DNS hosted there). If your DNS is elsewhere, migrate it first — it's free.
+
+**Step 1 — Create the tunnel:**
+
+1. Open [https://one.dash.cloudflare.com/](https://one.dash.cloudflare.com/) → **Networks → Tunnels → Create a tunnel**
+2. Connector type: **Cloudflared**
+3. Name it (e.g. `vibeprint-kiosk`)
+4. On the install page, pick the **Docker** tab and copy the token from the `environment: TUNNEL_TOKEN: ...` line of the displayed command. You don't need to run their `docker run` command — our sidecar handles that.
+
+**Step 2 — Configure the public hostname:**
+
+Still in the tunnel config, open the **Public Hostnames** tab → **Add a public hostname**:
+
+| Field | Value |
+|---|---|
+| Subdomain | whatever you want (e.g. `kiosk`) |
+| Domain | your domain (auto-selected) |
+| Path | (leave blank) |
+| Service Type | `HTTP` |
+| Service URL | `app:8000` (Docker service name + internal port — the cloudflared sidecar reaches the app via the Docker network) |
+
+Cloudflare auto-creates the DNS record since the domain is hosted there.
+
+**Step 3 — Configure `.env`:**
 
 ```bash
-# 1. Create a tunnel at https://one.dash.cloudflare.com/ → Tunnels
-#    Service: HTTP → app:8000 (Docker network name + internal port)
-# 2. In .env, set:
-#    PUBLIC_BASE_URL=https://kiosk.yourdomain.com
-#    TUNNEL_TOKEN=<token from Cloudflare>
-# 3. Start with the tunnel profile:
+PUBLIC_BASE_URL=https://kiosk.yourdomain.com
+TUNNEL_TOKEN=<paste the token from step 1>
+
+# Optional branding shown on the landing page:
+SHARE_BRAND_NAME=Your Cafe Name
+SHARE_BRAND_HANDLE=@yourcafe
+SHARE_BRAND_COLOR=#FF5722
+```
+
+**Step 4 — Start with the tunnel profile:**
+
+```bash
 make prod-tunnel
 ```
 
-The cloudflared sidecar connects outbound — no inbound port opened, no router config. If you already run cloudflared on the host (e.g. for SSH), reuse that tunnel instead of the sidecar: add a public hostname pointing at `localhost:8000` and skip `TUNNEL_TOKEN` (use plain `make prod`).
+This is identical to `make prod` but sets `COMPOSE_PROFILES=tunnel`, which starts the cloudflared sidecar alongside the app.
 
-**Option B — LAN-only fallback (offline events, no internet):**
+**Step 5 — Verify the sidecar is healthy:**
 
 ```bash
-# .env:
-BIND_HOST=0.0.0.0    # exposes the port on all interfaces (was 127.0.0.1)
-# PUBLIC_BASE_URL stays unset
-
-make prod
-# Find kiosk LAN IP, scan QR from a phone on the same WiFi.
+docker compose --profile tunnel ps
+# Expected: vibeprint-app = running, cloudflared = running (not restarting)
 ```
 
-⚠️ `BIND_HOST=0.0.0.0` exposes `/admin` to the LAN. Use only on trusted networks.
+If cloudflared shows `restarting`, the token is wrong or copy-paste got mangled. Check with `docker compose logs cloudflared`.
 
-Full setup guide, smoke-test checklist, and the iOS Safari caveat live in [`docs/technical/docker-deployment-guide.md` §2.5](docs/technical/docker-deployment-guide.md).
+---
+
+### Option A2: Reuse an existing Cloudflare Tunnel (~5 min)
+
+If you already run cloudflared on the host (e.g. for SSH access to the kiosk machine), **do not** start a second cloudflared — two processes with the same token will fight each other and flap. Instead, add a hostname to your existing tunnel.
+
+**Step 1 — Add a public hostname to your existing tunnel:**
+
+In the Cloudflare dashboard, open your existing tunnel → **Public Hostnames** tab → **Add a public hostname**:
+
+| Field | Value |
+|---|---|
+| Subdomain | e.g. `kiosk` |
+| Domain | your domain |
+| Service Type | `HTTP` |
+| Service URL | `localhost:8000` (host cloudflared reaches the app via the host's loopback, where Docker publishes the port) |
+
+**Step 2 — Configure `.env`:**
+
+```bash
+PUBLIC_BASE_URL=https://kiosk.yourdomain.com
+# TUNNEL_TOKEN stays UNSET — you're not using the sidecar
+```
+
+**Step 3 — Start normally:**
+
+```bash
+make prod    # NOT make prod-tunnel
+```
+
+The host cloudflared routes both SSH (existing) and the kiosk (new) through one tunnel.
+
+---
+
+### Option B: LAN-only fallback (~2 min, no internet needed)
+
+For venues with no internet (conferences, remote locations). Phones must be on the **same WiFi** as the kiosk. Phones on mobile data still won't work.
+
+**Step 1 — Find the kiosk's LAN IP:**
+
+```bash
+ip -4 addr show | grep "inet " | grep -v 127.0.0.1
+# e.g. 192.168.1.50
+```
+
+**Step 2 — Configure `.env`:**
+
+```bash
+BIND_HOST=0.0.0.0    # exposes the port on all interfaces (was 127.0.0.1)
+# PUBLIC_BASE_URL stays UNSET — frontend prepends window.location.origin,
+# which the phone resolves to the LAN IP it scanned the QR from.
+```
+
+**Step 3 — Restart and test:**
+
+```bash
+make prod
+# Run a photobooth session on the kiosk, scan the QR with a phone on the same WiFi.
+```
+
+⚠️ **Security caveat:** `BIND_HOST=0.0.0.0` exposes the entire app — including `/admin` — to anyone on the LAN. The 4-digit admin PIN is the only barrier. Use only on trusted networks (your home, a private event), never on shared public WiFi. Switch back to `BIND_HOST=127.0.0.1` when the event is over.
+
+---
+
+### Verifying it works
+
+After setting up any of the three options, walk through this checklist:
+
+1. **Walk through a photobooth session** on the kiosk to reach the reveal screen (QR code visible).
+2. **Scan the QR with a phone:**
+   - Option A1/A2: turn off WiFi on the phone first (use mobile data only) — this is the real test
+   - Option B: keep the phone on the same WiFi
+3. **The landing page should render** — shows the photo preview, a Download button, and your branding.
+4. **Tap Download.** On Android Chrome the image saves to Downloads. On iOS Safari the `<a download>` attribute may not save cross-origin — if it doesn't, long-press the image → "Save to Photos" (the page has a hint for this).
+5. **Check analytics fired:**
+
+```bash
+docker compose exec postgres psql -U thermavibe -c \
+  "SELECT event_type, count(*) FROM analytics_events \
+   WHERE event_type IN ('share_url_scanned','composite_downloaded') GROUP BY 1;"
+```
+
+Both rows should appear after one scan + one download.
+
+6. **Test an expired link** (optional): wait 5+ minutes after generating a share URL (default TTL is 300s), then re-open it. You should see a friendly "This link has expired" page (HTTP 410), not a JSON error.
+
+---
+
+### Quick URL-plumbing sanity check (no Cloudflare account needed)
+
+Want to verify the URL plumbing without setting up a tunnel? Temporarily set `PUBLIC_BASE_URL=https://example.com` in `.env`, restart with `make prod`, run a photobooth session, and inspect the QR code's value (e.g. via the browser devtools on the kiosk, or by scanning with any phone). It should encode `https://example.com/api/v1/kiosk/share/...` — not `localhost`. Then unset it.
+
+---
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `cloudflared` container shows status `restarting` | Wrong `TUNNEL_TOKEN` | Re-copy token from Cloudflare dashboard; check `docker compose logs cloudflared` for the auth error |
+| Scanning the QR loads a Cloudflare 502 page | Public hostname service URL is wrong | For sidecar: must be `app:8000` (Docker DNS). For host cloudflared: must be `localhost:8000` |
+| Scanning the QR loads a Cloudflare "not found" page | DNS hasn't propagated | Wait 1-2 min after creating the hostname, then retry |
+| QR code still encodes `localhost` | `PUBLIC_BASE_URL` not set, or app not restarted | Verify `.env` has `PUBLIC_BASE_URL=https://...`, then `make prod-tunnel` (or `make prod`) again |
+| Landing page loads but image 404s | Composite image purged by retention service | Default retention is 7 days. If the session is older, the image is gone — generate a fresh share URL from a new session |
+| Download button opens image in new tab instead of saving (iOS) | iOS Safari `<a download>` limitation for cross-origin URLs | Long-press the image → "Save to Photos". Page already has a hint for this. No code fix possible. |
+| Two cloudflared processes fighting (intermittent disconnects) | Both sidecar and host cloudflared running with same token | Pick one. Either stop the host cloudflared and use `make prod-tunnel`, or remove `TUNNEL_TOKEN` from `.env` and use the host cloudflared (Option A2) |
+
+---
+
+### Alternatives to Cloudflare Tunnel (not recommended)
+
+If you can't or don't want to use Cloudflare Tunnel:
+
+- **Tailscale Funnel** — similar outbound-only model, free tier, slightly simpler setup if you already use Tailscale. Not documented here; the plumbing (`PUBLIC_BASE_URL`) is the same.
+- **ngrok** — works but free tier uses random URLs that change on restart (breaks QR codes generated before the restart). Paid tier needed for stable URLs.
+- **Port forwarding on the kiosk router** — opens an inbound port, requires dynamic DNS if the kiosk has a residential connection, exposes the app to internet attacks. The admin PIN is too weak for this. **Don't.**
+
+The `PUBLIC_BASE_URL` env var works with any of these — set it to whatever public URL fronts your kiosk.
+
+---
+
+For the full deep-dive (architecture diagrams, the loopback-only default rationale, iOS Safari background, decision records D-026 through D-029), see [`docs/technical/docker-deployment-guide.md` §2.5](docs/technical/docker-deployment-guide.md) and [`docs/technical/update-roadmap.md` §5](docs/technical/update-roadmap.md).
 
 ---
 
