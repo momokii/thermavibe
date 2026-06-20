@@ -309,12 +309,9 @@ The tunnel connects outbound from your kiosk to Cloudflare's edge, so no inbound
    ```bash
    PUBLIC_BASE_URL=https://kiosk.yourdomain.com
    TUNNEL_TOKEN=<paste the token from step 2>
-
-   # Optional branding shown on the share landing page
-   SHARE_BRAND_NAME=Your Cafe Name
-   SHARE_BRAND_HANDLE=@yourcafe
-   SHARE_BRAND_COLOR=#FF5722
    ```
+
+   Share landing page branding (brand name, social handle, accent color) is configured at `/admin/sharing` after first boot — **not** via env vars.
 
 5. **Start with the tunnel profile:**
    ```bash

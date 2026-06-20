@@ -28,6 +28,7 @@ class ConfigCategory(str, enum.Enum):
     VIBE_CHECK = 'vibe_check'
     ACCESS_CODE = 'access_code'
     PRINT = 'print'
+    SHARING = 'sharing'
 
 
 class OperatorConfig(Base):

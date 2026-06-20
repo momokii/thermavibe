@@ -289,15 +289,12 @@ Four concrete gaps, in priority order:
    - "This link expires in X minutes" hint
    - Light styling (inline CSS, no external dependencies — kiosk may have no internet when serving)
 
-3. New config keys (add to `backend/app/core/config.py`):
-   ```python
-   share_brand_name: str = ''           # Cafe/venue name shown on landing page
-   share_brand_handle: str = ''         # Hashtag or @handle to suggest (e.g., "@yourcafe")
-   share_brand_color: str = '#000000'   # Accent color for buttons (hex)
-   ```
-   Read from env: `SHARE_BRAND_NAME`, `SHARE_BRAND_HANDLE`, `SHARE_BRAND_COLOR`.
+3. New config keys — **shipped 2026-06-20 in `operator_configs` under the `SHARING` category** (per D-030, superseding D-028's original env-var approach):
+   - `share_brand_name` — Cafe/venue name shown as page heading (empty = "VibePrint")
+   - `share_brand_handle` — Optional social handle for "Tag us" prompt (empty = hidden)
+   - `share_brand_color` — Hex color for heading and Download button (default `#000000`)
 
-   Alternatively (better long-term): move these to `OperatorConfig` so admins can edit them via the admin UI without touching env vars. Suggested category: `sharing`. New keys under that category: `share_brand_name`, `share_brand_handle`, `share_brand_color`. The share endpoint reads them via `config_service.get_configs_by_category(db, 'sharing')`.
+   Edited via `/admin/sharing` (new admin panel). Read by the share endpoint via `config_service.get_configs_by_category(db, ConfigCategory.SHARING.value)`. Seeded on first boot via `config_service.seed_default_configs()`.
 
 4. Update `frontend/src/api/types.ts` — no change needed (existing `ShareResponse` shape works for both LAN and public modes).
 
@@ -306,10 +303,10 @@ Four concrete gaps, in priority order:
 - [x] `GET /api/v1/kiosk/share/{token}/image` returns the raw JPEG (existing behavior preserved)
 - [ ] Landing page renders correctly on iOS Safari and Android Chrome *(pending operator smoke test — cannot be verified from Linux dev environment)*
 - [ ] Download button triggers actual file download (not just navigation to image) *(pending operator smoke test)*
-- [x] Branding fields populate from env vars (`SHARE_BRAND_NAME`, `SHARE_BRAND_HANDLE`, `SHARE_BRAND_COLOR`)
+- [x] Branding fields editable at `/admin/sharing` and persisted in `operator_configs` (`SHARING` category). Falls back to defaults (`VibePrint` / hidden / `#000000`) when unset.
 - [x] Expired token shows a friendly "link expired" page (HTTP 410 HTML, not JSON error)
 
-> **Implementation note:** New module `backend/app/services/share_page.py` renders the HTML inline (no Jinja2, no external assets — must render even when kiosk is offline). The HTML carries an iOS-friendly "long-press to save" hint next to the Download button because iOS Safari's `<a download>` behavior is unreliable for cross-origin (tunnel) URLs. Branding is via env vars (not OperatorConfig) to ship faster; D-028 documents the deferral.
+> **Implementation note:** New module `backend/app/services/share_page.py` renders the HTML inline (no Jinja2, no external assets — must render even when kiosk is offline). The HTML carries an iOS-friendly "long-press to save" hint next to the Download button because iOS Safari's `<a download>` behavior is unreliable for cross-origin (tunnel) URLs. Branding is sourced from the `SHARING` category in `operator_configs` (D-030, 2026-06-20) — originally env vars per D-028, moved to OperatorConfig after the user asked to revisit.
 
 ---
 

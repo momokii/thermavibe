@@ -1102,6 +1102,7 @@ A JSON object where keys are configuration field names and values are the new va
 > - `access_code` and `payment` categories are mutually exclusive. Enabling one automatically disables the other.
 > - `ai` category: `ai_timeout_minutes` must be between 1 and 30.
 > - `print` category: `print_footer_name` must be 24 characters or fewer. `print_timezone_offset` must be a number between -14 and +14.
+> - `sharing` category: `share_brand_color` must be a valid 6-digit hex (e.g. `#C8553D`). `share_brand_name` and `share_brand_handle` accept any string (empty = use default / hide). The `sharing` category is unusual: although it's edited via the admin endpoint, it's also read by the public `/api/v1/kiosk/share/{token}` endpoint to render landing-page branding.
 
 Retrieve per-feature analytics breakdown, comparing Vibe Check and Photobooth session performance. Returns total sessions, completion rate, average duration, and revenue (split by payment and access code) for each feature independently.
 

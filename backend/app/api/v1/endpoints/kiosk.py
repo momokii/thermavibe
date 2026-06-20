@@ -15,6 +15,7 @@ from app.api.deps import get_db_session, get_settings
 from app.core.config import Settings
 from app.core.exceptions import SessionNotFoundError, VibePrintError
 from app.models.analytics import EventType
+from app.models.configuration import ConfigCategory
 from app.models.session import SessionType
 from app.schemas.access_code import (
     AccessCodeValidateRequest,
@@ -38,7 +39,7 @@ from app.schemas.photobooth import (
     ShareResponse,
 )
 from app.schemas.print import PrintJobRequest
-from app.services import session_service
+from app.services import config_service, session_service
 from app.services.share_page import render_share_page
 
 router = APIRouter()
@@ -756,17 +757,20 @@ async def photobooth_share(
 async def share_landing_page(
     token: str,
     db: AsyncSession = Depends(get_db_session),
-    settings: Settings = Depends(get_settings),
 ) -> HTMLResponse:
     """Render the mobile landing page that wraps the composite image."""
     from app.services import analytics_service
     from app.services.share_service import validate_share_token
 
+    branding = await config_service.get_configs_by_category(
+        db, ConfigCategory.SHARING.value
+    )
+
     try:
         session_id = validate_share_token(token)
     except VibePrintError:
         return HTMLResponse(
-            content=render_share_page(token, None, settings, expired=True),
+            content=render_share_page(token, None, branding, expired=True),
             status_code=410,
         )
 
@@ -780,7 +784,7 @@ async def share_landing_page(
     except Exception:
         log.exception('share_scan_analytics_failed')
 
-    return HTMLResponse(content=render_share_page(token, session_id, settings))
+    return HTMLResponse(content=render_share_page(token, session_id, branding))
 
 
 @router.get('/share/{token}/image')

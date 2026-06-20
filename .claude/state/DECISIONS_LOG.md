@@ -535,3 +535,28 @@ Record of key architectural and implementation decisions. Each entry documents w
 - **Never:** Too strong — should remain data-driven, not dogmatic.
 
 **Source:** `docs/technical/update-roadmap.md` §5.4 Gap 4, this batch's TASK_QUEUE deferral entry
+
+---
+
+## D-030: Share Branding Moved from Env Vars to OperatorConfig
+
+**Decision (2026-06-20):** The three share landing page branding fields (`share_brand_name`, `share_brand_handle`, `share_brand_color`) now live in the `operator_configs` table under a new `SHARING` category, editable via `/admin/sharing`. The corresponding `SHARE_BRAND_*` env vars have been removed from `backend/app/core/config.py`, `.env.example`, and `.env.production`.
+
+**Supersedes:** D-028 (which originally put these fields in env vars to ship the Digital Sharing batch faster).
+
+**Rationale:**
+- D-028 was an explicit "ship faster" shortcut with a "revisit later" deferral. The user asked to revisit.
+- Every other operator-editable setting (print footer, photobooth watermark, payment, AI keys, etc.) is already DB-backed and edited via `/admin`. Env vars for branding broke the pattern.
+- Operator changing their cafe name shouldn't require SSH + `.env` edit + Docker restart.
+- The `operator_configs` table,`config_service`, admin Config page pattern, and admin API (`GET /admin/config`, `PUT /admin/config/{category}`) all already existed — adding a new category reused every layer.
+
+**Why not unify with `print_footer_name` (D-028 reconsidered):** The existing Print Template `print_footer_name` field lives on a different surface (thermal receipt footer, 24-char paper-width constraint, toggle-able). Coupling them would mean turning off the print footer also nukes the share page heading. The user explicitly chose to keep them separate.
+
+**Migration cost:** Existing operators who set `SHARE_BRAND_*` in their `.env` need to re-enter the values once via `/admin/sharing`. Empty defaults seed on next app boot via `config_service.seed_default_configs()`. No Alembic migration needed — `operator_configs.category` is a string column.
+
+**Alternatives Rejected:**
+- **Keep env vars:** Rejected — UX worse than the rest of admin config.
+- **Reuse `print_footer_name`:** Rejected — couples two unrelated surfaces; print footer toggle would affect share page.
+- **Add Sharing fields to an existing category (e.g., PHOTOBOOTH):** Rejected — sharing branding applies to both flows' reveal screens long-term, not just photobooth.
+
+**Source:** `backend/app/models/configuration.py` (ConfigCategory.SHARING), `backend/app/services/config_service.py` (DEFAULT_CONFIGS[SHARING]), `backend/app/services/share_page.py` (signature changed from `Settings` to `dict`), `backend/app/api/v1/endpoints/kiosk.py` (`share_landing_page` reads from DB), `frontend/src/components/admin/SharingConfig.tsx`, `frontend/src/pages/AdminSharingPage.tsx`

@@ -9,13 +9,11 @@ from __future__ import annotations
 
 from html import escape
 
-from app.core.config import Settings
-
 
 def render_share_page(
     token: str,
     session_id: str | None,
-    settings: Settings,
+    branding: dict[str, str],
     expired: bool = False,
 ) -> str:
     """Return the HTML string for the share landing page.
@@ -23,15 +21,17 @@ def render_share_page(
     Args:
         token: Share token (used to build the image URL).
         session_id: Validated session id, or None when the token is invalid/expired.
-        settings: App settings (provides branding fields).
+        branding: Dict with optional keys `share_brand_name`, `share_brand_handle`,
+            `share_brand_color`. Missing or empty values fall back to defaults
+            ('VibePrint' / hidden / '#000000').
         expired: When True, render the expired-link variant with no image.
 
     Returns:
         Complete HTML document as a string.
     """
-    brand = settings.share_brand_name or 'VibePrint'
-    handle = settings.share_brand_handle
-    color = settings.share_brand_color or '#000000'
+    brand = branding.get('share_brand_name') or 'VibePrint'
+    handle = branding.get('share_brand_handle') or ''
+    color = branding.get('share_brand_color') or '#000000'
     image_url = f'/api/v1/kiosk/share/{token}/image'
 
     title = f'{brand} — Your Photo'

@@ -9,23 +9,22 @@ mobile rendering.
 
 from __future__ import annotations
 
-from app.core.config import Settings
 from app.services.share_page import render_share_page
 
 
-def _settings(**overrides) -> Settings:
-    """Build a Settings instance with share-brand fields overridden."""
+def _branding(**overrides) -> dict[str, str]:
+    """Build a branding dict matching the OperatorConfig SHARING category shape."""
     base = {
         'share_brand_name': 'TestBrand',
         'share_brand_handle': '@testhandle',
         'share_brand_color': '#abcdef',
     }
     base.update(overrides)
-    return Settings(**base)
+    return base
 
 
 def test_active_page_contains_image_download_and_viewport():
-    out = render_share_page('tok123', 'session-abc', _settings())
+    out = render_share_page('tok123', 'session-abc', _branding())
     assert '<meta name="viewport"' in out
     assert '/api/v1/kiosk/share/tok123/image' in out
     assert 'download' in out
@@ -33,39 +32,47 @@ def test_active_page_contains_image_download_and_viewport():
 
 
 def test_active_page_includes_brand_handle_when_set():
-    out = render_share_page('tok123', 'session-abc', _settings())
+    out = render_share_page('tok123', 'session-abc', _branding())
     assert '@testhandle' in out
 
 
 def test_active_page_omits_handle_when_unset():
-    out = render_share_page('tok123', 'session-abc', _settings(share_brand_handle=''))
+    out = render_share_page('tok123', 'session-abc', _branding(share_brand_handle=''))
     assert '@testhandle' not in out
 
 
 def test_expired_page_omits_image_tag():
-    out = render_share_page('tok123', None, _settings(), expired=True)
+    out = render_share_page('tok123', None, _branding(), expired=True)
     assert '<img' not in out
     assert 'expired' in out.lower()
 
 
 def test_invalid_session_renders_expired_variant():
     """When session_id is None (token validation failed), the expired branch is used."""
-    out = render_share_page('tok123', None, _settings())
+    out = render_share_page('tok123', None, _branding())
     assert '<img' not in out
     assert 'expired' in out.lower()
 
 
 def test_brand_color_applied_to_html():
-    out = render_share_page('tok123', 'session-abc', _settings(share_brand_color='#ff0000'))
+    out = render_share_page('tok123', 'session-abc', _branding(share_brand_color='#ff0000'))
     assert '#ff0000' in out
 
 
 def test_brand_name_falls_back_to_default_when_unset():
-    out = render_share_page('tok123', 'session-abc', _settings(share_brand_name=''))
+    out = render_share_page('tok123', 'session-abc', _branding(share_brand_name=''))
     assert 'VibePrint' in out
 
 
 def test_html_escapes_brand_name_with_special_chars():
-    out = render_share_page('tok123', 'session-abc', _settings(share_brand_name='<script>x</script>'))
+    out = render_share_page('tok123', 'session-abc', _branding(share_brand_name='<script>x</script>'))
     assert '<script>' not in out  # must be escaped
     assert '&lt;script&gt;' in out
+
+
+def test_empty_branding_dict_uses_all_defaults():
+    """When the SHARING category hasn't been seeded yet (empty dict), defaults kick in."""
+    out = render_share_page('tok123', 'session-abc', {})
+    assert 'VibePrint' in out
+    assert '#000000' in out
+    assert '<img' in out  # active variant, not expired

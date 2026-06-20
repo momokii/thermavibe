@@ -81,6 +81,11 @@ DEFAULT_CONFIGS: dict[str, dict[str, dict[str, str]]] = {
         'print_footer_name_enabled': {'value': 'true', 'description': 'Show brand name in footer'},
         'print_footer_timestamp_enabled': {'value': 'true', 'description': 'Show timestamp in footer'},
     },
+    ConfigCategory.SHARING: {
+        'share_brand_name': {'value': '', 'description': 'Venue/brand name shown on the share landing page (empty = "VibePrint")'},
+        'share_brand_handle': {'value': '', 'description': 'Optional social handle (e.g. @yourcafe) for "Tag us" prompt (empty = hidden)'},
+        'share_brand_color': {'value': '#000000', 'description': 'Hex color for share page heading and Download button'},
+    },
 }
 
 

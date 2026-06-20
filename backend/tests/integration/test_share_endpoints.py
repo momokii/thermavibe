@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.analytics import AnalyticsEvent
+from app.models.configuration import ConfigCategory, OperatorConfig
 from app.models.session import KioskSession, KioskState, SessionType
 
 # ---------------------------------------------------------------------------
@@ -30,6 +31,32 @@ def composite_file(tmp_path: Path) -> Path:
     p = tmp_path / 'strip.jpg'
     p.write_bytes(b'\xff\xd8\xff\xe0' + b'\x00' * 100 + b'\xff\xd9')
     return p
+
+
+@pytest.fixture
+async def sharing_config(db_session: AsyncSession):
+    """Seed the SHARING OperatorConfig category so the share endpoint has branding."""
+    db_session.add_all([
+        OperatorConfig(
+            key='share_brand_name',
+            value='TestCafe',
+            category=ConfigCategory.SHARING.value,
+            description='',
+        ),
+        OperatorConfig(
+            key='share_brand_handle',
+            value='@testcafe',
+            category=ConfigCategory.SHARING.value,
+            description='',
+        ),
+        OperatorConfig(
+            key='share_brand_color',
+            value='#123456',
+            category=ConfigCategory.SHARING.value,
+            description='',
+        ),
+    ])
+    await db_session.commit()
 
 
 async def _seed_photobooth_session(db_session: AsyncSession, composite_path: Path) -> KioskSession:
@@ -70,9 +97,19 @@ async def test_share_url_is_relative_by_default(
     client: AsyncClient, db_session: AsyncSession, composite_file: Path
 ):
     """Without PUBLIC_BASE_URL, qr_data starts with /api/v1/kiosk/share/."""
-    session = await _seed_photobooth_session(db_session, composite_file)
-    resp = await client.get(f'/api/v1/kiosk/session/{session.id}/photobooth/share')
-    assert resp.status_code == 200
+    from app.api.v1.endpoints import kiosk as kiosk_module
+    from app.core.config import settings
+
+    # Force unset regardless of what's in the operator's .env — this test
+    # must be deterministic.
+    saved = settings.public_base_url
+    settings.public_base_url = None
+    with patch.object(kiosk_module, 'get_settings') as mock_dep:
+        mock_dep.return_value = settings
+        session = await _seed_photobooth_session(db_session, composite_file)
+        resp = await client.get(f'/api/v1/kiosk/session/{session.id}/photobooth/share')
+    settings.public_base_url = saved
+
     data = resp.json()
     assert data['share_url'].startswith('/api/v1/kiosk/share/')
     assert data['qr_data'] == data['share_url']
@@ -187,6 +224,22 @@ async def test_tampered_token_returns_410(
     resp = await client.get('/api/v1/kiosk/share/not-a-real-token')
     assert resp.status_code == 410
     assert 'text/html' in resp.headers['content-type']
+
+
+@pytest.mark.asyncio
+async def test_landing_page_uses_db_sourced_branding(
+    client: AsyncClient, db_session: AsyncSession, composite_file: Path, sharing_config
+):
+    """Branding fields from the SHARING OperatorConfig category appear in the HTML."""
+    session = await _seed_photobooth_session(db_session, composite_file)
+    share = (await client.get(f'/api/v1/kiosk/session/{session.id}/photobooth/share')).json()
+    token = _extract_token(share['qr_data'])
+
+    resp = await client.get(f'/api/v1/kiosk/share/{token}')
+    assert resp.status_code == 200
+    assert 'TestCafe' in resp.text
+    assert '@testcafe' in resp.text
+    assert '#123456' in resp.text
 
 
 # ---------------------------------------------------------------------------

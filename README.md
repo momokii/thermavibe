@@ -263,12 +263,9 @@ Cloudflare auto-creates the DNS record since the domain is hosted there.
 ```bash
 PUBLIC_BASE_URL=https://kiosk.yourdomain.com
 TUNNEL_TOKEN=<paste the token from step 1>
-
-# Optional branding shown on the landing page:
-SHARE_BRAND_NAME=Your Cafe Name
-SHARE_BRAND_HANDLE=@yourcafe
-SHARE_BRAND_COLOR=#FF5722
 ```
+
+Share landing page branding (cafe name, social handle, accent color) is **not** in `.env` — configure it at `/admin/sharing` after first boot.
 
 **Step 4 — Start with the tunnel profile:**
 
@@ -555,9 +552,8 @@ Only these need to be set in `.env`. All other settings have sensible defaults a
 | `PUBLIC_BASE_URL` | (unset) | Public hostname for digital sharing QR codes (via Cloudflare Tunnel). Unset = share URLs are relative and only work on the kiosk's own browser. |
 | `BIND_HOST` | `127.0.0.1` | Network interface for the app port. `0.0.0.0` exposes to LAN (fallback when no tunnel). Default preserves loopback-only binding. |
 | `TUNNEL_TOKEN` | (unset) | Cloudflare Tunnel token. Required only when using `make *-tunnel` targets. |
-| `SHARE_BRAND_NAME` | (unset) | Branding shown on the share landing page (defaults to "VibePrint"). |
-| `SHARE_BRAND_HANDLE` | (unset) | Optional `@handle` shown on the landing page. |
-| `SHARE_BRAND_COLOR` | `#000000` | Accent color for the landing page (hex). |
+
+> **Note:** Share landing page branding (brand name, social handle, accent color) is configured at `/admin/sharing` after first boot, not via env vars.
 
 ### Log Levels
 
