@@ -23,6 +23,7 @@ VibePrint OS turns a basic computer, a USB webcam, and a thermal receipt printer
 ## Features
 
 - **Dual features**: Vibe Check (single photo + AI reading) and Photobooth (multi-photo strip with themes)
+- **Digital sharing**: opt-in public share URLs via Cloudflare Tunnel sidecar — customers scan a QR on the photobooth reveal screen and get a mobile-friendly landing page with a Download button. Works on mobile data, not just same-WiFi. See [Digital Sharing](#digital-sharing-optional) below.
 - **5 AI providers** with automatic fallback chain (OpenAI, Anthropic, Google, Ollama, Mock)
 - **3 payment providers** (Midtrans, Xendit, Mock) — toggle-able, default OFF
 - **Access code system**: Generate codes for event-hosted kiosks (vibe check, photobooth, or universal), with pricing, batch generation, QR codes, and revocation
@@ -214,6 +215,41 @@ make prod-restart
 
 ---
 
+## Digital Sharing (optional)
+
+By default, the photobooth reveal screen shows a QR code whose URL only works on the kiosk's own browser (Docker binds the port to `127.0.0.1`). To let customers download their photo on their phones — including on mobile data — enable digital sharing.
+
+**Option A — Cloudflare Tunnel (recommended, works on mobile data):**
+
+```bash
+# 1. Create a tunnel at https://one.dash.cloudflare.com/ → Tunnels
+#    Service: HTTP → app:8000 (Docker network name + internal port)
+# 2. In .env, set:
+#    PUBLIC_BASE_URL=https://kiosk.yourdomain.com
+#    TUNNEL_TOKEN=<token from Cloudflare>
+# 3. Start with the tunnel profile:
+make prod-tunnel
+```
+
+The cloudflared sidecar connects outbound — no inbound port opened, no router config. If you already run cloudflared on the host (e.g. for SSH), reuse that tunnel instead of the sidecar: add a public hostname pointing at `localhost:8000` and skip `TUNNEL_TOKEN` (use plain `make prod`).
+
+**Option B — LAN-only fallback (offline events, no internet):**
+
+```bash
+# .env:
+BIND_HOST=0.0.0.0    # exposes the port on all interfaces (was 127.0.0.1)
+# PUBLIC_BASE_URL stays unset
+
+make prod
+# Find kiosk LAN IP, scan QR from a phone on the same WiFi.
+```
+
+⚠️ `BIND_HOST=0.0.0.0` exposes `/admin` to the LAN. Use only on trusted networks.
+
+Full setup guide, smoke-test checklist, and the iOS Safari caveat live in [`docs/technical/docker-deployment-guide.md` §2.5](docs/technical/docker-deployment-guide.md).
+
+---
+
 ## Local Development (no Docker)
 
 For backend development without Docker. Requires PostgreSQL running locally.
@@ -251,7 +287,7 @@ make local-lint              # Lint code
 make test
 ```
 
-### Backend tests only (284 tests)
+### Backend tests only (322 tests)
 
 ```bash
 # Inside Docker
@@ -262,7 +298,7 @@ cd backend
 python -m pytest tests/ -v
 ```
 
-### Frontend tests only (32 tests)
+### Frontend tests only (36 tests)
 
 ```bash
 make test-frontend
@@ -284,9 +320,11 @@ All commands are run from the repository root. Run `make help` for the full list
 |---------|-------------|
 | `make deploy` | Validate env, build, start production, verify health |
 | `make prod` | Start production mode (auto-detects hardware) |
+| `make prod-tunnel` | Start production with Cloudflare Tunnel sidecar (digital sharing) |
 | `make prod-down` | Stop production containers |
 | `make prod-restart` | Full clean restart: down, remove images, rebuild from scratch |
 | `make dev` | Start dev environment (Docker + hot-reload) |
+| `make dev-tunnel` | Start dev environment with Cloudflare Tunnel (digital sharing) |
 | `make dev-down` | Stop all containers |
 | `make dev-restart` | Full clean restart: down, remove images, rebuild from scratch |
 | `make dev-logs` | Tail dev environment logs |
@@ -353,6 +391,12 @@ Only these need to be set in `.env`. All other settings have sensible defaults a
 | `ADMIN_PIN` | `1234` | PIN for admin dashboard access |
 | `CAMERA_DEVICE_INDEX` | `0` | Camera device index (`/dev/video0` = 0) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,...` | Comma-separated allowed origins (dev only) |
+| `PUBLIC_BASE_URL` | (unset) | Public hostname for digital sharing QR codes (via Cloudflare Tunnel). Unset = share URLs are relative and only work on the kiosk's own browser. |
+| `BIND_HOST` | `127.0.0.1` | Network interface for the app port. `0.0.0.0` exposes to LAN (fallback when no tunnel). Default preserves loopback-only binding. |
+| `TUNNEL_TOKEN` | (unset) | Cloudflare Tunnel token. Required only when using `make *-tunnel` targets. |
+| `SHARE_BRAND_NAME` | (unset) | Branding shown on the share landing page (defaults to "VibePrint"). |
+| `SHARE_BRAND_HANDLE` | (unset) | Optional `@handle` shown on the landing page. |
+| `SHARE_BRAND_COLOR` | `#000000` | Accent color for the landing page (hex). |
 
 ### Log Levels
 
@@ -431,15 +475,15 @@ thermavibe/
 ├── backend/                  # FastAPI Python application
 │   ├── app/
 │   │   ├── ai/              # AI provider adapters (OpenAI, Anthropic, Google, Ollama, Mock)
-│   │   ├── api/v1/endpoints/# REST API route handlers (6 modules, 65 endpoints)
+│   │   ├── api/v1/endpoints/# REST API route handlers (6 modules, 66 endpoints)
 │   │   ├── core/            # Config, database, security, middleware, exceptions
 │   │   ├── models/          # SQLAlchemy ORM models (7 tables)
 │   │   ├── payment/         # Payment provider adapters (Midtrans, Xendit, Mock)
 │   │   ├── schemas/         # Pydantic request/response schemas (10 modules)
-│   │   ├── services/        # Business logic (14 services)
+│   │   ├── services/        # Business logic (15 services)
 │   │   └── utils/           # Utilities (dithering, ESC/POS, image processing, validators)
 │   ├── alembic/             # Database migrations (5 revisions)
-│   ├── tests/               # Unit + integration tests (284 tests)
+│   ├── tests/               # Unit + integration tests (322 tests)
 │   └── pyproject.toml       # Python dependencies
 ├── frontend/                 # React TypeScript SPA
 │   ├── src/
@@ -448,7 +492,7 @@ thermavibe/
 │   │   ├── hooks/           # Custom React hooks
 │   │   ├── pages/           # Route page components
 │   │   ├── stores/          # Zustand state stores
-│   │   └── __tests__/       # Component, hook, and store tests (32 tests)
+│   │   └── __tests__/       # Component, hook, and store tests (36 tests)
 │   ├── package.json
 │   └── vite.config.ts
 ├── docs/                     # Documentation
@@ -496,7 +540,7 @@ Full documentation is in the [`docs/`](docs/) directory:
 ## Known Limitations
 
 - **No CI/CD pipeline**: No automated build/test/deploy pipeline yet.
-- **Test coverage**: Backend is well-tested (284 tests). Frontend has basic coverage (32 tests) — admin components and most hooks lack tests.
+- **Test coverage**: Backend is well-tested (322 tests). Frontend has basic coverage (36 tests) — admin components and most hooks lack tests.
 - **Single kiosk**: Currently supports one kiosk instance per deployment. Multi-kiosk architecture is planned (see `docs/technical/multi-kiosk-architecture.md`).
 - **Container runs as root**: The Dockerfile has no `USER` directive (audit finding SEC-001). acceptable for a dedicated kiosk host but should be hardened for shared deployments.
 

@@ -52,7 +52,7 @@ What's done:
 ### Other Remaining Work
 
 1. **SEC-001: Add non-root user to Dockerfile** — App container still runs as root. Only open item from the Phase 1 security audit.
-2. **Expand frontend test coverage** — Only 32 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `PhotoboothRevealScreen`, `AccessCodeScreen`) have no tests.
+2. **Expand frontend test coverage** — Only 36 frontend tests; admin pages, most hooks, and most screens lack tests. New photobooth screens (`PhotoboothCaptureScreen`, `FrameSelectScreen`, `ArrangeScreen`, `ReviewScreen`, `AccessCodeScreen`) have no tests. (`PhotoboothRevealScreen` covered 2026-06-19.)
 3. **Backend test coverage gaps** — New services added since the last snapshot (`access_code_service`, `photobooth_service`, `theme_service`, `image_composition_service`, `retention_service`, `share_service`) have unit tests but the integration test suite (4 files) does not yet exercise the photobooth flow end-to-end.
 4. **Wave 5 — E2E & hardware testing** — Not started. Full kiosk flow in Docker with mock providers, real camera capture, real thermal printer, real AI provider, performance benchmarks.
 5. **CI/CD pipeline** — No automated testing or deployment.
@@ -86,7 +86,7 @@ What's done:
 - [x] Security/auth — PIN verification, JWT tokens, global rate limiting, request size limiting
 
 ### Backend Business Logic (100%)
-- [x] **14 services** fully implemented:
+- [x] **15 services** fully implemented:
   - `session_service.py` — Vibe Check state machine (12 states across two flows)
   - `photobooth_service.py` — Photobooth flow (multi-photo capture, frame select, arrange, composite)
   - `ai_service.py` — Provider-agnostic AI image analysis with fallback chain
@@ -100,9 +100,10 @@ What's done:
   - `theme_service.py` — Photobooth theme management (built-in + custom)
   - `image_composition_service.py` — Photo strip composite generation
   - `retention_service.py` — Composite image retention/expiry
-  - `share_service.py` — Time-limited share URLs
+  - `share_service.py` — Time-limited share URLs (HMAC-signed tokens)
+  - `share_page.py` — Inline HTML landing page renderer for the public share endpoint (digital sharing)
 - [x] **7 user-facing tables**: `kiosk_sessions`, `access_codes`, `photobooth_themes`, `operator_configs`, `analytics_events`, `print_jobs`, `devices`
-- [x] **65 API endpoints** across 6 route modules (admin 29, kiosk 25, camera 3, printer 4, ai 1, payment 3)
+- [x] **66 API endpoints** across 6 route modules (admin 29, kiosk 26, camera 3, printer 4, ai 1, payment 3)
 - [x] 5 AI providers (OpenAI, Anthropic, Google, Ollama, Mock) with fallback chain
 - [x] 3 payment providers (Midtrans, Xendit, Mock)
 - [x] 6 utility modules (dithering, escpos, image, validators, logging, constants)
@@ -127,18 +128,18 @@ What's done:
 - [x] `next-themes` dependency removed (was unused)
 - [x] Error display via Toaster (sonner)
 
-### Testing (~65%)
-- [x] **Backend: 284 tests** (up from 249)
-  - Unit (12 files): ai, analytics, camera, config, exceptions, hardware, payment, printer, security, session, access_code, retention
-  - Integration (4 files): admin_flow, ai_flow, kiosk_flow, payment_flow
+### Testing (~70%)
+- [x] **Backend: 322 tests passing** (4 pre-existing failures in `test_kiosk_flow.py` + `test_camera_service.py` unrelated to current work)
+  - Unit (13 files): ai, analytics, camera, config, exceptions, hardware, payment, printer, security, session, access_code, retention, share_page
+  - Integration (5 files): admin_flow, ai_flow, kiosk_flow, payment_flow, share_endpoints
   - Database: SQLite in-memory with PostgreSQL compat patches
-- [x] **Frontend: 32 tests**
+- [x] **Frontend: 36 tests** (all passing — 3 RevealScreen regressions fixed 2026-06-19 via Proxy-based framer-motion mock)
   - Stores: kioskStore, adminStore
-  - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
+  - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage, PhotoboothRevealScreen
   - Hooks: useCountdown
   - MSW handlers configured
-- [ ] Frontend: missing tests for ProcessingScreen, all photobooth screens, admin pages, admin components, most hooks, ErrorBoundary
-- [ ] Backend: missing integration test for photobooth flow
+- [ ] Frontend: missing tests for ProcessingScreen, other photobooth screens (Capture/FrameSelect/Arrange/Review), admin pages, admin components, most hooks, ErrorBoundary
+- [ ] Backend: missing integration test for photobooth flow (only share endpoints covered)
 
 ### DevOps (100%)
 - [x] Docker Compose production config (PostgreSQL 16, multi-stage build, USB passthrough, resource limits)
@@ -166,9 +167,9 @@ What's done:
 ## Known Gaps
 
 1. **SEC-001: Docker container runs as root** — Dockerfile has no `USER` directive. Only remaining item from the Phase 1 security audit.
-2. **Frontend test coverage thin** — 32 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
-3. **RevealScreen tests are failing (regression)** — All 3 tests in `frontend/src/__tests__/components/RevealScreen.test.tsx` fail with `Element type is invalid: ... got: undefined`, meaning a component used by `RevealScreen.tsx` is missing or wrongly imported (likely a `framer-motion` element not covered by the test's mock, which only stubs `motion.div`, `motion.img`, `motion.p`). Investigation needed; current state is **29 pass / 3 fail** out of 32.
-4. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine.
+2. **Frontend test coverage thin** — 36 tests against 14 kiosk screens + 10 admin components + 13 pages + 8 hooks. Most new photobooth and admin work is untested.
+3. ~~**RevealScreen tests are failing (regression)**~~ — **FIXED 2026-06-19.** Proxy-based framer-motion mock now renders any `motion.X` as the corresponding HTML tag. All 3 previously-failing tests pass.
+4. **No photobooth integration test** — Unit tests exist but no end-to-end backend test for the photobooth state machine (only share endpoints have integration coverage).
 5. **No CI/CD pipeline** — Tests run only locally.
 6. **Tests use SQLite, production uses PostgreSQL** — Minor gap in DB-level testing.
 7. **In-memory rate limiter and payment store** — Acceptable for single-kiosk; would need Redis for multi-kiosk.
@@ -212,9 +213,9 @@ Full details in `.claude/SECURITY_STANDARDS.md`
 
 ## Test Results
 
-- **Backend**: 284 tests across 12 unit + 4 integration files — should all pass
-- **Frontend**: 32 tests — **29 pass / 3 fail** (see Known Gap #3: RevealScreen regression)
-- **Total**: ~316 tests
+- **Backend**: 322 passing / 4 failing across 13 unit + 5 integration files. The 4 failures (`test_capture_photo_returns_capture_response`, `test_full_kiosk_flow_without_payment`, `test_raises_when_no_device`, `test_raises_when_no_active_device_and_none_index`) are pre-existing and unrelated to current work — MagicMock patterns that need refactoring to AsyncMock.
+- **Frontend**: 36 tests — **36 pass / 0 fail** (RevealScreen regression fixed 2026-06-19)
+- **Total**: 362 tests
 
 Run with:
 ```bash

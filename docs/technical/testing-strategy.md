@@ -982,21 +982,30 @@ describe('kioskStore', () => {
 })
 ```
 
-### 3.7 Known Test Failures
+### 3.7 Historical Test Failures (resolved)
 
-The frontend suite currently reports **29 pass / 3 fail** out of 32 tests. The failures are isolated to a single file and represent a regression to investigate before adding new frontend tests on top.
+The frontend suite previously reported **29 pass / 3 fail** out of 32 tests. All 3 failures were in `frontend/src/__tests__/components/RevealScreen.test.tsx` and shared the same root cause.
 
-| File | Failing tests | Error | Likely cause |
-|------|---------------|-------|--------------|
-| `frontend/src/__tests__/components/RevealScreen.test.tsx` | `renders the captured photo`, `renders the hint text`, `displays typewriter text progressively` | `Element type is invalid: expected a string ... but got: undefined. Check the render method of RevealScreen.` | The test mocks `framer-motion` with only `motion.div`, `motion.img`, `motion.p`, and `AnimatePresence` (see `RevealScreen.test.tsx:11-23`). `RevealScreen.tsx` likely renders another `motion.*` element (e.g. `motion.button`, `motion.span`) that resolves to `undefined` under the partial mock. Expand the mock to cover every motion element used, or replace it with a Proxy-based catch-all stub. |
+**Status:** Fixed 2026-06-19 as part of the Digital Sharing batch.
 
-Reproduce locally:
+**Root cause:** the test mocked `framer-motion` with a whitelist of only `motion.{div,img,p}`. `RevealScreen.tsx` renders additional `motion.*` elements (notably `motion.h2`) that resolved to `undefined` under the partial mock → `Element type is invalid`.
 
-```bash
-cd frontend && npx vitest run src/__tests__/components/RevealScreen.test.tsx
+**Fix:** replaced the whitelist mock with a Proxy-based catch-all that renders any `motion.X` as the corresponding plain HTML tag. This survives future component churn — no need to update the mock when new animated elements are added.
+
+```typescript
+vi.mock('framer-motion', () => {
+  const motion = new Proxy({}, {
+    get: (_target, tag: string) => {
+      const htmlTag = String(tag).toLowerCase();
+      return ({ children, ...props }: any) =>
+        React.createElement(htmlTag, props, children);
+    },
+  });
+  return { motion, AnimatePresence: ({ children }: any) => <>{children}</> };
+});
 ```
 
-Track in `.claude/state/TASK_QUEUE.md` (Hardening & Test Coverage, item 3).
+This pattern is now used in both `RevealScreen.test.tsx` and `PhotoboothRevealScreen.test.tsx`.
 
 ---
 

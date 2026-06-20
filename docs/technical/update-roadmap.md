@@ -30,7 +30,7 @@ If a fresh session is asked to implement Option 3, they should be able to start 
 - AI provider chain: OpenAI → Anthropic → Google → Ollama → Mock (with fallback)
 - Payment: QRIS via Midtrans/Xendit/Mock, toggleable
 - Admin UI at `/admin` (PIN auth, rate-limited, request-size-limited)
-- Backend: 314 tests passing, Frontend: 36 tests passing (4 pre-existing failures unrelated to digital sharing — see `.claude/state/CURRENT_STATUS.md`)
+- Backend: 322 tests passing, Frontend: 36 tests passing (4 pre-existing failures unrelated to digital sharing — see `.claude/state/CURRENT_STATUS.md`)
 - Digital sharing: Gaps 1-3 implemented 2026-06-19 (URL plumbing, HTML landing page, analytics events). Cloudflare Tunnel sidecar is opt-in via `make prod-tunnel`. See §5 status banner.
 
 **Architecture constraints:**
@@ -246,7 +246,7 @@ Four concrete gaps, in priority order:
 - [x] Token validation still rejects expired/tampered tokens (no auth bypass)
 - [x] Without `--profile tunnel`, `docker compose up` starts no cloudflared container (no behavior change for operators who don't want the feature)
 
-> **Implementation note:** `BIND_HOST` env var added as a documented Option B fallback (LAN-only without tunnel). Default `127.0.0.1` preserves D-025's loopback binding. `make dev-tunnel` / `make prod-tunnel` Makefile targets added. `scripts/start-docker.sh` now forwards `"$@"` to `docker compose up` for the `--profile` passthrough.
+> **Implementation note:** `BIND_HOST` env var added as a documented Option B fallback (LAN-only without tunnel). Default `127.0.0.1` preserves D-025's loopback binding. `make dev-tunnel` / `make prod-tunnel` Makefile targets set `COMPOSE_PROFILES=tunnel` to enable the cloudflared sidecar (the `--profile` CLI flag was avoided because it must appear before the `up` subcommand, which doesn't compose cleanly with our dynamically-built compose file list).
 
 ---
 
@@ -432,7 +432,7 @@ Option 3 is complete when:
 - [x] Backend logs SHARE_URL_SCANNED and COMPOSITE_DOWNLOADED events
 - [ ] Admin dashboard shows share scan rate and download rate *(DEFERRED — not in this batch)*
 - [x] Composite images still auto-purge after 7 days (no behavior change)
-- [x] All existing tests still pass (314 backend, 36 frontend — was 303/32 pre-batch)
+- [x] All existing tests still pass (322 backend, 36 frontend — was 303/32 pre-batch)
 - [x] New tests cover: token validation, landing page rendering, analytics event emission, expired token handling
 
 ---

@@ -289,9 +289,9 @@ These must be completed first. Everything else depends on them.
 
 | | **Priority:** P1 | **Complexity:** L | **Dependencies:** Wave 1-2 | **Status:** DONE |
 |---|---|
-| **Scope:** | 284 tests across unit and integration:
-  - **Unit tests (12 files):** ai_service, analytics_service, camera_service, config_service, exceptions, hardware_service, payment_service, printer_service, security, session_service, access_code_service, retention_service
-  - **Integration tests (4 files):** admin_flow, ai_flow, kiosk_flow, payment_flow
+| **Scope:** | 322 tests across unit and integration:
+  - **Unit tests (13 files):** ai_service, analytics_service, camera_service, config_service, exceptions, hardware_service, payment_service, printer_service, security, session_service, access_code_service, retention_service, share_page
+  - **Integration tests (5 files):** admin_flow, ai_flow, kiosk_flow, payment_flow, share_endpoints
   - Database: SQLite in-memory with PostgreSQL compat patches
 
 ---
@@ -300,12 +300,12 @@ These must be completed first. Everything else depends on them.
 
 | | **Priority:** P1 | **Complexity:** M | **Dependencies:** Wave 3 | **Status:** PARTIAL |
 |---|---|
-| **Scope:** | 32 tests:
+| **Scope:** | 36 tests:
   - Stores: kioskStore, adminStore
-  - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage
+  - Components: IdleScreen, CaptureScreen, RevealScreen, AdminLoginPage, PhotoboothRevealScreen
   - Hooks: useCountdown
   - MSW API mocking configured |
-| **Remaining:** | Tests for ProcessingScreen, all photobooth screens (PhotoboothCaptureScreen, FrameSelectScreen, ArrangeScreen, ReviewScreen, PhotoboothRevealScreen), AccessCodeScreen, admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check), admin components, useSession, useKioskState, usePhotoboothState, useCamera, usePrinter, usePayment, ErrorBoundary |
+| **Remaining:** | Tests for ProcessingScreen, other photobooth screens (PhotoboothCaptureScreen, FrameSelectScreen, ArrangeScreen, ReviewScreen), AccessCodeScreen, admin pages (Photobooth, Strips Gallery, Print Template, Vibe Check), admin components, useSession, useKioskState, usePhotoboothState, useCamera, usePrinter, usePayment, ErrorBoundary |
 
 ---
 

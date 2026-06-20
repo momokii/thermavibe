@@ -84,7 +84,7 @@ curl http://localhost:8000/health
 ```
 
 Other key commands:
-- `make test` — Run all tests (284 backend + 32 frontend)
+- `make test` — Run all tests (322 backend + 36 frontend)
 - `make lint` — Run all linters
 - `make help` — See all available commands
 - See `.claude/ENVIRONMENT_GUIDE.md` for the complete command reference

@@ -54,10 +54,10 @@ make dev-logs
 # Run all tests (backend + frontend)
 make test
 
-# Run backend tests only (284 tests)
+# Run backend tests only (322 tests)
 cd backend && python -m pytest tests/ -v
 
-# Run frontend tests only (32 tests)
+# Run frontend tests only (36 tests)
 cd frontend && npm test
 
 # Lint all code
