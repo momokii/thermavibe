@@ -766,12 +766,18 @@ async def share_landing_page(
         db, ConfigCategory.SHARING.value
     )
 
+    # no-store: branding is operator-editable at runtime; cached HTML would show
+    # stale brand names on iOS Safari (which aggressively heuristic-caches HTML
+    # that has no explicit Cache-Control header).
+    no_cache_headers = {'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache'}
+
     try:
         session_id = validate_share_token(token)
     except VibePrintError:
         return HTMLResponse(
             content=render_share_page(token, None, branding, expired=True),
             status_code=410,
+            headers=no_cache_headers,
         )
 
     try:
@@ -784,7 +790,10 @@ async def share_landing_page(
     except Exception:
         log.exception('share_scan_analytics_failed')
 
-    return HTMLResponse(content=render_share_page(token, session_id, branding))
+    return HTMLResponse(
+        content=render_share_page(token, session_id, branding),
+        headers=no_cache_headers,
+    )
 
 
 @router.get('/share/{token}/image')
@@ -817,6 +826,7 @@ async def serve_shared_composite(
         session.composite_image_path,
         media_type='image/jpeg',
         filename=f'vibeprint_strip_{session_id}.jpg',
+        headers={'Cache-Control': 'private, max-age=300'},  # token TTL; safe to cache within window
     )
 
 
